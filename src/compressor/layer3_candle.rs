@@ -110,7 +110,7 @@ impl CandleBackend {
         output_type: OutputType,
         prompts_dir: &Path,
     ) -> Result<Layer3Result> {
-        use candle_core::{quantized::gguf_file, Device, Tensor};
+        use candle_core::{quantized::gguf_file, Tensor};
         use candle_transformers::generation::LogitsProcessor;
         use candle_transformers::models::quantized_phi3;
         use tokenizers::Tokenizer;
