@@ -60,7 +60,7 @@ tokio-test = "0.4"
 predicates = "3"
 
 [features]
-default = ["sqlite-bundled"]
+default = ["sqlite-bundled", "candle"]
 sqlite-bundled = ["libsqlite3-sys/bundled"]
 candle = ["dep:candle-core", "dep:candle-nn", "dep:candle-transformers", "dep:tokenizers"]
 cuda   = ["candle", "candle-core/cuda",   "candle-nn/cuda",   "candle-transformers/cuda"]
