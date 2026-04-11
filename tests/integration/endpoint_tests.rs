@@ -2,7 +2,7 @@ use axum_test::TestServer;
 use ntk::compressor::layer3_backend::BackendKind;
 use ntk::config::NtkConfig;
 use ntk::metrics::MetricsStore;
-use ntk::server::{AppState, build_router};
+use ntk::server::{build_router, AppState};
 use std::sync::{Arc, Mutex};
 
 fn default_backend() -> Arc<BackendKind> {
@@ -12,7 +12,12 @@ fn default_backend() -> Arc<BackendKind> {
 fn test_server() -> TestServer {
     let config = Arc::new(NtkConfig::default());
     let metrics = Arc::new(Mutex::new(MetricsStore::new()));
-    let state = AppState { config, metrics, db: None, backend: default_backend() };
+    let state = AppState {
+        config,
+        metrics,
+        db: None,
+        backend: default_backend(),
+    };
     let router = build_router(state);
     TestServer::new(router).expect("test server")
 }

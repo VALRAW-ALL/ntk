@@ -50,7 +50,9 @@ async fn test_inference_request_format() {
 
     Mock::given(method("POST"))
         .and(path("/api/generate"))
-        .respond_with(ResponseTemplate::new(200).set_body_json(ollama_response("2 passed, 1 failed")))
+        .respond_with(
+            ResponseTemplate::new(200).set_body_json(ollama_response("2 passed, 1 failed")),
+        )
         .expect(1)
         .mount(&server)
         .await;
@@ -148,14 +150,22 @@ async fn test_correct_prompt_per_type() {
         .compress("vitest output", OutputType::Test, dir.path())
         .await;
 
-    assert!(result.is_ok(), "expected Ok for Test type: {:?}", result.err());
+    assert!(
+        result.is_ok(),
+        "expected Ok for Test type: {:?}",
+        result.err()
+    );
 
     // Verify via a second call that Build type also works (different prompt file).
     let result2 = client
         .compress("tsc error output", OutputType::Build, dir.path())
         .await;
 
-    assert!(result2.is_ok(), "expected Ok for Build type: {:?}", result2.err());
+    assert!(
+        result2.is_ok(),
+        "expected Ok for Build type: {:?}",
+        result2.err()
+    );
 
     // Both calls should succeed, confirming prompt files for both types are loaded.
     drop(sender); // silence unused warning

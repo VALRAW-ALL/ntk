@@ -71,8 +71,17 @@ static PROGRESS_PATTERNS: &[&str] = &[
     "[====",
     "[####",
     "[----",
-    "⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏", // spinner chars
-    "Downloading",  // cargo download progress lines (repeated)
+    "⠋",
+    "⠙",
+    "⠹",
+    "⠸",
+    "⠼",
+    "⠴",
+    "⠦",
+    "⠧",
+    "⠇",
+    "⠏",             // spinner chars
+    "Downloading",   // cargo download progress lines (repeated)
     " Downloading ", // with spaces for specificity
 ];
 
@@ -89,9 +98,7 @@ fn remove_progress_bars(input: &str) -> String {
         }
 
         // Skip lines that are pure progress bar content.
-        let is_progress = PROGRESS_PATTERNS
-            .iter()
-            .any(|pat| trimmed.contains(pat));
+        let is_progress = PROGRESS_PATTERNS.iter().any(|pat| trimmed.contains(pat));
 
         if !is_progress {
             out.push(line);
@@ -118,7 +125,8 @@ fn group_repeated_lines(input: &str) -> String {
         let current = lines[idx];
         let mut count = 1usize;
 
-        while idx.saturating_add(count) < lines.len() && lines[idx.saturating_add(count)] == current {
+        while idx.saturating_add(count) < lines.len() && lines[idx.saturating_add(count)] == current
+        {
             count = count.saturating_add(1);
         }
 

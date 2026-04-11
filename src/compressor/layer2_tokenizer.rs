@@ -94,7 +94,13 @@ fn shorten_line_paths(line: &str) -> String {
     let mut i = 0usize;
 
     while i <= len {
-        let is_boundary = i == len || chars[i].is_whitespace() || chars[i] == ',' || chars[i] == ')' || chars[i] == '(' || chars[i] == '\'' || chars[i] == '"';
+        let is_boundary = i == len
+            || chars[i].is_whitespace()
+            || chars[i] == ','
+            || chars[i] == ')'
+            || chars[i] == '('
+            || chars[i] == '\''
+            || chars[i] == '"';
 
         if is_boundary {
             let token: String = chars[token_start..i].iter().collect();
@@ -123,7 +129,10 @@ fn maybe_shorten_path(token: &str) -> String {
     let (path_part, suffix) = split_path_suffix(token);
 
     // Count path separators.
-    let sep_count = path_part.chars().filter(|c| matches!(c, '/' | '\\')).count();
+    let sep_count = path_part
+        .chars()
+        .filter(|c| matches!(c, '/' | '\\'))
+        .count();
     if sep_count < 2 {
         // Not deep enough to shorten.
         return token.to_owned();
@@ -278,8 +287,12 @@ mod tests {
     fn test_path_shortening_reduces_tokens() {
         let long_path = "src/components/auth/LoginForm/index.tsx:42:10: error TS2345";
         let result = process(long_path).unwrap();
-        assert!(result.compressed_tokens < result.original_tokens,
-            "expected {} < {}", result.compressed_tokens, result.original_tokens);
+        assert!(
+            result.compressed_tokens < result.original_tokens,
+            "expected {} < {}",
+            result.compressed_tokens,
+            result.original_tokens
+        );
         // Shortened path should still contain filename and line number.
         assert!(result.output.contains("index.tsx"));
         assert!(result.output.contains("42"));
@@ -313,7 +326,10 @@ mod tests {
         // that a short input counts fewer than 300 tokens after Layer 2.
         let short_input = "git status: nothing to commit, working tree clean";
         let result = process(short_input).unwrap();
-        assert!(result.compressed_tokens < 300,
-            "expected < 300 tokens, got {}", result.compressed_tokens);
+        assert!(
+            result.compressed_tokens < 300,
+            "expected < 300 tokens, got {}",
+            result.compressed_tokens
+        );
     }
 }

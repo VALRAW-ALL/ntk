@@ -1,6 +1,6 @@
 use anyhow::{anyhow, Context, Result};
 use clap::{Parser, Subcommand};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 
 // ---------------------------------------------------------------------------
@@ -8,7 +8,11 @@ use std::sync::{Arc, Mutex};
 // ---------------------------------------------------------------------------
 
 #[derive(Parser, Debug)]
-#[command(name = "ntk", version, about = "Neural Token Killer — semantic compression for Claude Code")]
+#[command(
+    name = "ntk",
+    version,
+    about = "Neural Token Killer — semantic compression for Claude Code"
+)]
 struct Cli {
     #[command(subcommand)]
     command: Option<Command>,
@@ -142,9 +146,14 @@ fn main() -> Result<()> {
         // Default (no subcommand): start daemon.
         None => run_daemon(false),
 
-        Some(Command::Init { global, opencode, auto_patch, hook_only, show, uninstall }) => {
-            run_init(global, opencode, auto_patch, hook_only, show, uninstall)
-        }
+        Some(Command::Init {
+            global,
+            opencode,
+            auto_patch,
+            hook_only,
+            show,
+            uninstall,
+        }) => run_init(global, opencode, auto_patch, hook_only, show, uninstall),
 
         Some(Command::Start { gpu }) => run_daemon(gpu),
 
@@ -165,7 +174,6 @@ fn main() -> Result<()> {
         Some(Command::TestCompress { file }) => run_test_compress(&file),
 
         Some(Command::Model { action }) => run_model(action),
-
 
         Some(Command::Discover) => run_discover(),
 
@@ -261,12 +269,13 @@ async fn async_run_daemon(gpu: bool) -> Result<()> {
         }
         Err(e) => {
             tracing::warn!("Layer 3 backend init failed, falling back to Ollama: {e}");
-            Arc::new(
-                ntk::compressor::layer3_backend::BackendKind::from_config(
-                    &ntk::config::NtkConfig::default(),
-                )
-                .expect("default Ollama backend must always succeed"),
-            )
+            Arc::new(ntk::compressor::layer3_backend::BackendKind::Ollama(
+                ntk::compressor::layer3_inference::OllamaClient::new(
+                    "http://localhost:11434",
+                    2000,
+                    "phi3:mini",
+                ),
+            ))
         }
     };
 
@@ -329,7 +338,9 @@ fn run_stop() -> Result<()> {
             };
             let handle = OpenProcess(PROCESS_TERMINATE, 0, pid);
             if handle == 0 {
-                return Err(anyhow!("cannot open process (PID {pid}) — already stopped?"));
+                return Err(anyhow!(
+                    "cannot open process (PID {pid}) — already stopped?"
+                ));
             }
             TerminateProcess(handle, 0);
         }
@@ -385,10 +396,17 @@ fn run_status() -> Result<()> {
     let daemon_icon = if daemon_ok { &ok } else { &err };
     println!("  Daemon       : {daemon_icon} {daemon_info}");
     println!("  Endpoint     : {}{url}{}", term::dim(), term::reset());
-    println!("  GPU backend  : {}{backend}{}", term::cyan(), term::reset());
-    println!("  Config       : {}{}{}",
+    println!(
+        "  GPU backend  : {}{backend}{}",
+        term::cyan(),
+        term::reset()
+    );
+    println!(
+        "  Config       : {}{}{}",
         term::dim(),
-        ntk::config::global_config_path().map(|p| p.display().to_string()).unwrap_or_else(|_| "unknown".to_owned()),
+        ntk::config::global_config_path()
+            .map(|p| p.display().to_string())
+            .unwrap_or_else(|_| "unknown".to_owned()),
         term::reset()
     );
     println!();
@@ -398,47 +416,107 @@ fn run_status() -> Result<()> {
         ntk::config::ModelProvider::Candle => "candle",
         ntk::config::ModelProvider::LlamaCpp => "llama.cpp",
     };
-    println!("{}{}Model ({}):{}",
-        term::bold(), term::bright_cyan(), provider_name, term::reset());
-    println!("  Configured : {}{}{}", term::cyan(), config.model.model_name, term::reset());
+    println!(
+        "{}{}Model ({}):{}",
+        term::bold(),
+        term::bright_cyan(),
+        provider_name,
+        term::reset()
+    );
+    println!(
+        "  Configured : {}{}{}",
+        term::cyan(),
+        config.model.model_name,
+        term::reset()
+    );
     println!("  Quantize   : {}", config.model.quantization);
     if ollama_ok {
-        println!("  Ollama     : {} reachable  ({}{}{})",
-            ok, term::dim(), config.model.ollama_url, term::reset());
+        println!(
+            "  Ollama     : {} reachable  ({}{}{})",
+            ok,
+            term::dim(),
+            config.model.ollama_url,
+            term::reset()
+        );
         if model_list.is_empty() {
-            println!("  Available  : {}(none — run `ntk model pull`){}", term::yellow(), term::reset());
+            println!(
+                "  Available  : {}(none — run `ntk model pull`){}",
+                term::yellow(),
+                term::reset()
+            );
         } else {
             println!("  Available  :");
             for m in &model_list {
                 let is_active = m.contains(&config.model.model_name)
-                    || config.model.model_name.contains(m.split(':').next().unwrap_or(""));
+                    || config
+                        .model
+                        .model_name
+                        .contains(m.split(':').next().unwrap_or(""));
                 if is_active {
-                    println!("    {} {}{m}{} {}◀ active{}",
-                        ok, term::bright_green(), term::reset(), term::dim(), term::reset());
+                    println!(
+                        "    {} {}{m}{} {}◀ active{}",
+                        ok,
+                        term::bright_green(),
+                        term::reset(),
+                        term::dim(),
+                        term::reset()
+                    );
                 } else {
                     println!("    {} {}{m}{}", term::dim(), term::reset(), term::reset());
                 }
             }
         }
     } else if daemon_ok {
-        println!("  Ollama     : {} unreachable — L3 falls back to L1+L2", err);
+        println!(
+            "  Ollama     : {} unreachable — L3 falls back to L1+L2",
+            err
+        );
     } else {
-        println!("  Ollama     : {}(daemon not running){}", term::dim(), term::reset());
+        println!(
+            "  Ollama     : {}(daemon not running){}",
+            term::dim(),
+            term::reset()
+        );
     }
     println!();
 
     let on_off = |v: bool| -> String {
-        if v { format!("{}{}on{}", term::bold(), term::bright_green(), term::reset()) }
-        else  { format!("{}off{}", term::dim(), term::reset()) }
+        if v {
+            format!(
+                "{}{}on{}",
+                term::bold(),
+                term::bright_green(),
+                term::reset()
+            )
+        } else {
+            format!("{}off{}", term::dim(), term::reset())
+        }
     };
 
-    println!("{}{}Compression:{}",
-        term::bold(), term::bright_cyan(), term::reset());
-    println!("  L1 filter   : {}", on_off(config.compression.layer1_enabled));
-    println!("  L2 tokenize : {}", on_off(config.compression.layer2_enabled));
-    println!("  L3 infer    : {}", on_off(config.compression.layer3_enabled));
-    println!("  L3 threshold: {}{} tokens{}",
-        term::cyan(), config.compression.inference_threshold_tokens, term::reset());
+    println!(
+        "{}{}Compression:{}",
+        term::bold(),
+        term::bright_cyan(),
+        term::reset()
+    );
+    println!(
+        "  L1 filter   : {}",
+        on_off(config.compression.layer1_enabled)
+    );
+    println!(
+        "  L2 tokenize : {}",
+        on_off(config.compression.layer2_enabled)
+    );
+    println!(
+        "  L3 infer    : {}",
+        on_off(config.compression.layer3_enabled)
+    );
+    println!(
+        "  L3 threshold: {}{} tokens{}",
+        term::cyan(),
+        config.compression.inference_threshold_tokens,
+        term::reset()
+    );
     Ok(())
 }
 
@@ -455,7 +533,9 @@ fn run_graph() -> Result<()> {
     let db_path = config.storage_path_expanded();
 
     if !db_path.exists() {
-        println!("[ntk graph] No metrics database found. Start the daemon and run some commands first.");
+        println!(
+            "[ntk graph] No metrics database found. Start the daemon and run some commands first."
+        );
         return Ok(());
     }
 
@@ -677,7 +757,10 @@ fn run_model_pull_gguf(quant: &str, backend: &str) -> Result<()> {
     // ---- Download GGUF model ----
     if model_path.exists() {
         println!("Model file already present — skipping download.");
-        println!("Delete it to force a fresh download: rm \"{}\"", model_path.display());
+        println!(
+            "Delete it to force a fresh download: rm \"{}\"",
+            model_path.display()
+        );
     } else {
         // Phi-3 Mini GGUF files from Bartowski's HuggingFace mirror (all quants available).
         let quant_upper = quant.to_uppercase();
@@ -741,19 +824,32 @@ fn run_model_list() -> Result<()> {
         } else {
             println!("Installed models:");
             for m in &models {
-                let active = if m.contains(&config.model.model_name) { " ← active" } else { "" };
+                let active = if m.contains(&config.model.model_name) {
+                    " ← active"
+                } else {
+                    ""
+                };
                 println!("  {m}{active}");
             }
         }
     } else {
         // Candle / llama.cpp: just show the configured GGUF path.
         if let Some(p) = &config.model.model_path {
-            let status = if p.exists() { "✓ found" } else { "✗ not found" };
+            let status = if p.exists() {
+                "✓ found"
+            } else {
+                "✗ not found"
+            };
             println!("Model path: {} [{status}]", p.display());
         } else {
-            let default = ntk::compressor::layer3_candle::default_model_path(&config.model.quantization)
-                .unwrap_or_default();
-            let status = if default.exists() { "✓ found" } else { "✗ not found" };
+            let default =
+                ntk::compressor::layer3_candle::default_model_path(&config.model.quantization)
+                    .unwrap_or_default();
+            let status = if default.exists() {
+                "✓ found"
+            } else {
+                "✗ not found"
+            };
             println!("Model path: {} [{status}] (default)", default.display());
             println!("Set model.model_path in ~/.ntk/config.json to use a custom path.");
         }
@@ -766,13 +862,22 @@ fn run_model_list() -> Result<()> {
 // ---------------------------------------------------------------------------
 
 fn run_model_setup() -> Result<()> {
-    use std::io::{self, BufRead, Write};
     use ntk::gpu;
     use ntk::output::terminal as term;
+    use std::io::{self, BufRead, Write};
 
     println!();
-    println!("{}{}  NTK Model Setup Wizard  {}", term::bold(), term::bright_cyan(), term::reset());
-    println!("{}══════════════════════════════════════════════════════════════════{}", term::dim(), term::reset());
+    println!(
+        "{}{}  NTK Model Setup Wizard  {}",
+        term::bold(),
+        term::bright_cyan(),
+        term::reset()
+    );
+    println!(
+        "{}══════════════════════════════════════════════════════════════════{}",
+        term::dim(),
+        term::reset()
+    );
     println!();
 
     // ---- System detection (with spinner) ----
@@ -802,78 +907,251 @@ fn run_model_setup() -> Result<()> {
     sp.finish();
 
     // ---- System info ----
-    println!("{}{}System Info{}", term::bold(), term::bright_cyan(), term::reset());
-    println!("{}  ────────────────────────────────────{}", term::dim(), term::reset());
+    println!(
+        "{}{}System Info{}",
+        term::bold(),
+        term::bright_cyan(),
+        term::reset()
+    );
+    println!(
+        "{}  ────────────────────────────────────{}",
+        term::dim(),
+        term::reset()
+    );
 
-    let gpu_color = if has_gpu { term::bright_green() } else { term::yellow() };
+    let gpu_color = if has_gpu {
+        term::bright_green()
+    } else {
+        term::yellow()
+    };
     let gpu_icon = if has_gpu { "✓" } else { "◌" };
-    println!("  {}GPU / CPU{}    {}{} {}{}", term::dim(), term::reset(), gpu_color, gpu_icon, gpu_str, term::reset());
+    println!(
+        "  {}GPU / CPU{}    {}{} {}{}",
+        term::dim(),
+        term::reset(),
+        gpu_color,
+        gpu_icon,
+        gpu_str,
+        term::reset()
+    );
 
-    let ollama_color = if ollama_ok { term::bright_green() } else { term::yellow() };
+    let ollama_color = if ollama_ok {
+        term::bright_green()
+    } else {
+        term::yellow()
+    };
     let ollama_icon = if ollama_ok { "✓" } else { "◌" };
     let ollama_status = if ollama_ok { "running" } else { "not running" };
-    println!("  {}Ollama{}       {}{} {}{}", term::dim(), term::reset(), ollama_color, ollama_icon, ollama_status, term::reset());
+    println!(
+        "  {}Ollama{}       {}{} {}{}",
+        term::dim(),
+        term::reset(),
+        ollama_color,
+        ollama_icon,
+        ollama_status,
+        term::reset()
+    );
 
-    let llama_color = if llamacpp_ok { term::bright_green() } else { term::yellow() };
+    let llama_color = if llamacpp_ok {
+        term::bright_green()
+    } else {
+        term::yellow()
+    };
     let llama_icon = if llamacpp_ok { "✓" } else { "◌" };
-    let llama_status = if llamacpp_ok { "found in PATH / ~/.ntk/bin" } else { "not found" };
-    println!("  {}llama-server{} {}{} {}{}", term::dim(), term::reset(), llama_color, llama_icon, llama_status, term::reset());
+    let llama_status = if llamacpp_ok {
+        "found in PATH / ~/.ntk/bin"
+    } else {
+        "not found"
+    };
+    println!(
+        "  {}llama-server{} {}{} {}{}",
+        term::dim(),
+        term::reset(),
+        llama_color,
+        llama_icon,
+        llama_status,
+        term::reset()
+    );
 
-    let candle_color = if candle_compiled { term::bright_green() } else { term::yellow() };
+    let candle_color = if candle_compiled {
+        term::bright_green()
+    } else {
+        term::yellow()
+    };
     let candle_icon = if candle_compiled { "✓" } else { "◌" };
-    let candle_status = if candle_compiled { "compiled in" } else { "needs --features candle" };
-    println!("  {}Candle{}       {}{} {}{}", term::dim(), term::reset(), candle_color, candle_icon, candle_status, term::reset());
+    let candle_status = if candle_compiled {
+        "compiled in"
+    } else {
+        "needs --features candle"
+    };
+    println!(
+        "  {}Candle{}       {}{} {}{}",
+        term::dim(),
+        term::reset(),
+        candle_color,
+        candle_icon,
+        candle_status,
+        term::reset()
+    );
     println!();
 
     // ---- Comparison table (plain text inside cells to keep alignment) ----
-    println!("{}{}Backend Comparison{}", term::bold(), term::bright_cyan(), term::reset());
+    println!(
+        "{}{}Backend Comparison{}",
+        term::bold(),
+        term::bright_cyan(),
+        term::reset()
+    );
     println!("  ┌──────────────────┬─────────────────┬──────────────────────────────────────┐");
     println!("  │ {}Backend{}          │ {}Availability{}    │ {}Summary{}                              │",
         term::bold(), term::reset(), term::bold(), term::reset(), term::bold(), term::reset());
     println!("  ├──────────────────┼─────────────────┼──────────────────────────────────────┤");
 
-    let ollama_av = if ollama_ok { "✓ running       " } else { "◌ needs install  " };
-    println!("  │ {}[1] Ollama{}       │ {} │ External daemon, any model, easiest  │",
-        term::bold(), term::reset(), ollama_av);
+    let ollama_av = if ollama_ok {
+        "✓ running       "
+    } else {
+        "◌ needs install  "
+    };
+    println!(
+        "  │ {}[1] Ollama{}       │ {} │ External daemon, any model, easiest  │",
+        term::bold(),
+        term::reset(),
+        ollama_av
+    );
 
-    let candle_av = if candle_compiled { "✓ compiled      " } else { "◌ needs rebuild  " };
-    println!("  │ {}[2] Candle{}       │ {} │ In-process GGUF, no daemon           │",
-        term::bold(), term::reset(), candle_av);
+    let candle_av = if candle_compiled {
+        "✓ compiled      "
+    } else {
+        "◌ needs rebuild  "
+    };
+    println!(
+        "  │ {}[2] Candle{}       │ {} │ In-process GGUF, no daemon           │",
+        term::bold(),
+        term::reset(),
+        candle_av
+    );
 
-    let llama_av = if llamacpp_ok { "✓ found         " } else { "◌ needs install  " };
-    println!("  │ {}[3] llama.cpp{}    │ {} │ Subprocess, best CPU performance     │",
-        term::bold(), term::reset(), llama_av);
+    let llama_av = if llamacpp_ok {
+        "✓ found         "
+    } else {
+        "◌ needs install  "
+    };
+    println!(
+        "  │ {}[3] llama.cpp{}    │ {} │ Subprocess, best CPU performance     │",
+        term::bold(),
+        term::reset(),
+        llama_av
+    );
 
     println!("  └──────────────────┴─────────────────┴──────────────────────────────────────┘");
     println!();
 
     // ---- Pros / cons ----
-    println!("{}{}Pros & Cons{}", term::bold(), term::bright_cyan(), term::reset());
+    println!(
+        "{}{}Pros & Cons{}",
+        term::bold(),
+        term::bright_cyan(),
+        term::reset()
+    );
     println!();
 
     println!("  {}[1] Ollama{}", term::bold(), term::reset());
-    println!("    {}+{} Easiest setup — just `ollama pull phi3:mini`", term::bright_green(), term::reset());
-    println!("    {}+{} Supports hundreds of models (llama3, mistral, gemma2, qwen2…)", term::bright_green(), term::reset());
-    println!("    {}+{} Auto GPU/CPU fallback, model management built-in", term::bright_green(), term::reset());
-    println!("    {}−{} Requires Ollama daemon running alongside NTK (two processes)", term::bright_red(), term::reset());
-    println!("    {}−{} External installation: {}https://ollama.ai{}", term::bright_red(), term::reset(), term::dim(), term::reset());
+    println!(
+        "    {}+{} Easiest setup — just `ollama pull phi3:mini`",
+        term::bright_green(),
+        term::reset()
+    );
+    println!(
+        "    {}+{} Supports hundreds of models (llama3, mistral, gemma2, qwen2…)",
+        term::bright_green(),
+        term::reset()
+    );
+    println!(
+        "    {}+{} Auto GPU/CPU fallback, model management built-in",
+        term::bright_green(),
+        term::reset()
+    );
+    println!(
+        "    {}−{} Requires Ollama daemon running alongside NTK (two processes)",
+        term::bright_red(),
+        term::reset()
+    );
+    println!(
+        "    {}−{} External installation: {}https://ollama.ai{}",
+        term::bright_red(),
+        term::reset(),
+        term::dim(),
+        term::reset()
+    );
     println!();
 
-    println!("  {}[2] Candle{}  {}(in-process — requires: cargo build --features candle){}", term::bold(), term::reset(), term::dim(), term::reset());
-    println!("    {}+{} Single binary, no external processes", term::bright_green(), term::reset());
-    println!("    {}+{} Direct CUDA/Metal/CPU access, lowest overhead", term::bright_green(), term::reset());
-    println!("    {}+{} Works offline once GGUF + tokenizer.json downloaded", term::bright_green(), term::reset());
-    println!("    {}−{} Requires recompiling NTK with --features candle", term::bright_red(), term::reset());
-    println!("    {}−{} GGUF + tokenizer.json must be downloaded (~2.2 GB)", term::bright_red(), term::reset());
-    println!("    {}−{} Limited to GGUF-format models", term::bright_red(), term::reset());
+    println!(
+        "  {}[2] Candle{}  {}(in-process — requires: cargo build --features candle){}",
+        term::bold(),
+        term::reset(),
+        term::dim(),
+        term::reset()
+    );
+    println!(
+        "    {}+{} Single binary, no external processes",
+        term::bright_green(),
+        term::reset()
+    );
+    println!(
+        "    {}+{} Direct CUDA/Metal/CPU access, lowest overhead",
+        term::bright_green(),
+        term::reset()
+    );
+    println!(
+        "    {}+{} Works offline once GGUF + tokenizer.json downloaded",
+        term::bright_green(),
+        term::reset()
+    );
+    println!(
+        "    {}−{} Requires recompiling NTK with --features candle",
+        term::bright_red(),
+        term::reset()
+    );
+    println!(
+        "    {}−{} GGUF + tokenizer.json must be downloaded (~2.2 GB)",
+        term::bright_red(),
+        term::reset()
+    );
+    println!(
+        "    {}−{} Limited to GGUF-format models",
+        term::bright_red(),
+        term::reset()
+    );
     println!();
 
     println!("  {}[3] llama.cpp{}", term::bold(), term::reset());
-    println!("    {}+{} Best CPU performance (AVX2 / AMX optimisations)", term::bright_green(), term::reset());
-    println!("    {}+{} Excellent CUDA/Metal GPU support", term::bright_green(), term::reset());
-    println!("    {}+{} Works offline once GGUF downloaded (~2.2 GB)", term::bright_green(), term::reset());
-    println!("    {}−{} Requires llama-server: {}brew install llama.cpp  or GitHub releases{}", term::bright_red(), term::reset(), term::dim(), term::reset());
-    println!("    {}−{} Extra process to manage (auto-started by NTK daemon)", term::bright_red(), term::reset());
+    println!(
+        "    {}+{} Best CPU performance (AVX2 / AMX optimisations)",
+        term::bright_green(),
+        term::reset()
+    );
+    println!(
+        "    {}+{} Excellent CUDA/Metal GPU support",
+        term::bright_green(),
+        term::reset()
+    );
+    println!(
+        "    {}+{} Works offline once GGUF downloaded (~2.2 GB)",
+        term::bright_green(),
+        term::reset()
+    );
+    println!(
+        "    {}−{} Requires llama-server: {}brew install llama.cpp  or GitHub releases{}",
+        term::bright_red(),
+        term::reset(),
+        term::dim(),
+        term::reset()
+    );
+    println!(
+        "    {}−{} Extra process to manage (auto-started by NTK daemon)",
+        term::bright_red(),
+        term::reset()
+    );
     println!();
 
     // ---- Recommendation ----
@@ -887,15 +1165,34 @@ fn run_model_setup() -> Result<()> {
         1
     };
 
-    let rec_name = match recommended { 2 => "Candle", 3 => "llama.cpp", _ => "Ollama" };
-    println!("  {}🎯  Recommendation: [{}] {}{}", term::bright_yellow(), recommended, rec_name, term::reset());
+    let rec_name = match recommended {
+        2 => "Candle",
+        3 => "llama.cpp",
+        _ => "Ollama",
+    };
+    println!(
+        "  {}💡  Recommendation: [{}] {}{}",
+        term::bright_yellow(),
+        recommended,
+        rec_name,
+        term::reset()
+    );
     if recommended == 1 && !ollama_ok {
-        println!("  {}    Install Ollama at https://ollama.ai then run: ollama serve{}", term::dim(), term::reset());
+        println!(
+            "  {}    Install Ollama at https://ollama.ai then run: ollama serve{}",
+            term::dim(),
+            term::reset()
+        );
     }
     println!();
 
     // ---- User choice ----
-    print!("{}Choose backend [1/2/3] or Enter for [{}]:{} ", term::bold(), recommended, term::reset());
+    print!(
+        "{}Choose backend [1/2/3] or Enter for [{}]:{} ",
+        term::bold(),
+        recommended,
+        term::reset()
+    );
     io::stdout().flush()?;
 
     let stdin = io::stdin();
@@ -908,14 +1205,26 @@ fn run_model_setup() -> Result<()> {
         2 => setup_candle(&config)?,
         3 => setup_llamacpp(&config)?,
         _ => {
-            println!("{}✗  Invalid choice. Run `ntk model setup` again.{}", term::bright_red(), term::reset());
+            println!(
+                "{}✗  Invalid choice. Run `ntk model setup` again.{}",
+                term::bright_red(),
+                term::reset()
+            );
             return Ok(());
         }
     }
 
     println!();
-    println!("{}✓{}  Configuration saved.  {}Restart NTK daemon:{} ntk stop && ntk start",
-        term::bright_green(), term::reset(), term::bold(), term::reset());
+    println!(
+        "{}✓{}  Configuration saved.",
+        term::bright_green(),
+        term::reset()
+    );
+    println!(
+        "  {}Restart NTK daemon:{} ntk stop && ntk start",
+        term::bold(),
+        term::reset()
+    );
     Ok(())
 }
 
@@ -942,35 +1251,87 @@ fn setup_write_config(provider: &str, existing: &ntk::config::NtkConfig) -> Resu
 
     sp.finish_ok(&format!(
         "{}~/.ntk/config.json{}  {}provider = {}{}",
-        term::bold(), term::reset(), term::dim(), provider, term::reset()
+        term::bold(),
+        term::reset(),
+        term::dim(),
+        provider,
+        term::reset()
     ));
 
     println!();
     println!("  {}Next steps for Ollama:{}", term::bold(), term::reset());
-    println!("  {}1.{} Install Ollama:     {}https://ollama.ai{}", term::bright_cyan(), term::reset(), term::dim(), term::reset());
-    println!("  {}2.{} Pull the model:     {}ollama pull phi3:mini{}", term::bright_cyan(), term::reset(), term::dim(), term::reset());
-    println!("  {}3.{} Start the daemon:   {}ntk start{}", term::bright_cyan(), term::reset(), term::dim(), term::reset());
+    println!(
+        "  {}1.{} Install Ollama:     {}https://ollama.ai{}",
+        term::bright_cyan(),
+        term::reset(),
+        term::dim(),
+        term::reset()
+    );
+    println!(
+        "  {}2.{} Pull the model:     {}ollama pull phi3:mini{}",
+        term::bright_cyan(),
+        term::reset(),
+        term::dim(),
+        term::reset()
+    );
+    println!(
+        "  {}3.{} Start the daemon:   {}ntk start{}",
+        term::bright_cyan(),
+        term::reset(),
+        term::dim(),
+        term::reset()
+    );
     Ok(())
 }
 
 fn setup_candle(existing: &ntk::config::NtkConfig) -> Result<()> {
-    use std::io::{self, BufRead, Write};
     use ntk::output::terminal as term;
+    use std::io::{self, BufRead, Write};
 
     if !cfg!(feature = "candle") {
-        println!("{}{}Candle is not compiled in the current binary.{}", term::bold(), term::bright_yellow(), term::reset());
+        println!(
+            "{}{}Candle is not compiled in the current binary.{}",
+            term::bold(),
+            term::bright_yellow(),
+            term::reset()
+        );
         println!();
         println!("  Rebuild NTK with the Candle feature flag:");
-        println!("  {}Standard (CPU){}  cargo build --release --features candle", term::dim(), term::reset());
-        println!("  {}NVIDIA GPU{}     cargo build --release --features cuda", term::dim(), term::reset());
-        println!("  {}Apple GPU{}      cargo build --release --features metal", term::dim(), term::reset());
+        println!(
+            "  {}Standard (CPU){}  cargo build --release --features candle",
+            term::dim(),
+            term::reset()
+        );
+        println!(
+            "  {}NVIDIA GPU{}     cargo build --release --features cuda",
+            term::dim(),
+            term::reset()
+        );
+        println!(
+            "  {}Apple GPU{}      cargo build --release --features metal",
+            term::dim(),
+            term::reset()
+        );
         println!();
-        println!("  {}Then run: ntk model setup{}", term::dim(), term::reset());
+        println!(
+            "  {}Then run: ntk model setup{}",
+            term::dim(),
+            term::reset()
+        );
         return Ok(());
     }
 
-    println!("{}{}[2] Candle — In-process inference{}", term::bold(), term::bright_cyan(), term::reset());
-    println!("{}  ────────────────────────────────────{}", term::dim(), term::reset());
+    println!(
+        "{}{}[2] Candle — In-process inference{}",
+        term::bold(),
+        term::bright_cyan(),
+        term::reset()
+    );
+    println!(
+        "{}  ────────────────────────────────────{}",
+        term::dim(),
+        term::reset()
+    );
 
     let quant = &existing.model.quantization;
     let model_path = ntk::compressor::layer3_candle::default_model_path(quant)?;
@@ -979,21 +1340,49 @@ fn setup_candle(existing: &ntk::config::NtkConfig) -> Result<()> {
     let need_model = !model_path.exists();
     let need_tokenizer = !tokenizer_path.exists();
 
-    let model_icon = if need_model { format!("{}◌ missing{}", term::yellow(), term::reset()) } else { format!("{}✓ found{}", term::bright_green(), term::reset()) };
-    let tok_icon   = if need_tokenizer { format!("{}◌ missing{}", term::yellow(), term::reset()) } else { format!("{}✓ found{}", term::bright_green(), term::reset()) };
+    let model_icon = if need_model {
+        format!("{}◌ missing{}", term::yellow(), term::reset())
+    } else {
+        format!("{}✓ found{}", term::bright_green(), term::reset())
+    };
+    let tok_icon = if need_tokenizer {
+        format!("{}◌ missing{}", term::yellow(), term::reset())
+    } else {
+        format!("{}✓ found{}", term::bright_green(), term::reset())
+    };
 
-    println!("  {}Model{}      {}  {}", term::dim(), term::reset(), model_path.display(), model_icon);
-    println!("  {}Tokenizer{} {}  {}", term::dim(), term::reset(), tokenizer_path.display(), tok_icon);
+    println!(
+        "  {}Model{}      {}  {}",
+        term::dim(),
+        term::reset(),
+        model_path.display(),
+        model_icon
+    );
+    println!(
+        "  {}Tokenizer{} {}  {}",
+        term::dim(),
+        term::reset(),
+        tokenizer_path.display(),
+        tok_icon
+    );
     println!();
 
     if need_model || need_tokenizer {
         let missing_label = match (need_model, need_tokenizer) {
-            (true, true)  => "model + tokenizer (~2.2 GB)",
+            (true, true) => "model + tokenizer (~2.2 GB)",
             (true, false) => "model (~2.2 GB)",
-            _             => "tokenizer (~1 MB)",
+            _ => "tokenizer (~1 MB)",
         };
-        print!("{}Download missing files now?{}  {}[{}]  {}{}", term::bold(), term::reset(), term::dim(), missing_label, term::reset(),
-               format!("{}[Y/n]:{} ", term::bright_cyan(), term::reset()));
+        print!(
+            "{}Download missing files now?{}  {}[{}]  {}{}[Y/n]:{} ",
+            term::bold(),
+            term::reset(),
+            term::dim(),
+            missing_label,
+            term::reset(),
+            term::bright_cyan(),
+            term::reset(),
+        );
         io::stdout().flush()?;
         let answer = io::stdin()
             .lock()
@@ -1010,21 +1399,37 @@ fn setup_candle(existing: &ntk::config::NtkConfig) -> Result<()> {
                 let tok_url = "https://huggingface.co/microsoft/Phi-3-mini-4k-instruct/resolve/main/tokenizer.json";
                 println!("  {}Downloading tokenizer…{}", term::dim(), term::reset());
                 download_file_with_progress(tok_url, &tokenizer_path)?;
-                println!("\r  {}✓{}  tokenizer.json                                    ", term::bright_green(), term::reset());
+                println!(
+                    "\r  {}✓{}  tokenizer.json                                    ",
+                    term::bright_green(),
+                    term::reset()
+                );
             }
             if need_model {
                 let quant_upper = quant.to_uppercase();
                 let gguf_url = format!(
                     "https://huggingface.co/bartowski/Phi-3-mini-4k-instruct-GGUF/resolve/main/Phi-3-mini-4k-instruct-{quant_upper}.gguf"
                 );
-                println!("  {}Downloading model  ({quant_upper}, ~2.2 GB)…{}", term::dim(), term::reset());
+                println!(
+                    "  {}Downloading model  ({quant_upper}, ~2.2 GB)…{}",
+                    term::dim(),
+                    term::reset()
+                );
                 download_file_with_progress(&gguf_url, &model_path)?;
-                println!("\r  {}✓{}  Phi-3-mini-4k-instruct-{quant_upper}.gguf                ", term::bright_green(), term::reset());
+                println!(
+                    "\r  {}✓{}  Phi-3-mini-4k-instruct-{quant_upper}.gguf                ",
+                    term::bright_green(),
+                    term::reset()
+                );
             }
             println!();
         }
     } else {
-        println!("  {}✓  All files already present — no download needed.{}", term::bright_green(), term::reset());
+        println!(
+            "  {}✓  All files already present — no download needed.{}",
+            term::bright_green(),
+            term::reset()
+        );
         println!();
     }
 
@@ -1044,17 +1449,29 @@ fn setup_candle(existing: &ntk::config::NtkConfig) -> Result<()> {
     std::fs::rename(&tmp, &global_path)?;
     sp.finish_ok(&format!(
         "{}~/.ntk/config.json{}  {}provider = candle{}",
-        term::bold(), term::reset(), term::dim(), term::reset()
+        term::bold(),
+        term::reset(),
+        term::dim(),
+        term::reset()
     ));
     Ok(())
 }
 
 fn setup_llamacpp(existing: &ntk::config::NtkConfig) -> Result<()> {
-    use std::io::{self, BufRead, Write};
     use ntk::output::terminal as term;
+    use std::io::{self, BufRead, Write};
 
-    println!("{}{}[3] llama.cpp — Subprocess inference{}", term::bold(), term::bright_cyan(), term::reset());
-    println!("{}  ────────────────────────────────────{}", term::dim(), term::reset());
+    println!(
+        "{}{}[3] llama.cpp — Subprocess inference{}",
+        term::bold(),
+        term::bright_cyan(),
+        term::reset()
+    );
+    println!(
+        "{}  ────────────────────────────────────{}",
+        term::dim(),
+        term::reset()
+    );
     println!();
 
     // Check for llama-server — offer auto-install if missing or incomplete.
@@ -1069,16 +1486,33 @@ fn setup_llamacpp(existing: &ntk::config::NtkConfig) -> Result<()> {
                 .collect();
 
             if !missing_libs.is_empty() {
-                let lib_ext = if cfg!(windows) { "DLLs" }
-                    else if cfg!(target_os = "macos") { "dylibs" }
-                    else { "shared libs (.so)" };
-                println!("  {}llama-server{}  {}{}{}  {}companion {} missing: {}{}",
-                    term::dim(), term::reset(),
-                    term::yellow(), p.display(), term::reset(),
-                    term::bright_red(), lib_ext, missing_libs.join(", "), term::reset());
+                let lib_ext = if cfg!(windows) {
+                    "DLLs"
+                } else if cfg!(target_os = "macos") {
+                    "dylibs"
+                } else {
+                    "shared libs (.so)"
+                };
+                println!(
+                    "  {}llama-server{}  {}{}{}  {}companion {} missing: {}{}",
+                    term::dim(),
+                    term::reset(),
+                    term::yellow(),
+                    p.display(),
+                    term::reset(),
+                    term::bright_red(),
+                    lib_ext,
+                    missing_libs.join(", "),
+                    term::reset()
+                );
                 println!();
-                print!("  {}Re-download llama-server with all shared libraries?{}  {}[Y/n]:{} ",
-                    term::bold(), term::reset(), term::bright_cyan(), term::reset());
+                print!(
+                    "  {}Re-download llama-server with all shared libraries?{}  {}[Y/n]:{} ",
+                    term::bold(),
+                    term::reset(),
+                    term::bright_cyan(),
+                    term::reset()
+                );
                 io::stdout().flush()?;
                 let answer = io::stdin()
                     .lock()
@@ -1086,23 +1520,44 @@ fn setup_llamacpp(existing: &ntk::config::NtkConfig) -> Result<()> {
                     .next()
                     .unwrap_or(Ok(String::new()))?;
                 if answer.trim().to_lowercase() == "n" {
-                    println!("  {}◌  Keeping existing binary — server may fail to start.{}", term::yellow(), term::reset());
+                    println!(
+                        "  {}◌  Keeping existing binary — server may fail to start.{}",
+                        term::yellow(),
+                        term::reset()
+                    );
                     p
                 } else {
                     println!();
                     install_llama_server_binary()?
                 }
             } else {
-                println!("  {}llama-server{}  {}✓ {}{}",
-                    term::dim(), term::reset(), term::bright_green(), p.display(), term::reset());
+                println!(
+                    "  {}llama-server{}  {}✓ {}{}",
+                    term::dim(),
+                    term::reset(),
+                    term::bright_green(),
+                    p.display(),
+                    term::reset()
+                );
                 p
             }
         }
         Err(_) => {
-            println!("  {}llama-server{}  {}◌ not found in PATH or ~/.ntk/bin{}", term::dim(), term::reset(), term::yellow(), term::reset());
+            println!(
+                "  {}llama-server{}  {}◌ not found in PATH or ~/.ntk/bin{}",
+                term::dim(),
+                term::reset(),
+                term::yellow(),
+                term::reset()
+            );
             println!();
-            print!("  {}Download and install llama-server automatically?{}  {}[Y/n]:{} ",
-                term::bold(), term::reset(), term::bright_cyan(), term::reset());
+            print!(
+                "  {}Download and install llama-server automatically?{}  {}[Y/n]:{} ",
+                term::bold(),
+                term::reset(),
+                term::bright_cyan(),
+                term::reset()
+            );
             io::stdout().flush()?;
             let answer = io::stdin()
                 .lock()
@@ -1112,9 +1567,23 @@ fn setup_llamacpp(existing: &ntk::config::NtkConfig) -> Result<()> {
             if answer.trim().to_lowercase() == "n" {
                 println!();
                 println!("  {}Manual install options:{}", term::bold(), term::reset());
-                println!("  {}macOS (Homebrew){}  brew install llama.cpp", term::dim(), term::reset());
-                println!("  {}Linux (apt){}      apt install llama.cpp", term::dim(), term::reset());
-                println!("  {}Releases page{}    {}https://github.com/ggerganov/llama.cpp/releases{}", term::dim(), term::reset(), term::dim(), term::reset());
+                println!(
+                    "  {}macOS (Homebrew){}  brew install llama.cpp",
+                    term::dim(),
+                    term::reset()
+                );
+                println!(
+                    "  {}Linux (apt){}      apt install llama.cpp",
+                    term::dim(),
+                    term::reset()
+                );
+                println!(
+                    "  {}Releases page{}    {}https://github.com/ggerganov/llama.cpp/releases{}",
+                    term::dim(),
+                    term::reset(),
+                    term::dim(),
+                    term::reset()
+                );
                 println!();
                 println!("  Place llama-server in {}~/.ntk/bin/{} or on your PATH, then run `ntk model setup` again.", term::bold(), term::reset());
                 return Ok(());
@@ -1123,20 +1592,42 @@ fn setup_llamacpp(existing: &ntk::config::NtkConfig) -> Result<()> {
             install_llama_server_binary()?
         }
     };
-    println!("  {}✓{}  llama-server ready: {}", term::bright_green(), term::reset(), server_binary.display());
+    println!(
+        "  {}✓{}  llama-server ready: {}",
+        term::bright_green(),
+        term::reset(),
+        server_binary.display()
+    );
     println!();
 
     let quant = &existing.model.quantization;
     let model_path = ntk::compressor::layer3_candle::default_model_path(quant)?;
 
-    let model_icon = if model_path.exists() { format!("{}✓ found{}", term::bright_green(), term::reset()) } else { format!("{}◌ missing{}", term::yellow(), term::reset()) };
-    println!("  {}Model{}  {}  {}", term::dim(), term::reset(), model_path.display(), model_icon);
+    let model_icon = if model_path.exists() {
+        format!("{}✓ found{}", term::bright_green(), term::reset())
+    } else {
+        format!("{}◌ missing{}", term::yellow(), term::reset())
+    };
+    println!(
+        "  {}Model{}  {}  {}",
+        term::dim(),
+        term::reset(),
+        model_path.display(),
+        model_icon
+    );
     println!();
 
     if !model_path.exists() {
         let quant_upper = quant.to_uppercase();
-        print!("  {}Download GGUF model now?{}  {}({quant_upper}, ~2.2 GB){}  {}[Y/n]:{} ",
-            term::bold(), term::reset(), term::dim(), term::reset(), term::bright_cyan(), term::reset());
+        print!(
+            "  {}Download GGUF model now?{}  {}({quant_upper}, ~2.2 GB){}  {}[Y/n]:{} ",
+            term::bold(),
+            term::reset(),
+            term::dim(),
+            term::reset(),
+            term::bright_cyan(),
+            term::reset()
+        );
         io::stdout().flush()?;
         let answer = io::stdin()
             .lock()
@@ -1151,13 +1642,25 @@ fn setup_llamacpp(existing: &ntk::config::NtkConfig) -> Result<()> {
             let gguf_url = format!(
                 "https://huggingface.co/bartowski/Phi-3-mini-4k-instruct-GGUF/resolve/main/Phi-3-mini-4k-instruct-{quant_upper}.gguf"
             );
-            println!("  {}Downloading model  ({quant_upper}, ~2.2 GB)…{}", term::dim(), term::reset());
+            println!(
+                "  {}Downloading model  ({quant_upper}, ~2.2 GB)…{}",
+                term::dim(),
+                term::reset()
+            );
             download_file_with_progress(&gguf_url, &model_path)?;
-            println!("\r  {}✓{}  Phi-3-mini-4k-instruct-{quant_upper}.gguf                ", term::bright_green(), term::reset());
+            println!(
+                "\r  {}✓{}  Phi-3-mini-4k-instruct-{quant_upper}.gguf                ",
+                term::bright_green(),
+                term::reset()
+            );
             println!();
         }
     } else {
-        println!("  {}✓  Model already present — no download needed.{}", term::bright_green(), term::reset());
+        println!(
+            "  {}✓  Model already present — no download needed.{}",
+            term::bright_green(),
+            term::reset()
+        );
         println!();
     }
 
@@ -1176,7 +1679,10 @@ fn setup_llamacpp(existing: &ntk::config::NtkConfig) -> Result<()> {
     std::fs::rename(&tmp, &global_path)?;
     sp.finish_ok(&format!(
         "{}~/.ntk/config.json{}  {}provider = llama_cpp{}",
-        term::bold(), term::reset(), term::dim(), term::reset()
+        term::bold(),
+        term::reset(),
+        term::dim(),
+        term::reset()
     ));
     Ok(())
 }
@@ -1198,11 +1704,16 @@ async fn install_llama_server_binary_async() -> Result<PathBuf> {
     use ntk::output::terminal as term;
 
     // Destination dir: ~/.ntk/bin/
-    let home = dirs::home_dir().ok_or_else(|| anyhow::anyhow!("cannot determine home directory"))?;
+    let home =
+        dirs::home_dir().ok_or_else(|| anyhow::anyhow!("cannot determine home directory"))?;
     let bin_dir = home.join(".ntk").join("bin");
     std::fs::create_dir_all(&bin_dir)?;
 
-    let binary_name = if cfg!(windows) { "llama-server.exe" } else { "llama-server" };
+    let binary_name = if cfg!(windows) {
+        "llama-server.exe"
+    } else {
+        "llama-server"
+    };
     let dest = bin_dir.join(binary_name);
 
     // ---- 1. Fetch latest release info from GitHub API ----
@@ -1221,8 +1732,16 @@ async fn install_llama_server_binary_async() -> Result<PathBuf> {
         .await
         .map_err(|e| anyhow::anyhow!("parsing GitHub release JSON: {e}"))?;
 
-    let tag = release.get("tag_name").and_then(|v| v.as_str()).unwrap_or("unknown");
-    sp.finish_ok(&format!("Latest release: {}{}{}", term::bold(), tag, term::reset()));
+    let tag = release
+        .get("tag_name")
+        .and_then(|v| v.as_str())
+        .unwrap_or("unknown");
+    sp.finish_ok(&format!(
+        "Latest release: {}{}{}",
+        term::bold(),
+        tag,
+        term::reset()
+    ));
 
     let assets = release
         .get("assets")
@@ -1230,24 +1749,35 @@ async fn install_llama_server_binary_async() -> Result<PathBuf> {
         .ok_or_else(|| anyhow::anyhow!("no assets in GitHub release"))?;
 
     // ---- 2. Pick the right asset for this platform/arch ----
-    let (asset_name, asset_url) = select_llama_cpp_asset(assets)
-        .ok_or_else(|| anyhow::anyhow!(
+    let (asset_name, asset_url) = select_llama_cpp_asset(assets).ok_or_else(|| {
+        anyhow::anyhow!(
             "No suitable llama.cpp binary found for {}/{}\n\
              Download manually from: https://github.com/ggerganov/llama.cpp/releases",
-            std::env::consts::OS, std::env::consts::ARCH
-        ))?;
+            std::env::consts::OS,
+            std::env::consts::ARCH
+        )
+    })?;
 
     println!("  {}Asset{}  {}", term::dim(), term::reset(), asset_name);
 
     // ---- 3. Download the zip into memory ----
     println!("  {}Downloading archive…{}", term::dim(), term::reset());
     let zip_bytes = download_bytes_with_progress(&client, &asset_url).await?;
-    println!("\r  {}✓{}  Download complete                                          ", term::bright_green(), term::reset());
+    println!(
+        "\r  {}✓{}  Download complete                                          ",
+        term::bright_green(),
+        term::reset()
+    );
 
     // ---- 4. Extract llama-server from the zip ----
     let sp = term::Spinner::start("Extracting llama-server from archive…");
     extract_llama_server_from_zip(&zip_bytes, &dest)?;
-    sp.finish_ok(&format!("Installed: {}{}{}", term::bold(), dest.display(), term::reset()));
+    sp.finish_ok(&format!(
+        "Installed: {}{}{}",
+        term::bold(),
+        dest.display(),
+        term::reset()
+    ));
 
     Ok(dest)
 }
@@ -1255,20 +1785,20 @@ async fn install_llama_server_binary_async() -> Result<PathBuf> {
 /// Pick the best zip asset from the GitHub release assets list for the current OS/arch.
 /// Returns `(asset_name, download_url)` or `None` if no match found.
 fn select_llama_cpp_asset(assets: &[serde_json::Value]) -> Option<(String, String)> {
-    let os = std::env::consts::OS;     // "linux" | "macos" | "windows"
+    let os = std::env::consts::OS; // "linux" | "macos" | "windows"
     let arch = std::env::consts::ARCH; // "x86_64" | "aarch64"
 
     // Keywords that must appear in the asset name for os and arch.
     let os_keywords: &[&str] = match os {
-        "linux"   => &["linux", "ubuntu"],
-        "macos"   => &["macos", "osx"],
+        "linux" => &["linux", "ubuntu"],
+        "macos" => &["macos", "osx"],
         "windows" => &["win"],
-        _         => return None,
+        _ => return None,
     };
     let arch_keywords: &[&str] = match arch {
-        "x86_64"  => &["x64"],
+        "x86_64" => &["x64"],
         "aarch64" => &["arm64", "aarch64"],
-        _         => return None,
+        _ => return None,
     };
 
     // Collect all matching zip assets (case-insensitive).
@@ -1276,7 +1806,7 @@ fn select_llama_cpp_asset(assets: &[serde_json::Value]) -> Option<(String, Strin
         .iter()
         .filter_map(|a| {
             let name = a.get("name")?.as_str()?;
-            let url  = a.get("browser_download_url")?.as_str()?;
+            let url = a.get("browser_download_url")?.as_str()?;
             if !name.ends_with(".zip") {
                 return None;
             }
@@ -1350,16 +1880,22 @@ fn core_lib_stems() -> &'static [&'static str] {
 ///   Windows : `.dll`
 ///   macOS   : `.dylib`
 ///   Linux   : `.so` / `.so.<version>`
-fn extract_llama_server_from_zip(zip_bytes: &[u8], dest: &PathBuf) -> Result<()> {
+fn extract_llama_server_from_zip(zip_bytes: &[u8], dest: &Path) -> Result<()> {
     use std::io::Read;
 
-    let bin_dir = dest.parent().ok_or_else(|| anyhow::anyhow!("dest has no parent dir"))?;
+    let bin_dir = dest
+        .parent()
+        .ok_or_else(|| anyhow::anyhow!("dest has no parent dir"))?;
 
     let cursor = std::io::Cursor::new(zip_bytes);
-    let mut archive = zip::ZipArchive::new(cursor)
-        .map_err(|e| anyhow::anyhow!("opening zip archive: {e}"))?;
+    let mut archive =
+        zip::ZipArchive::new(cursor).map_err(|e| anyhow::anyhow!("opening zip archive: {e}"))?;
 
-    let binary_name = if cfg!(windows) { "llama-server.exe" } else { "llama-server" };
+    let binary_name = if cfg!(windows) {
+        "llama-server.exe"
+    } else {
+        "llama-server"
+    };
     let mut found_binary = false;
 
     for i in 0..archive.len() {
@@ -1390,7 +1926,11 @@ fn extract_llama_server_from_zip(zip_bytes: &[u8], dest: &PathBuf) -> Result<()>
             .read_to_end(&mut bytes)
             .map_err(|e| anyhow::anyhow!("reading zip entry '{}': {e}", entry_name))?;
 
-        let out_path = if is_binary { dest.to_path_buf() } else { bin_dir.join(&file_part) };
+        let out_path = if is_binary {
+            dest.to_path_buf()
+        } else {
+            bin_dir.join(&file_part)
+        };
 
         // Atomic write: temp file + rename.
         let tmp = out_path.with_extension("_ntk_tmp");
@@ -1403,8 +1943,9 @@ fn extract_llama_server_from_zip(zip_bytes: &[u8], dest: &PathBuf) -> Result<()>
         #[cfg(unix)]
         {
             use std::os::unix::fs::PermissionsExt;
-            std::fs::set_permissions(&out_path, std::fs::Permissions::from_mode(0o755))
-                .map_err(|e| anyhow::anyhow!("setting permissions on '{}': {e}", out_path.display()))?;
+            std::fs::set_permissions(&out_path, std::fs::Permissions::from_mode(0o755)).map_err(
+                |e| anyhow::anyhow!("setting permissions on '{}': {e}", out_path.display()),
+            )?;
         }
 
         if is_binary {
@@ -1424,12 +1965,9 @@ fn extract_llama_server_from_zip(zip_bytes: &[u8], dest: &PathBuf) -> Result<()>
 }
 
 /// Download `url` into a `Vec<u8>`, printing a colored progress bar to stdout.
-async fn download_bytes_with_progress(
-    client: &reqwest::Client,
-    url: &str,
-) -> Result<Vec<u8>> {
-    use std::io::Write as _;
+async fn download_bytes_with_progress(client: &reqwest::Client, url: &str) -> Result<Vec<u8>> {
     use ntk::output::terminal as term;
+    use std::io::Write as _;
 
     let mut response = client
         .get(url)
@@ -1438,7 +1976,10 @@ async fn download_bytes_with_progress(
         .map_err(|e| anyhow::anyhow!("download request failed: {e}"))?;
 
     if !response.status().is_success() {
-        return Err(anyhow::anyhow!("download returned HTTP {}", response.status()));
+        return Err(anyhow::anyhow!(
+            "download returned HTTP {}",
+            response.status()
+        ));
     }
 
     let total = response.content_length().unwrap_or(0);
@@ -1455,19 +1996,35 @@ async fn download_bytes_with_progress(
     {
         bytes.extend_from_slice(&chunk);
         if total > 0 {
-            let pct = bytes.len().saturating_mul(100).checked_div(total as usize).unwrap_or(0);
-            let mb = bytes.len() / 1_048_576;
-            let total_mb = total as usize / 1_048_576;
+            let pct = bytes
+                .len()
+                .saturating_mul(100)
+                .checked_div(total as usize)
+                .unwrap_or(0);
+            let mb = bytes.len().saturating_div(1_048_576);
+            let total_mb = (total as usize).saturating_div(1_048_576);
             let bar_width = 20usize;
-            let filled = (pct * bar_width / 100).min(bar_width);
-            let empty = bar_width - filled;
+            let filled = pct
+                .saturating_mul(bar_width)
+                .checked_div(100)
+                .unwrap_or(0)
+                .min(bar_width);
+            let empty = bar_width.saturating_sub(filled);
             let bar_filled = "█".repeat(filled);
-            let bar_empty  = "░".repeat(empty);
-            print!("\r  {}⬇{}  [{}{}{}{}{}]  {}/{} MB  {}%   ",
-                term::bright_cyan(), term::reset(),
-                term::bright_green(), bar_filled,
-                term::dim(), bar_empty, term::reset(),
-                mb, total_mb, pct);
+            let bar_empty = "░".repeat(empty);
+            print!(
+                "\r  {}⬇{}  [{}{}{}{}{}]  {}/{} MB  {}%   ",
+                term::bright_cyan(),
+                term::reset(),
+                term::bright_green(),
+                bar_filled,
+                term::dim(),
+                bar_empty,
+                term::reset(),
+                mb,
+                total_mb,
+                pct
+            );
             std::io::stdout().flush().ok();
         }
     }
@@ -1482,8 +2039,8 @@ async fn download_bytes_with_progress(
 /// Download a file from `url` to `dest`, printing a colored progress bar to stdout.
 /// Uses `.chunk()` streaming. Writes to a `.tmp` file first then renames atomically.
 fn download_file_with_progress(url: &str, dest: &std::path::Path) -> Result<()> {
-    use std::io::Write as _;
     use ntk::output::terminal as term;
+    use std::io::Write as _;
 
     let rt = tokio::runtime::Builder::new_current_thread()
         .enable_all()
@@ -1517,22 +2074,42 @@ fn download_file_with_progress(url: &str, dest: &std::path::Path) -> Result<()> 
             downloaded = downloaded.saturating_add(chunk.len() as u64);
 
             if total_bytes > 0 {
-                let pct = downloaded.saturating_mul(100).checked_div(total_bytes).unwrap_or(0) as usize;
-                let mb = downloaded / 1_048_576;
-                let total_mb = total_bytes / 1_048_576;
-                let filled = (pct * bar_width / 100).min(bar_width);
-                let empty = bar_width - filled;
+                let pct = downloaded
+                    .saturating_mul(100)
+                    .checked_div(total_bytes)
+                    .unwrap_or(0) as usize;
+                let mb = downloaded.saturating_div(1_048_576);
+                let total_mb = total_bytes.saturating_div(1_048_576);
+                let filled = pct
+                    .saturating_mul(bar_width)
+                    .checked_div(100)
+                    .unwrap_or(0)
+                    .min(bar_width);
+                let empty = bar_width.saturating_sub(filled);
                 let bar_filled = "█".repeat(filled);
-                let bar_empty  = "░".repeat(empty);
-                print!("\r  {}⬇{}  [{}{}{}{}{}]  {}/{} MB  {}%   ",
-                    term::bright_cyan(), term::reset(),
-                    term::bright_green(), bar_filled,
-                    term::dim(), bar_empty, term::reset(),
-                    mb, total_mb, pct);
+                let bar_empty = "░".repeat(empty);
+                print!(
+                    "\r  {}⬇{}  [{}{}{}{}{}]  {}/{} MB  {}%   ",
+                    term::bright_cyan(),
+                    term::reset(),
+                    term::bright_green(),
+                    bar_filled,
+                    term::dim(),
+                    bar_empty,
+                    term::reset(),
+                    mb,
+                    total_mb,
+                    pct
+                );
                 std::io::stdout().flush().ok();
             } else {
                 let mb = downloaded / 1_048_576;
-                print!("\r  {}⬇{}  {} MB downloaded…   ", term::bright_cyan(), term::reset(), mb);
+                print!(
+                    "\r  {}⬇{}  {} MB downloaded…   ",
+                    term::bright_cyan(),
+                    term::reset(),
+                    mb
+                );
                 std::io::stdout().flush().ok();
             }
         }
@@ -1559,8 +2136,11 @@ fn run_model_test() -> Result<()> {
 
     println!(
         "{}Backend:{} {}{}{}",
-        term::bold(), term::reset(),
-        term::bright_cyan(), backend.name(), term::reset()
+        term::bold(),
+        term::reset(),
+        term::bright_cyan(),
+        backend.name(),
+        term::reset()
     );
 
     let rt = tokio::runtime::Builder::new_current_thread()
@@ -1587,42 +2167,65 @@ fn run_model_test() -> Result<()> {
     let sp = term::Spinner::start("Running inference …");
     let start = std::time::Instant::now();
     let result = match rt.block_on(backend.compress(test_input, OutputType::Test, &prompts_dir)) {
-        Ok(r) => { sp.finish(); r }
-        Err(e) => { sp.finish_err(&e.to_string()); return Err(e); }
+        Ok(r) => {
+            sp.finish();
+            r
+        }
+        Err(e) => {
+            sp.finish_err(&e.to_string());
+            return Err(e);
+        }
     };
     let elapsed = start.elapsed();
 
-    let ratio_pct = result.output_tokens.saturating_mul(100)
-        .checked_div(result.input_tokens.max(1)).unwrap_or(0);
+    let ratio_pct = result
+        .output_tokens
+        .saturating_mul(100)
+        .checked_div(result.input_tokens.max(1))
+        .unwrap_or(0);
     let tok_per_s = if elapsed.as_millis() > 0 {
         result.output_tokens as f64 * 1000.0 / elapsed.as_millis() as f64
-    } else { 0.0 };
+    } else {
+        0.0
+    };
 
     println!();
     println!(
         "  {}Input  :{} {} tokens",
-        term::bold(), term::reset(), result.input_tokens
+        term::bold(),
+        term::reset(),
+        result.input_tokens
     );
     println!(
         "  {}Output :{} {} tokens",
-        term::bold(), term::reset(), result.output_tokens
+        term::bold(),
+        term::reset(),
+        result.output_tokens
     );
     println!(
         "  {}Latency:{} {}{:.0}ms{}",
-        term::bold(), term::reset(),
+        term::bold(),
+        term::reset(),
         term::latency_color(elapsed.as_millis() as u64),
         elapsed.as_millis(),
         term::reset()
     );
     println!(
         "  {}Ratio  :{} {}{ratio_pct}%{} of input  {}Speed: {tok_per_s:.2} tok/s{}",
-        term::bold(), term::reset(),
-        term::ratio_color(ratio_pct), term::reset(),
-        term::dim(), term::reset()
+        term::bold(),
+        term::reset(),
+        term::ratio_color(ratio_pct),
+        term::reset(),
+        term::dim(),
+        term::reset()
     );
     println!();
-    println!("{}{}Compressed output:{}",
-        term::bold(), term::bright_cyan(), term::reset());
+    println!(
+        "{}{}Compressed output:{}",
+        term::bold(),
+        term::bright_cyan(),
+        term::reset()
+    );
     println!("{}{}{}", term::dim(), "─".repeat(50), term::reset());
     println!("{}", result.output);
     println!("{}{}{}", term::dim(), "─".repeat(50), term::reset());
@@ -1643,10 +2246,18 @@ fn run_model_bench() -> Result<()> {
 
     println!(
         "{}{}NTK Layer 3 Benchmark{} — backend: {}{}{}",
-        term::bold(), term::bright_cyan(), term::reset(),
-        term::cyan(), backend.name(), term::reset()
+        term::bold(),
+        term::bright_cyan(),
+        term::reset(),
+        term::cyan(),
+        backend.name(),
+        term::reset()
     );
-    println!("{}{}{}", term::dim(), "══════════════════════════════════════════════════", term::reset());
+    println!(
+        "{}══════════════════════════════════════════════════{}",
+        term::dim(),
+        term::reset()
+    );
 
     let rt = tokio::runtime::Builder::new_current_thread()
         .enable_all()
@@ -1657,8 +2268,14 @@ fn run_model_bench() -> Result<()> {
         if let BackendKind::LlamaCpp(_) = &backend {
             let sp = term::Spinner::start("Starting llama-server …");
             match rt.block_on(backend.start_if_needed()) {
-                Ok(_) => { sp.finish_ok("llama-server ready"); println!(); }
-                Err(e) => { sp.finish_err(&format!("llama-server failed: {e}")); return Err(e); }
+                Ok(_) => {
+                    sp.finish_ok("llama-server ready");
+                    println!();
+                }
+                Err(e) => {
+                    sp.finish_err(&format!("llama-server failed: {e}"));
+                    return Err(e);
+                }
             }
         }
     }
@@ -1694,8 +2311,14 @@ fn run_model_bench() -> Result<()> {
     // Table header
     println!(
         "{}{}{:<28}  {:>8}  {:>8}  {:>8}  {:>6}  {:>10}{}",
-        term::bold(), term::white(),
-        "payload", "min ms", "avg ms", "max ms", "ratio", "tok/s",
+        term::bold(),
+        term::white(),
+        "payload",
+        "min ms",
+        "avg ms",
+        "max ms",
+        "ratio",
+        "tok/s",
         term::reset()
     );
     println!("{}{}{}", term::dim(), "─".repeat(74), term::reset());
@@ -1716,10 +2339,15 @@ fn run_model_bench() -> Result<()> {
                     last_result = Some(r);
                 }
                 Err(e) => {
-                    if let Some(s) = take_sp() { s.finish(); }
+                    if let Some(s) = take_sp() {
+                        s.finish();
+                    }
                     println!(
                         "{}{label:<28}{}  {}ERROR: {e}{}",
-                        term::dim(), term::reset(), term::bright_red(), term::reset()
+                        term::dim(),
+                        term::reset(),
+                        term::bright_red(),
+                        term::reset()
                     );
                     error_occurred = true;
                     break;
@@ -1731,16 +2359,25 @@ fn run_model_bench() -> Result<()> {
             continue;
         }
 
-        if let Some(s) = take_sp() { s.finish(); }
+        if let Some(s) = take_sp() {
+            s.finish();
+        }
 
         let min = latencies_ms.iter().copied().min().unwrap_or(0);
         let max = latencies_ms.iter().copied().max().unwrap_or(0);
-        let avg = latencies_ms.iter().copied().sum::<u64>()
-            .checked_div(latencies_ms.len() as u64).unwrap_or(0);
+        let avg = latencies_ms
+            .iter()
+            .copied()
+            .sum::<u64>()
+            .checked_div(latencies_ms.len() as u64)
+            .unwrap_or(0);
 
         let (ratio_pct, tok_per_s) = if let Some(ref r) = last_result {
-            let ratio = r.output_tokens.saturating_mul(100)
-                .checked_div(r.input_tokens.max(1)).unwrap_or(0);
+            let ratio = r
+                .output_tokens
+                .saturating_mul(100)
+                .checked_div(r.input_tokens.max(1))
+                .unwrap_or(0);
             let tps = r.output_tokens as f64 * 1000.0 / avg.max(1) as f64;
             (ratio, tps)
         } else {
@@ -1759,7 +2396,11 @@ fn run_model_bench() -> Result<()> {
     let gpu = ntk::gpu::detect_best_backend();
     println!(
         "{}GPU backend:{} {}{}{}",
-        term::bold(), term::reset(), term::cyan(), gpu, term::reset()
+        term::bold(),
+        term::reset(),
+        term::cyan(),
+        gpu,
+        term::reset()
     );
     Ok(())
 }
@@ -1871,7 +2512,8 @@ fn run_test(with_l3: bool) -> Result<()> {
         };
 
         // Check: errors must be preserved.
-        let errors_preserved = !case.input.contains("FAILED") || l2.output.contains("FAILED")
+        let errors_preserved = !case.input.contains("FAILED")
+            || l2.output.contains("FAILED")
             || l2.output.contains("failed")
             || l2.output.contains("error");
 
@@ -1885,12 +2527,20 @@ fn run_test(with_l3: bool) -> Result<()> {
             original,
             l2.compressed_tokens,
             ratio * 100.0,
-            if l1.lines_removed > 0 || l2.compressed_tokens < original { "1+2" } else { "0" },
+            if l1.lines_removed > 0 || l2.compressed_tokens < original {
+                "1+2"
+            } else {
+                "0"
+            },
             l1.lines_removed,
         );
 
         if !ratio_ok {
-            println!("    ✗ ratio {:.1}% < minimum {:.1}%", ratio * 100.0, case.min_ratio * 100.0);
+            println!(
+                "    ✗ ratio {:.1}% < minimum {:.1}%",
+                ratio * 100.0,
+                case.min_ratio * 100.0
+            );
         }
         if !errors_preserved {
             println!("    ✗ error keywords lost in compression");
@@ -1909,8 +2559,13 @@ fn run_test(with_l3: bool) -> Result<()> {
         let config = ntk::config::load(&cwd).unwrap_or_default();
         let backend = ntk::compressor::layer3_backend::BackendKind::from_config(&config)
             .unwrap_or_else(|_| {
-                ntk::compressor::layer3_backend::BackendKind::from_config(&ntk::config::NtkConfig::default())
-                    .expect("default Ollama backend")
+                ntk::compressor::layer3_backend::BackendKind::Ollama(
+                    ntk::compressor::layer3_inference::OllamaClient::new(
+                        "http://localhost:11434",
+                        2000,
+                        "phi3:mini",
+                    ),
+                )
             });
         println!("Layer 3 ({}):", backend.name());
         let prompts_dir = ntk::config::resolve_prompts_dir();
@@ -1923,9 +2578,17 @@ fn run_test(with_l3: bool) -> Result<()> {
                 Ok(r) => {
                     let ms = start.elapsed().as_millis();
                     let ratio = if r.input_tokens > 0 {
-                        r.output_tokens.saturating_mul(100).checked_div(r.input_tokens).unwrap_or(0)
-                    } else { 0 };
-                    println!("  ✓ {:<28}  {}ms  {} → {} tokens  ({ratio}% of input)", case.label, ms, r.input_tokens, r.output_tokens);
+                        r.output_tokens
+                            .saturating_mul(100)
+                            .checked_div(r.input_tokens)
+                            .unwrap_or(0)
+                    } else {
+                        0
+                    };
+                    println!(
+                        "  ✓ {:<28}  {}ms  {} → {} tokens  ({ratio}% of input)",
+                        case.label, ms, r.input_tokens, r.output_tokens
+                    );
                     passed = passed.saturating_add(1);
                 }
                 Err(e) => {
@@ -1995,10 +2658,18 @@ fn run_bench(runs: usize, with_l3: bool) -> Result<()> {
         let config = ntk::config::load(&cwd).unwrap_or_default();
         let backend = ntk::compressor::layer3_backend::BackendKind::from_config(&config)
             .unwrap_or_else(|_| {
-                ntk::compressor::layer3_backend::BackendKind::from_config(&ntk::config::NtkConfig::default())
-                    .expect("default Ollama backend")
+                ntk::compressor::layer3_backend::BackendKind::Ollama(
+                    ntk::compressor::layer3_inference::OllamaClient::new(
+                        "http://localhost:11434",
+                        2000,
+                        "phi3:mini",
+                    ),
+                )
             });
-        println!("Layer 3 — {} inference  ({runs} runs per payload)", backend.name());
+        println!(
+            "Layer 3 — {} inference  ({runs} runs per payload)",
+            backend.name()
+        );
         println!(
             "{:<28}  {:>8}  {:>8}  {:>8}  {:>7}",
             "payload", "min ms", "avg ms", "max ms", "ratio"
@@ -2034,13 +2705,26 @@ fn run_bench(runs: usize, with_l3: bool) -> Result<()> {
             let min = l3_latencies.iter().copied().min().unwrap_or(0);
             let max = l3_latencies.iter().copied().max().unwrap_or(0);
             let sum: u64 = l3_latencies.iter().copied().sum();
-            let avg = sum.checked_div(l3_latencies.len().max(1) as u64).unwrap_or(0);
-            let ratio = last_l3.as_ref().map(|r| {
-                if r.input_tokens > 0 {
-                    r.output_tokens.saturating_mul(100).checked_div(r.input_tokens).unwrap_or(0)
-                } else { 0 }
-            }).unwrap_or(0);
-            println!("{:<28}  {:>8}  {:>8}  {:>8}  {:>6}%", case.label, min, avg, max, ratio);
+            let avg = sum
+                .checked_div(l3_latencies.len().max(1) as u64)
+                .unwrap_or(0);
+            let ratio = last_l3
+                .as_ref()
+                .map(|r| {
+                    if r.input_tokens > 0 {
+                        r.output_tokens
+                            .saturating_mul(100)
+                            .checked_div(r.input_tokens)
+                            .unwrap_or(0)
+                    } else {
+                        0
+                    }
+                })
+                .unwrap_or(0);
+            println!(
+                "{:<28}  {:>8}  {:>8}  {:>8}  {:>6}%",
+                case.label, min, avg, max, ratio
+            );
         }
     } else {
         println!();
@@ -2059,7 +2743,10 @@ fn run_discover() -> Result<()> {
     let transcripts_dir = home.join(".claude").join("transcripts");
 
     if !transcripts_dir.exists() {
-        println!("No Claude transcripts directory found at {}.", transcripts_dir.display());
+        println!(
+            "No Claude transcripts directory found at {}.",
+            transcripts_dir.display()
+        );
         return Ok(());
     }
 
@@ -2071,7 +2758,10 @@ fn run_discover() -> Result<()> {
         .collect();
 
     if files.is_empty() {
-        println!("No transcript files found in {}.", transcripts_dir.display());
+        println!(
+            "No transcript files found in {}.",
+            transcripts_dir.display()
+        );
         return Ok(());
     }
 
@@ -2104,14 +2794,11 @@ fn run_discover() -> Result<()> {
 
         // Look for tool result lines: {"type":"tool_result","tool_use_id":...,"content":...}
         // or assistant messages containing tool_use of Bash.
-        let output = val
-            .get("content")
-            .and_then(|c| c.as_str())
-            .or_else(|| {
-                val.get("tool_response")
-                    .and_then(|r| r.get("output"))
-                    .and_then(|o| o.as_str())
-            });
+        let output = val.get("content").and_then(|c| c.as_str()).or_else(|| {
+            val.get("tool_response")
+                .and_then(|r| r.get("output"))
+                .and_then(|o| o.as_str())
+        });
 
         let command = val
             .get("tool_input")
@@ -2167,7 +2854,10 @@ fn run_discover() -> Result<()> {
 fn daemon_url() -> Result<String> {
     let cwd = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
     let config = ntk::config::load(&cwd).unwrap_or_default();
-    Ok(format!("http://{}:{}", config.daemon.host, config.daemon.port))
+    Ok(format!(
+        "http://{}:{}",
+        config.daemon.host, config.daemon.port
+    ))
 }
 
 fn pid_file_path() -> Result<PathBuf> {

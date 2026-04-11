@@ -69,7 +69,9 @@ async fn test_llamacpp_compress_happy_path() {
 
     Mock::given(method("POST"))
         .and(path("/completion"))
-        .respond_with(ResponseTemplate::new(200).set_body_json(llama_response("3 passed, 1 failed")))
+        .respond_with(
+            ResponseTemplate::new(200).set_body_json(llama_response("3 passed, 1 failed")),
+        )
         .expect(1)
         .mount(&server)
         .await;
@@ -112,7 +114,10 @@ async fn test_llamacpp_compress_server_error() {
 
     assert!(result.is_err(), "expected Err on HTTP 500");
     let msg = result.unwrap_err().to_string();
-    assert!(msg.contains("500") || msg.contains("HTTP"), "error should mention status: {msg}");
+    assert!(
+        msg.contains("500") || msg.contains("HTTP"),
+        "error should mention status: {msg}"
+    );
 }
 
 /// When the server is unreachable, `compress()` must return Err (not panic).
@@ -171,14 +176,12 @@ async fn test_llamacpp_compress_empty_content() {
 
     Mock::given(method("POST"))
         .and(path("/completion"))
-        .respond_with(
-            ResponseTemplate::new(200).set_body_json(serde_json::json!({
-                "content": "",
-                "stop": true,
-                "tokens_evaluated": 10,
-                "tokens_predicted": 0,
-            })),
-        )
+        .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+            "content": "",
+            "stop": true,
+            "tokens_evaluated": 10,
+            "tokens_predicted": 0,
+        })))
         .mount(&server)
         .await;
 
@@ -202,13 +205,11 @@ async fn test_llamacpp_compress_missing_content_field() {
 
     Mock::given(method("POST"))
         .and(path("/completion"))
-        .respond_with(
-            ResponseTemplate::new(200).set_body_json(serde_json::json!({
-                "stop": true,
-                "tokens_evaluated": 5,
-                "tokens_predicted": 0,
-            })),
-        )
+        .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+            "stop": true,
+            "tokens_evaluated": 5,
+            "tokens_predicted": 0,
+        })))
         .mount(&server)
         .await;
 
@@ -280,6 +281,10 @@ async fn test_llamacpp_request_has_prompt() {
 
     drop(received_body_clone);
 
-    assert!(result.is_ok(), "compress should succeed: {:?}", result.err());
+    assert!(
+        result.is_ok(),
+        "compress should succeed: {:?}",
+        result.err()
+    );
     assert_eq!(result.unwrap().output, "result");
 }

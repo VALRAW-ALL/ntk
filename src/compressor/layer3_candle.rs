@@ -17,11 +17,11 @@ use anyhow::{anyhow, Result};
 use std::path::{Path, PathBuf};
 
 #[cfg(feature = "candle")]
-use anyhow::Context;
-#[cfg(feature = "candle")]
 use crate::compressor::layer3_inference::load_system_prompt;
 use crate::compressor::layer3_inference::Layer3Result;
 use crate::detector::OutputType;
+#[cfg(feature = "candle")]
+use anyhow::Context;
 
 // ---------------------------------------------------------------------------
 // Public struct — always compiled regardless of feature flag
@@ -84,13 +84,13 @@ impl CandleBackend {
         #[cfg(not(feature = "candle"))]
         {
             let _ = (input, output_type, prompts_dir);
-            return Err(anyhow!(
+            Err(anyhow!(
                 "Candle backend is not compiled.\n\
                 Rebuild NTK with:  cargo build --release --features candle\n\
                 GPU (NVIDIA):      cargo build --release --features cuda\n\
                 GPU (Apple):       cargo build --release --features metal\n\
                 Or switch backend: set model.provider = \"ollama\" in ~/.ntk/config.json"
-            ));
+            ))
         }
 
         #[cfg(feature = "candle")]
@@ -140,7 +140,11 @@ impl CandleBackend {
                     .metadata
                     .get("tokenizer.ggml.eos_token_id")
                     .and_then(|v| {
-                        if let gguf_file::Value::U32(n) = v { Some(*n) } else { None }
+                        if let gguf_file::Value::U32(n) = v {
+                            Some(*n)
+                        } else {
+                            None
+                        }
                     })
                     .unwrap_or(32007);
 
@@ -152,7 +156,12 @@ impl CandleBackend {
                     .map_err(|e| anyhow!("loading tokenizer: {e}"))?;
 
                 tracing::info!("Candle: model loaded (EOS token id = {eos_token})");
-                Ok(CandleLoaded { model, tokenizer, device: device_clone, eos_token })
+                Ok(CandleLoaded {
+                    model,
+                    tokenizer,
+                    device: device_clone,
+                    eos_token,
+                })
             })
             .await
             .context("spawn_blocking model load")??;
@@ -179,8 +188,7 @@ impl CandleBackend {
         let input_token_count = prompt_ids.len();
 
         // Prefill: feed the full prompt to build the KV cache.
-        let prompt_tensor =
-            Tensor::new(prompt_ids.as_slice(), &loaded.device)?.unsqueeze(0)?;
+        let prompt_tensor = Tensor::new(prompt_ids.as_slice(), &loaded.device)?.unsqueeze(0)?;
         loaded
             .model
             .forward(&prompt_tensor, 0)
@@ -192,8 +200,7 @@ impl CandleBackend {
         let mut logits_processor = LogitsProcessor::new(42, Some(0.1_f64), None);
 
         for pos in input_token_count..input_token_count + self.max_new_tokens {
-            let step_tensor =
-                Tensor::new(&[last_token], &loaded.device)?.unsqueeze(0)?;
+            let step_tensor = Tensor::new(&[last_token], &loaded.device)?.unsqueeze(0)?;
             let logits = loaded
                 .model
                 .forward(&step_tensor, pos)
@@ -264,10 +271,10 @@ impl CandleBackend {
 /// Default GGUF model path under ~/.ntk/models/.
 pub fn default_model_path(quant: &str) -> Result<PathBuf> {
     let home = dirs::home_dir().ok_or_else(|| anyhow!("cannot determine home directory"))?;
-    Ok(home
-        .join(".ntk")
-        .join("models")
-        .join(format!("Phi-3-mini-4k-instruct-{}.gguf", quant.to_uppercase())))
+    Ok(home.join(".ntk").join("models").join(format!(
+        "Phi-3-mini-4k-instruct-{}.gguf",
+        quant.to_uppercase()
+    )))
 }
 
 /// Default tokenizer path under ~/.ntk/models/.

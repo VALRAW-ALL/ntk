@@ -23,8 +23,7 @@ fn compress_fixture(name: &str) -> (String, usize, usize, f64) {
     let input = std::fs::read_to_string(&path)
         .unwrap_or_else(|_| panic!("fixture not found: {}", path.display()));
 
-    let original_tokens = layer2_tokenizer::count_tokens(&input)
-        .expect("token count failed");
+    let original_tokens = layer2_tokenizer::count_tokens(&input).expect("token count failed");
 
     let l1 = layer1_filter::filter(&input);
     let l2 = layer2_tokenizer::process(&l1.output).expect("layer2 failed");
@@ -133,7 +132,10 @@ fn test_vitest_preserves_test_result() {
 #[test]
 fn test_docker_logs_non_empty_output() {
     let (output, _, _, _) = compress_fixture("docker_logs.txt");
-    assert!(!output.is_empty(), "Compressed docker logs must not be empty");
+    assert!(
+        !output.is_empty(),
+        "Compressed docker logs must not be empty"
+    );
 }
 
 // ---------------------------------------------------------------------------
@@ -143,7 +145,10 @@ fn test_docker_logs_non_empty_output() {
 #[test]
 fn test_next_build_non_empty_output() {
     let (output, _, _, _) = compress_fixture("next_build_output.txt");
-    assert!(!output.is_empty(), "Compressed next build must not be empty");
+    assert!(
+        !output.is_empty(),
+        "Compressed next build must not be empty"
+    );
 }
 
 // ---------------------------------------------------------------------------
@@ -154,7 +159,10 @@ fn test_next_build_non_empty_output() {
 fn test_rtk_filtered_output_still_valid() {
     // RTK-filtered output is already lean — NTK must at least not break it.
     let (output, _, _, _) = compress_fixture("cargo_test_rtk_filtered.txt");
-    assert!(!output.is_empty(), "RTK-pre-filtered output must survive NTK");
+    assert!(
+        !output.is_empty(),
+        "RTK-pre-filtered output must survive NTK"
+    );
 }
 
 // ---------------------------------------------------------------------------
@@ -171,10 +179,7 @@ fn test_compression_is_deterministic() {
     for fixture in &fixtures {
         let (out1, _, _, _) = compress_fixture(fixture);
         let (out2, _, _, _) = compress_fixture(fixture);
-        assert_eq!(
-            out1, out2,
-            "Compression is not deterministic for {fixture}"
-        );
+        assert_eq!(out1, out2, "Compression is not deterministic for {fixture}");
     }
 }
 
@@ -214,7 +219,10 @@ fn test_print_quality_summary() {
         ("next_build_output.txt", "next build"),
     ];
 
-    println!("\n{:<20}  {:>8}  {:>8}  {:>8}", "FIXTURE", "BEFORE", "AFTER", "RATIO");
+    println!(
+        "\n{:<20}  {:>8}  {:>8}  {:>8}",
+        "FIXTURE", "BEFORE", "AFTER", "RATIO"
+    );
     println!("{}", "-".repeat(52));
 
     for (file, label) in &fixtures {
@@ -227,7 +235,9 @@ fn test_print_quality_summary() {
         let (_, before, after, ratio) = compress_fixture(file);
         println!(
             "{:<20}  {:>8}  {:>8}  {:>7.1}%",
-            label, before, after,
+            label,
+            before,
+            after,
             ratio * 100.0
         );
     }

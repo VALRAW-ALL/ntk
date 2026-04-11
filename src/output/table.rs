@@ -28,11 +28,22 @@ pub fn print_metrics_table(records: &[CompressionRecord]) {
 
     println!(
         "{:<cmd_w$}  {:<8}  {:>8}  {:>8}  {:>6}  {:>5}  RTK",
-        "COMMAND", "TYPE", "BEFORE", "AFTER", "RATIO", "LAYER",
+        "COMMAND",
+        "TYPE",
+        "BEFORE",
+        "AFTER",
+        "RATIO",
+        "LAYER",
         cmd_w = cmd_w,
     );
-    let sep_len = cmd_w.saturating_add(8).saturating_add(8).saturating_add(8)
-        .saturating_add(6).saturating_add(5).saturating_add(5).saturating_add(14);
+    let sep_len = cmd_w
+        .saturating_add(8)
+        .saturating_add(8)
+        .saturating_add(8)
+        .saturating_add(6)
+        .saturating_add(5)
+        .saturating_add(5)
+        .saturating_add(14);
     println!("{}", "-".repeat(sep_len));
 
     for r in records {

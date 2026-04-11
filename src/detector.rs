@@ -82,7 +82,9 @@ fn is_build(input: &str) -> bool {
         return true;
     }
     // ESLint
-    if input.contains("eslint") || (input.contains("error") && input.contains("warning") && input.contains("problem")) {
+    if input.contains("eslint")
+        || (input.contains("error") && input.contains("warning") && input.contains("problem"))
+    {
         return true;
     }
     // Next.js build
@@ -179,7 +181,8 @@ test result: FAILED. 1 passed; 1 failed; 0 ignored";
 
     #[test]
     fn test_detects_tsc_output() {
-        let input = "src/index.ts(10,5): error TS2345: Argument of type 'string' is not assignable.";
+        let input =
+            "src/index.ts(10,5): error TS2345: Argument of type 'string' is not assignable.";
         assert_eq!(detect(input), OutputType::Build);
     }
 

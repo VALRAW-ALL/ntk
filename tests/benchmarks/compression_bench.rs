@@ -63,11 +63,11 @@ fn bench_layer1_fixtures(c: &mut Criterion) {
     group.measurement_time(Duration::from_secs(5));
 
     for name in &fixtures {
-        if let Ok(content) =
-            std::fs::read_to_string(std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        if let Ok(content) = std::fs::read_to_string(
+            std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
                 .join("tests/fixtures")
-                .join(name))
-        {
+                .join(name),
+        ) {
             group.bench_with_input(BenchmarkId::new("layer1", name), &content, |b, input| {
                 b.iter(|| layer1_filter::filter(black_box(input)))
             });
@@ -113,16 +113,12 @@ fn bench_full_pipeline_no_inference(c: &mut Criterion) {
     group.measurement_time(Duration::from_secs(8));
 
     for (label, input) in inputs {
-        group.bench_with_input(
-            BenchmarkId::new("l1+l2", label),
-            input,
-            |b, input| {
-                b.iter(|| {
-                    let l1 = layer1_filter::filter(black_box(input));
-                    layer2_tokenizer::process(&l1.output)
-                })
-            },
-        );
+        group.bench_with_input(BenchmarkId::new("l1+l2", label), input, |b, input| {
+            b.iter(|| {
+                let l1 = layer1_filter::filter(black_box(input));
+                layer2_tokenizer::process(&l1.output)
+            })
+        });
     }
 
     group.finish();
@@ -141,21 +137,17 @@ fn bench_full_pipeline_fixtures(c: &mut Criterion) {
     group.measurement_time(Duration::from_secs(8));
 
     for (label, file) in &fixtures {
-        if let Ok(content) =
-            std::fs::read_to_string(std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        if let Ok(content) = std::fs::read_to_string(
+            std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
                 .join("tests/fixtures")
-                .join(file))
-        {
-            group.bench_with_input(
-                BenchmarkId::new("l1+l2", label),
-                &content,
-                |b, input| {
-                    b.iter(|| {
-                        let l1 = layer1_filter::filter(black_box(input));
-                        layer2_tokenizer::process(&l1.output)
-                    })
-                },
-            );
+                .join(file),
+        ) {
+            group.bench_with_input(BenchmarkId::new("l1+l2", label), &content, |b, input| {
+                b.iter(|| {
+                    let l1 = layer1_filter::filter(black_box(input));
+                    layer2_tokenizer::process(&l1.output)
+                })
+            });
         }
     }
 

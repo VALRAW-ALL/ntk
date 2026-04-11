@@ -145,7 +145,10 @@ fn test_ntk_uninstall_removes_hook() {
     // Verify hook was installed.
     let settings = home_path.join(".claude").join("settings.json");
     let before = std::fs::read_to_string(&settings).unwrap_or_default();
-    assert!(before.contains("ntk-hook"), "hook not installed before uninstall test");
+    assert!(
+        before.contains("ntk-hook"),
+        "hook not installed before uninstall test"
+    );
 
     // Now uninstall.
     let output = ntk()
@@ -204,10 +207,7 @@ fn test_ntk_test_compress_file() {
 /// `ntk gain` without a daemon should print a readable message (not panic).
 #[test]
 fn test_ntk_gain_format_rtk_compatible() {
-    let output = ntk()
-        .arg("gain")
-        .output()
-        .expect("ntk gain failed");
+    let output = ntk().arg("gain").output().expect("ntk gain failed");
 
     let combined = format!(
         "{}{}",

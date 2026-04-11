@@ -33,10 +33,7 @@ fn hook_command() -> String {
         // the stored command is always an absolute path.
         if let Ok(home) = home_dir() {
             let ps1 = home.join(".ntk").join("bin").join("ntk-hook.ps1");
-            return format!(
-                "powershell -NoProfile -File \"{}\"",
-                ps1.display()
-            );
+            return format!("powershell -NoProfile -File \"{}\"", ps1.display());
         }
         // Fallback if home dir is unavailable (should never happen in practice).
         "powershell -NoProfile -File \"%USERPROFILE%\\.ntk\\bin\\ntk-hook.ps1\"".to_owned()
@@ -211,7 +208,14 @@ impl Installer {
         let _ = (&bin_path, &hook_path, &config_path, &settings_path);
 
         for (label, detail, outcome) in &summary {
-            println!("  {} {}{}{}  {}", outcome.icon(), term::bold(), label, term::reset(), detail);
+            println!(
+                "  {} {}{}{}  {}",
+                outcome.icon(),
+                term::bold(),
+                label,
+                term::reset(),
+                detail
+            );
         }
 
         println!();
@@ -297,10 +301,7 @@ impl Installer {
         let sp = term::Spinner::start("Removing NTK hook …");
         let new_contents = remove_ntk_hook_from_json(&contents)?;
         match write_atomic(&settings_path, &new_contents) {
-            Ok(()) => sp.finish_ok(&format!(
-                "hook removed from {}",
-                settings_path.display()
-            )),
+            Ok(()) => sp.finish_ok(&format!("hook removed from {}", settings_path.display())),
             Err(e) => {
                 sp.finish_err(&e.to_string());
                 return Err(e);
@@ -371,8 +372,7 @@ fn ntk_binary_name() -> &'static str {
 // ---------------------------------------------------------------------------
 
 fn ensure_dir(path: &Path) -> Result<()> {
-    std::fs::create_dir_all(path)
-        .with_context(|| format!("creating directory {}", path.display()))
+    std::fs::create_dir_all(path).with_context(|| format!("creating directory {}", path.display()))
 }
 
 fn print_status_line(label: &str, path: &Path) {
@@ -382,7 +382,14 @@ fn print_status_line(label: &str, path: &Path) {
         (term::err_mark(), "")
     };
     let _ = color;
-    println!("  {}{}{}  {}  {}", term::bold(), label, term::reset(), path.display(), mark);
+    println!(
+        "  {}{}{}  {}  {}",
+        term::bold(),
+        label,
+        term::reset(),
+        path.display(),
+        mark
+    );
 }
 
 /// Write file atomically: write to .tmp, then rename (atomic on NTFS + Unix).
@@ -453,7 +460,9 @@ fn install_ntk_binary(bin_dir: &Path) -> Result<String> {
     let dest = bin_dir.join(ntk_binary_name());
 
     // Canonicalize both paths to avoid copying a file over itself.
-    let canon_src = current_exe.canonicalize().unwrap_or_else(|_| current_exe.clone());
+    let canon_src = current_exe
+        .canonicalize()
+        .unwrap_or_else(|_| current_exe.clone());
     let canon_dst = dest.canonicalize().unwrap_or_else(|_| dest.clone());
     if canon_src == canon_dst {
         return Ok(format!("already installed — {}", dest.display()));
@@ -541,8 +550,8 @@ fn unix_add_to_path(dir: &str) -> Result<String> {
     // Idempotence: check all candidate rc files first.
     for rc in &rc_files {
         if rc.exists() {
-            let content = std::fs::read_to_string(rc)
-                .with_context(|| format!("reading {}", rc.display()))?;
+            let content =
+                std::fs::read_to_string(rc).with_context(|| format!("reading {}", rc.display()))?;
             if content.contains(&export_line) {
                 return Ok(format!("already in PATH — {dir}"));
             }
@@ -566,7 +575,11 @@ fn unix_add_to_path(dir: &str) -> Result<String> {
     std::io::Write::write_all(&mut file, block.as_bytes())
         .with_context(|| format!("writing to {}", target.display()))?;
 
-    Ok(format!("added to {} — run: source {}", target.display(), target.display()))
+    Ok(format!(
+        "added to {} — run: source {}",
+        target.display(),
+        target.display()
+    ))
 }
 
 #[cfg(not(target_os = "windows"))]
@@ -644,12 +657,19 @@ fn setup_ollama_path() -> Result<String> {
 fn install_ollama() -> Result<()> {
     // Try winget first (available on Windows 10 1709+ / Windows 11).
     let winget = std::process::Command::new("winget")
-        .args(["install", "--id", "Ollama.Ollama", "--silent", "--accept-package-agreements", "--accept-source-agreements"])
+        .args([
+            "install",
+            "--id",
+            "Ollama.Ollama",
+            "--silent",
+            "--accept-package-agreements",
+            "--accept-source-agreements",
+        ])
         .status();
 
     match winget {
         Ok(s) if s.success() => return Ok(()),
-        Ok(_) => {} // winget ran but failed — try direct download
+        Ok(_) => {}  // winget ran but failed — try direct download
         Err(_) => {} // winget not available — try direct download
     }
 
@@ -743,8 +763,8 @@ fn download_file(url: &str, dest: &std::path::Path) -> Result<()> {
             return Err(anyhow!("HTTP {} downloading {url}", response.status()));
         }
 
-        let mut file = std::fs::File::create(dest)
-            .with_context(|| format!("creating {}", dest.display()))?;
+        let mut file =
+            std::fs::File::create(dest).with_context(|| format!("creating {}", dest.display()))?;
 
         while let Some(chunk) = response.chunk().await.context("reading download chunk")? {
             std::io::Write::write_all(&mut file, &chunk)
@@ -953,12 +973,16 @@ mod tests {
     fn test_uninstall_removes_hook() {
         let (_dir, path) = temp_settings("{}");
         patch_settings(&path, true).unwrap();
-        assert!(std::fs::read_to_string(&path).unwrap().contains(NTK_HOOK_MARKER));
+        assert!(std::fs::read_to_string(&path)
+            .unwrap()
+            .contains(NTK_HOOK_MARKER));
 
         let content = std::fs::read_to_string(&path).unwrap();
         let cleaned = remove_ntk_hook_from_json(&content).unwrap();
         std::fs::write(&path, &cleaned).unwrap();
-        assert!(!std::fs::read_to_string(&path).unwrap().contains(NTK_HOOK_MARKER));
+        assert!(!std::fs::read_to_string(&path)
+            .unwrap()
+            .contains(NTK_HOOK_MARKER));
     }
 
     #[test]

@@ -94,8 +94,8 @@ impl MetricsStore {
         let mut rtk_pre_filtered_count = 0usize;
 
         for r in &self.records {
-            total_tokens_saved =
-                total_tokens_saved.saturating_add(r.original_tokens.saturating_sub(r.compressed_tokens));
+            total_tokens_saved = total_tokens_saved
+                .saturating_add(r.original_tokens.saturating_sub(r.compressed_tokens));
             ratio_sum += r.ratio();
 
             // layer_used is 1-indexed; clamp to valid range.
@@ -328,7 +328,11 @@ mod tests {
     #[test]
     fn test_ratio_calculation() {
         let r = make_record(1000, 200, 2, false);
-        assert!((r.ratio() - 0.8).abs() < 0.001, "expected ~0.8, got {}", r.ratio());
+        assert!(
+            (r.ratio() - 0.8).abs() < 0.001,
+            "expected ~0.8, got {}",
+            r.ratio()
+        );
     }
 
     #[test]

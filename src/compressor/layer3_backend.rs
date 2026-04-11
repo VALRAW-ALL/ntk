@@ -55,13 +55,13 @@ impl BackendKind {
             }
 
             ModelProvider::Candle => {
-                use crate::compressor::layer3_candle::{default_model_path, default_tokenizer_path};
+                use crate::compressor::layer3_candle::{
+                    default_model_path, default_tokenizer_path,
+                };
 
-                let model_path = config
-                    .model
-                    .model_path
-                    .clone()
-                    .unwrap_or_else(|| default_model_path(&config.model.quantization).unwrap_or_default());
+                let model_path = config.model.model_path.clone().unwrap_or_else(|| {
+                    default_model_path(&config.model.quantization).unwrap_or_default()
+                });
 
                 let tokenizer_path = config
                     .model

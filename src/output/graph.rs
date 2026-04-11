@@ -122,15 +122,20 @@ pub fn print_sparkline_weekly(summary: &WeeklySummary) {
         return;
     }
 
-    let max = summary.daily_savings.iter().copied().max().unwrap_or(1).max(1);
+    let max = summary
+        .daily_savings
+        .iter()
+        .copied()
+        .max()
+        .unwrap_or(1)
+        .max(1);
 
     let spark_last_idx = SPARKS.len().saturating_sub(1);
     let spark: String = summary
         .daily_savings
         .iter()
         .map(|&v| {
-            let idx =
-                ((v as f64 / max as f64) * spark_last_idx as f64).round() as usize;
+            let idx = ((v as f64 / max as f64) * spark_last_idx as f64).round() as usize;
             SPARKS[idx.min(spark_last_idx)]
         })
         .collect();

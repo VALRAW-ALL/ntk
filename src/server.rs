@@ -119,29 +119,38 @@ async fn handle_compress(
     let threshold = state.config.compression.inference_threshold_tokens;
     let output_type = detector::detect(&req.output);
 
-    let (output, layer_used) = if state.config.compression.layer3_enabled
-        && l2.compressed_tokens > threshold
-    {
-        // Prompts dir: NTK_PROMPTS_DIR env var, or ~/.ntk/system-prompts/, or ./system-prompts/
-        let prompts_dir = crate::config::resolve_prompts_dir();
-        match state.backend.compress(&l2.output, output_type, &prompts_dir).await {
-            Ok(l3) => (l3.output, 3u8),
-            Err(e) => {
-                tracing::warn!("Layer 3 inference failed ({name}): {e}", name = state.backend.name());
-                // Graceful fallback: Layer 3 unavailable → use Layer 2 output.
-                if state.config.model.fallback_to_layer1_on_timeout {
-                    (l2.output.clone(), 2u8)
-                } else {
-                    return Err((
-                        StatusCode::SERVICE_UNAVAILABLE,
-                        format!("Layer 3 inference unavailable ({}): {e}", state.backend.name()),
-                    ));
+    let (output, layer_used) =
+        if state.config.compression.layer3_enabled && l2.compressed_tokens > threshold {
+            // Prompts dir: NTK_PROMPTS_DIR env var, or ~/.ntk/system-prompts/, or ./system-prompts/
+            let prompts_dir = crate::config::resolve_prompts_dir();
+            match state
+                .backend
+                .compress(&l2.output, output_type, &prompts_dir)
+                .await
+            {
+                Ok(l3) => (l3.output, 3u8),
+                Err(e) => {
+                    tracing::warn!(
+                        "Layer 3 inference failed ({name}): {e}",
+                        name = state.backend.name()
+                    );
+                    // Graceful fallback: Layer 3 unavailable → use Layer 2 output.
+                    if state.config.model.fallback_to_layer1_on_timeout {
+                        (l2.output.clone(), 2u8)
+                    } else {
+                        return Err((
+                            StatusCode::SERVICE_UNAVAILABLE,
+                            format!(
+                                "Layer 3 inference unavailable ({}): {e}",
+                                state.backend.name()
+                            ),
+                        ));
+                    }
                 }
             }
-        }
-    } else {
-        (l2.output.clone(), 2u8)
-    };
+        } else {
+            (l2.output.clone(), 2u8)
+        };
 
     let latency_ms = started.elapsed().as_millis() as u64;
     let compressed_tokens = l2.compressed_tokens;
@@ -191,7 +200,6 @@ async fn handle_compress(
 // Helpers
 // ---------------------------------------------------------------------------
 
-
 // ---------------------------------------------------------------------------
 // GET /metrics
 // ---------------------------------------------------------------------------
@@ -204,10 +212,9 @@ async fn handle_metrics(
         .lock()
         .map(|m| m.session_summary())
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
-    Ok(RespJson(
-        serde_json::to_value(summary)
-            .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?,
-    ))
+    Ok(RespJson(serde_json::to_value(summary).map_err(|e| {
+        (StatusCode::INTERNAL_SERVER_ERROR, e.to_string())
+    })?))
 }
 
 // ---------------------------------------------------------------------------
@@ -218,6 +225,10 @@ async fn handle_health(State(state): State<AppState>) -> RespJson<HealthResponse
     RespJson(HealthResponse {
         status: "ok",
         version: env!("CARGO_PKG_VERSION"),
-        model: format!("{} ({})", state.config.model.model_name, state.backend.name()),
+        model: format!(
+            "{} ({})",
+            state.config.model.model_name,
+            state.backend.name()
+        ),
     })
 }

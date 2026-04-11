@@ -39,12 +39,7 @@ pub struct LlamaCppBackend {
 }
 
 impl LlamaCppBackend {
-    pub fn new(
-        model_path: PathBuf,
-        port: u16,
-        n_gpu_layers: i32,
-        timeout_ms: u64,
-    ) -> Self {
+    pub fn new(model_path: PathBuf, port: u16, n_gpu_layers: i32, timeout_ms: u64) -> Self {
         Self {
             server_url: format!("http://127.0.0.1:{port}"),
             model_path,
@@ -156,7 +151,11 @@ impl LlamaCppBackend {
 
     async fn wait_for_healthy(&self, timeout_ms: u64) -> Result<()> {
         let health_url = format!("{}/health", self.server_url);
-        let deadline = tokio::time::Instant::now() + Duration::from_millis(timeout_ms);
+        let fallback = Duration::from_secs(10);
+        let deadline = tokio::time::Instant::now()
+            .checked_add(Duration::from_millis(timeout_ms))
+            .or_else(|| tokio::time::Instant::now().checked_add(fallback))
+            .unwrap_or_else(tokio::time::Instant::now);
 
         let client = reqwest::Client::builder()
             .timeout(Duration::from_millis(500))
@@ -164,7 +163,12 @@ impl LlamaCppBackend {
             .context("building reqwest client for health check")?;
 
         while tokio::time::Instant::now() < deadline {
-            if client.get(&health_url).send().await.map_or(false, |r| r.status().is_success()) {
+            if client
+                .get(&health_url)
+                .send()
+                .await
+                .is_ok_and(|r| r.status().is_success())
+            {
                 return Ok(());
             }
             tokio::time::sleep(Duration::from_millis(200)).await;
@@ -172,7 +176,8 @@ impl LlamaCppBackend {
 
         Err(anyhow!(
             "llama-server at {} did not become healthy within {}ms",
-            self.server_url, timeout_ms
+            self.server_url,
+            timeout_ms
         ))
     }
 
@@ -196,9 +201,16 @@ impl LlamaCppBackend {
         let request_body = serde_json::json!({
             "prompt": prompt_text,
             "n_predict": 512,
-            "temperature": 0.1,
-            "top_p": 0.9,
-            "stop": ["<|end|>", "<|user|>", "<|endoftext|>"],
+            // temperature=0 → greedy decoding: eliminates stochastic hallucination.
+            // top_k=1 reinforces greedy (top_p is irrelevant when temp=0).
+            "temperature": 0.0,
+            "top_k": 1,
+            "repeat_penalty": 1.05,
+            "stop": [
+                "<|end|>", "<|user|>", "<|endoftext|>",
+                "\nNote:", "\nNote ", "\nPlease",
+                " not provided", " not available", " not specified"
+            ],
             "stream": false,
         });
 
@@ -225,16 +237,18 @@ impl LlamaCppBackend {
             .await
             .context("parsing llama-server response")?;
 
-        let content = body
+        let raw = body
             .get("content")
             .and_then(|v| v.as_str())
             .ok_or_else(|| anyhow!("llama-server response missing 'content' field"))?
             .trim()
             .to_owned();
 
-        if content.is_empty() {
+        if raw.is_empty() {
             return Err(anyhow!("llama-server returned empty content"));
         }
+
+        let content = strip_prose_lines(&raw);
 
         let input_tokens = body
             .get("tokens_evaluated")
@@ -266,7 +280,11 @@ impl Drop for LlamaCppBackend {
 /// Find the `llama-server` binary: checks ~/.ntk/bin/ first, then PATH.
 pub fn find_llama_server_binary() -> Result<PathBuf> {
     // 1. ~/.ntk/bin/llama-server (or llama-server.exe on Windows)
-    let binary_name = if cfg!(windows) { "llama-server.exe" } else { "llama-server" };
+    let binary_name = if cfg!(windows) {
+        "llama-server.exe"
+    } else {
+        "llama-server"
+    };
 
     if let Some(home) = dirs::home_dir() {
         let candidate = home.join(".ntk").join("bin").join(binary_name);
@@ -298,6 +316,74 @@ pub fn find_llama_server_binary() -> Result<PathBuf> {
           Manual:            https://github.com/ggerganov/llama.cpp/releases\n\
         Then place the binary in ~/.ntk/bin/ or on your PATH."
     ))
+}
+
+/// Remove prose/hallucination lines that local models sometimes append.
+///
+/// Works in two passes:
+/// 1. `PROSE_PREFIXES` — strips any trailing line whose trimmed content *starts with*
+///    a known hallucination prefix ("note:", "please", "if the", …).
+/// 2. `PROSE_CONTAINS` — strips any trailing line that *contains* a known
+///    invented-value phrase ("not provided", "not available", "not specified", …).
+///    These appear when the model invents "3. Total duration: not provided" instead
+///    of simply omitting the field.
+///
+/// Only trailing lines are removed so that matching tokens inside real output
+/// (e.g., a test named "if_the_value_is_zero") are never discarded.
+fn strip_prose_lines(text: &str) -> String {
+    const PROSE_PREFIXES: &[&str] = &[
+        "note:",
+        "note ",
+        "please",
+        "if the",
+        "if you",
+        "assumption:",
+        "replace ",
+        "the above",
+        "i have",
+        "the duration",
+        "actual duration",
+    ];
+
+    // Substrings that signal an invented value anywhere in a line.
+    const PROSE_CONTAINS: &[&str] = &[
+        "not provided",
+        "not available",
+        "not specified",
+        "not present",
+        "not found",
+        "not given",
+        "not applicable",
+        "n/a",
+        "unknown",
+    ];
+
+    let lines: Vec<&str> = text.lines().collect();
+
+    let is_prose = |line: &str| -> bool {
+        let lc = line.trim().to_lowercase();
+        if lc.is_empty() {
+            return false; // blank lines are handled separately
+        }
+        PROSE_PREFIXES.iter().any(|p| lc.starts_with(p))
+            || PROSE_CONTAINS.iter().any(|p| lc.contains(p))
+    };
+
+    // Walk backwards from the end, skipping blank lines and prose lines.
+    let last_real = lines
+        .iter()
+        .enumerate()
+        .rev()
+        .find(|(_, line)| {
+            let lc = line.trim();
+            !lc.is_empty() && !is_prose(line)
+        })
+        .map(|(i, _)| i);
+
+    match last_real {
+        Some(idx) => lines[..=idx].join("\n"),
+        None => text.trim().to_owned(), // all prose? return as-is rather than empty
+    }
 }
 
 fn num_cpus() -> usize {

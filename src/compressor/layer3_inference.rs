@@ -100,10 +100,7 @@ impl OllamaClient {
             .get("prompt_eval_count")
             .and_then(|v| v.as_u64())
             .unwrap_or(0) as usize;
-        let output_tokens = body
-            .get("eval_count")
-            .and_then(|v| v.as_u64())
-            .unwrap_or(0) as usize;
+        let output_tokens = body.get("eval_count").and_then(|v| v.as_u64()).unwrap_or(0) as usize;
 
         Ok(Layer3Result {
             output: compressed,
@@ -142,32 +139,50 @@ pub(crate) fn load_system_prompt(output_type: OutputType, prompts_dir: &Path) ->
 fn embedded_prompt(output_type: OutputType) -> &'static str {
     match output_type {
         OutputType::Test => {
-            "You are a test output compressor. Copy the EXACT numbers from the input. \
-            Extract ONLY: \
-            (1) test counts copied verbatim: X passed, Y failed, Z skipped; \
-            (2) for each FAILED test: name + file:line + assertion failure (expected: X, got: Y) or panic message; \
-            (3) total duration. No prose. No passing test names. \
-            IMPORTANT: never invent or change numeric values. \
-            IMPORTANT: always include the expected vs actual values from assertion failures — this is critical for debugging."
+            "You are a test output compressor. Produce EXACTLY this format:\n\
+            1. X passed, Y failed, Z skipped\n\
+            2. failing_test_name at file:line — expected: A, got: B\n\
+            3. 1.23s\n\
+            Rules: copy all numbers verbatim; copy expected/got in the SAME ORDER as the input, never swap them; \
+            repeat line 2 once per failed test; omit line 3 if duration is absent; \
+            no labels, no notes, no prose; stop after the last line."
         }
         OutputType::Build => {
-            "You are a build output compressor. Extract ONLY: \
-            (1) build result: success/failed; \
-            (2) each ERROR: file:line + code + message (1 line); \
-            (3) warning count only. No info messages, no progress."
+            concat!(
+                "You are a build output compressor. Extract ONLY: \
+                (1) build result: success/failed; \
+                (2) each ERROR: file:line + code + message (1 line); \
+                (3) warning count only. No info messages, no progress.",
+                " STRICT RULES: Output only data extracted from the input. \
+                Do NOT add notes, assumptions, clarifications, or any sentence not found in the input. \
+                If a value is absent, omit the field — do not guess or approximate it. \
+                Stop immediately after the last extracted item."
+            )
         }
         OutputType::Log | OutputType::Generic => {
-            "You are a log compressor. Extract: \
-            (1) all ERROR/CRITICAL lines with timestamps; \
-            (2) WARN lines grouped as [xN] if repeated; \
-            (3) first stack trace only; \
-            (4) summary: X errors, Y warnings in N lines. Discard INFO/DEBUG."
+            concat!(
+                "You are a log compressor. Extract: \
+                (1) all ERROR/CRITICAL lines with timestamps; \
+                (2) WARN lines grouped as [xN] if repeated; \
+                (3) first stack trace only; \
+                (4) summary: X errors, Y warnings in N lines. Discard INFO/DEBUG.",
+                " STRICT RULES: Output only data extracted from the input. \
+                Do NOT add notes, assumptions, clarifications, or any sentence not found in the input. \
+                If a value is absent, omit the field — do not guess or approximate it. \
+                Stop immediately after the last extracted item."
+            )
         }
         OutputType::Diff => {
-            "You are a diff compressor. Extract: \
-            (1) files changed; \
-            (2) per-file: one-line summary of change; \
-            (3) total: X files, +Y -Z lines. Discard unchanged context."
+            concat!(
+                "You are a diff compressor. Extract: \
+                (1) files changed; \
+                (2) per-file: one-line summary of change; \
+                (3) total: X files, +Y -Z lines. Discard unchanged context.",
+                " STRICT RULES: Output only data extracted from the input. \
+                Do NOT add notes, assumptions, clarifications, or any sentence not found in the input. \
+                If a value is absent, omit the field — do not guess or approximate it. \
+                Stop immediately after the last extracted item."
+            )
         }
     }
 }
@@ -241,7 +256,11 @@ pub async fn pull_model(base_url: &str, model: &str, timeout_ms: u64) -> Result<
     let mut buf = String::new();
 
     // Use .chunk() to stream NDJSON without pulling the entire body into memory.
-    while let Some(chunk) = response.chunk().await.context("reading pull stream chunk")? {
+    while let Some(chunk) = response
+        .chunk()
+        .await
+        .context("reading pull stream chunk")?
+    {
         buf.push_str(std::str::from_utf8(&chunk).unwrap_or(""));
 
         // Process complete lines.
@@ -264,7 +283,10 @@ pub async fn pull_model(base_url: &str, model: &str, timeout_ms: u64) -> Result<
                     val.get("total").and_then(|v| v.as_u64()),
                 ) {
                     let pct = if total > 0 {
-                        completed.saturating_mul(100).checked_div(total).unwrap_or(0)
+                        completed
+                            .saturating_mul(100)
+                            .checked_div(total)
+                            .unwrap_or(0)
                     } else {
                         0
                     };
@@ -313,7 +335,10 @@ mod tests {
             OutputType::Generic,
         ] {
             let name = prompt_file_name(t);
-            assert!(!name.is_empty(), "prompt_file_name returned empty for {t:?}");
+            assert!(
+                !name.is_empty(),
+                "prompt_file_name returned empty for {t:?}"
+            );
         }
     }
 
@@ -323,7 +348,10 @@ mod tests {
         write_prompts(dir.path());
 
         let content = load_system_prompt(OutputType::Test, dir.path()).unwrap();
-        assert!(content.contains("test.txt"), "expected prompt content: {content}");
+        assert!(
+            content.contains("test.txt"),
+            "expected prompt content: {content}"
+        );
     }
 
     #[test]
@@ -331,9 +359,16 @@ mod tests {
         let dir = TempDir::new().expect("tempdir");
         // Don't write any prompts — should fall back to embedded strings.
         let result = load_system_prompt(OutputType::Build, dir.path());
-        assert!(result.is_ok(), "expected embedded fallback, got Err: {:?}", result.err());
+        assert!(
+            result.is_ok(),
+            "expected embedded fallback, got Err: {:?}",
+            result.err()
+        );
         let prompt = result.unwrap();
-        assert!(!prompt.is_empty(), "embedded fallback prompt must not be empty");
+        assert!(
+            !prompt.is_empty(),
+            "embedded fallback prompt must not be empty"
+        );
     }
 
     #[test]

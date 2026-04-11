@@ -4,3 +4,4 @@ You are a diff compressor. Extract:
 3. Total: X files, +Y -Z lines
 
 Discard: unchanged context lines, hunk headers.
+STRICT RULES: Output only data extracted from the input. Do NOT add notes, assumptions, clarifications, or any sentence not found in the input. If a value is absent, omit the field — do not guess or approximate it. Stop immediately after the last extracted item.

@@ -65,8 +65,8 @@ fn windows_is_tty() -> bool {
 #[cfg(windows)]
 fn enable_windows_ansi() {
     use windows_sys::Win32::System::Console::{
-        GetConsoleMode, GetStdHandle, SetConsoleMode, STD_OUTPUT_HANDLE,
-        ENABLE_VIRTUAL_TERMINAL_PROCESSING,
+        GetConsoleMode, GetStdHandle, SetConsoleMode, ENABLE_VIRTUAL_TERMINAL_PROCESSING,
+        STD_OUTPUT_HANDLE,
     };
     unsafe {
         let handle = GetStdHandle(STD_OUTPUT_HANDLE);
@@ -87,27 +87,31 @@ fn enable_windows_ansi() {
 macro_rules! color {
     ($name:ident, $code:expr) => {
         pub fn $name() -> &'static str {
-            if color_enabled() { $code } else { "" }
+            if color_enabled() {
+                $code
+            } else {
+                ""
+            }
         }
     };
 }
 
-color!(reset,         "\x1b[0m");
-color!(bold,          "\x1b[1m");
-color!(dim,           "\x1b[2m");
-color!(cyan,          "\x1b[36m");
-color!(bright_cyan,   "\x1b[96m");
-color!(green,         "\x1b[32m");
-color!(bright_green,  "\x1b[92m");
-color!(yellow,        "\x1b[33m");
+color!(reset, "\x1b[0m");
+color!(bold, "\x1b[1m");
+color!(dim, "\x1b[2m");
+color!(cyan, "\x1b[36m");
+color!(bright_cyan, "\x1b[96m");
+color!(green, "\x1b[32m");
+color!(bright_green, "\x1b[92m");
+color!(yellow, "\x1b[33m");
 color!(bright_yellow, "\x1b[93m");
-color!(red,           "\x1b[31m");
-color!(bright_red,    "\x1b[91m");
-color!(blue,          "\x1b[34m");
-color!(bright_blue,   "\x1b[94m");
-color!(magenta,       "\x1b[35m");
-color!(white,         "\x1b[97m");
-color!(gray,          "\x1b[90m");
+color!(red, "\x1b[31m");
+color!(bright_red, "\x1b[91m");
+color!(blue, "\x1b[34m");
+color!(bright_blue, "\x1b[94m");
+color!(magenta, "\x1b[35m");
+color!(white, "\x1b[97m");
+color!(gray, "\x1b[90m");
 
 /// Color a ratio value: ≤40% green, ≤80% yellow, >80% red.
 pub fn ratio_color(ratio_pct: usize) -> &'static str {
@@ -165,9 +169,9 @@ impl Spinner {
 
         let handle = std::thread::spawn(move || {
             let frames = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
-            let mut i = 0usize;
+            let mut frame_iter = frames.iter().cycle();
             while !stop_clone.load(Ordering::Relaxed) {
-                let frame = frames[i % frames.len()];
+                let frame = frame_iter.next().unwrap_or(&"⠋");
                 if color_enabled() {
                     print!("\r\x1b[96m{frame}\x1b[0m {label}");
                 } else {
@@ -175,11 +179,13 @@ impl Spinner {
                 }
                 let _ = std::io::stdout().flush();
                 std::thread::sleep(Duration::from_millis(80));
-                i = i.wrapping_add(1);
             }
         });
 
-        Self { stop, handle: Some(handle) }
+        Self {
+            stop,
+            handle: Some(handle),
+        }
     }
 
     /// Stop the spinner and clear the line. Call before printing the result.
@@ -239,11 +245,11 @@ impl BenchSpinner {
         let handle = std::thread::spawn(move || {
             let frames = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
             let start = std::time::Instant::now();
-            let mut i = 0usize;
+            let mut frame_iter = frames.iter().cycle();
 
             while !stop_clone.load(Ordering::Relaxed) {
                 let elapsed = start.elapsed().as_secs_f64();
-                let frame = frames[i % frames.len()];
+                let frame = frame_iter.next().unwrap_or(&"⠋");
                 let chars_label = if input_chars > 0 {
                     format!("  {}[{} chars]{}", "\x1b[90m", input_chars, "\x1b[0m")
                 } else {
@@ -258,11 +264,13 @@ impl BenchSpinner {
                 }
                 let _ = std::io::stdout().flush();
                 std::thread::sleep(Duration::from_millis(250));
-                i = i.wrapping_add(1);
             }
         });
 
-        Self { stop, handle: Some(handle) }
+        Self {
+            stop,
+            handle: Some(handle),
+        }
     }
 
     /// Stop spinner and clear the line.
@@ -290,13 +298,7 @@ impl Drop for BenchSpinner {
 // ---------------------------------------------------------------------------
 
 pub fn print_header(title: &str, separator: &str) {
-    println!(
-        "{}{}{}{}",
-        bold(),
-        bright_cyan(),
-        title,
-        reset()
-    );
+    println!("{}{}{}{}", bold(), bright_cyan(), title, reset());
     println!("{}{}{}", dim(), separator, reset());
 }
 

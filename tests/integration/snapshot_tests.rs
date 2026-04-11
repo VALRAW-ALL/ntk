@@ -42,10 +42,7 @@ fn compress_fixture(name: &str) -> String {
          # lines_removed: {}\n\
          ---\n\
          {}",
-        l2.original_tokens,
-        l2.compressed_tokens,
-        l1.lines_removed,
-        l2.output,
+        l2.original_tokens, l2.compressed_tokens, l1.lines_removed, l2.output,
     )
 }
 

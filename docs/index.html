@@ -1,0 +1,717 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>NTK — Neural Token Killer</title>
+  <meta name="description" content="Semantic compression proxy daemon for Claude Code. Reduces tool output by 70–99% before it reaches the LLM context using progressive neural compression layers." />
+  <meta property="og:title" content="NTK — Neural Token Killer" />
+  <meta property="og:description" content="Semantic compression proxy for Claude Code. 70–99% token savings with local neural inference." />
+  <meta property="og:type" content="website" />
+  <meta name="theme-color" content="#2979FF" />
+  <link rel="stylesheet" href="style.css" />
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='8' fill='%232979FF'/><text x='50%' y='54%' dominant-baseline='middle' text-anchor='middle' font-family='Ubuntu Mono,monospace' font-weight='700' font-size='16' fill='white'>N</text></svg>" />
+</head>
+<body>
+
+<!-- ════════════════════════ HEADER ════════════════════════ -->
+<header class="header" id="header">
+  <div class="container">
+    <div class="header-inner">
+      <div class="logo" onclick="navigateTo('home');" style="cursor:pointer">
+        <span>NTK</span>
+        <span class="logo-badge">v0.1</span>
+      </div>
+      <nav class="nav" role="navigation">
+        <button class="nav-link active" data-page="home"     onclick="navigateTo('home')"     data-i18n="nav.home">Home</button>
+        <button class="nav-link"        data-page="getstart" onclick="navigateTo('getstart')" data-i18n="nav.getstart">Get Started</button>
+        <button class="nav-link"        data-page="commands" onclick="navigateTo('commands')" data-i18n="nav.commands">Commands</button>
+        <button class="nav-link"        data-page="metrics"  onclick="navigateTo('metrics')"  data-i18n="nav.metrics">Metrics</button>
+      </nav>
+      <div class="header-cta">
+        <button class="lang-btn" id="langToggle" onclick="toggleLang()" title="Switch language">EN</button>
+        <button class="btn btn-primary btn-sm" onclick="navigateTo('getstart')" data-i18n="nav.getstarted">Get Started</button>
+        <button class="mobile-menu-btn" id="mobileMenuBtn" onclick="toggleMobileMenu()" aria-label="Menu">☰</button>
+      </div>
+    </div>
+  </div>
+  <nav class="mobile-nav" id="mobileNav">
+    <button class="nav-link" onclick="navigateTo('home');    toggleMobileMenu()" data-i18n="nav.home">Home</button>
+    <button class="nav-link" onclick="navigateTo('getstart');toggleMobileMenu()" data-i18n="nav.getstart">Get Started</button>
+    <button class="nav-link" onclick="navigateTo('commands');toggleMobileMenu()" data-i18n="nav.commands">Commands</button>
+    <button class="nav-link" onclick="navigateTo('metrics'); toggleMobileMenu()" data-i18n="nav.metrics">Metrics</button>
+  </nav>
+</header>
+
+<!-- ════════════════════════ PAGE: HOME ════════════════════════ -->
+<div id="page-home" class="page active">
+
+  <!-- Hero -->
+  <section class="hero">
+    <div class="hero-bg">
+      <div class="hero-grid"></div>
+      <div class="hero-orb-blue"></div>
+      <div class="hero-orb-green"></div>
+      <div class="hero-fade"></div>
+    </div>
+    <div class="container hero-content">
+
+      <div class="hero-badge">
+        <div class="hero-badge-dot"></div>
+        <span data-i18n="hero.badge">Open Source · Rust · Local AI</span>
+      </div>
+
+      <h1 class="hero-title">
+        <span data-i18n="hero.title1">Neural</span><br>
+        <span class="gradient-text-blue" data-i18n="hero.title2">Token Killer</span>
+      </h1>
+
+      <p class="hero-subtitle" data-i18n="hero.subtitle">
+        Semantic compression proxy daemon for Claude Code.
+        Reduces tool output by <strong>70–99%</strong> before it reaches the LLM context —
+        using three progressive compression layers with optional local neural inference.
+      </p>
+
+      <div class="hero-actions">
+        <button class="btn btn-primary" onclick="navigateTo('getstart')" data-i18n="hero.cta_primary">
+          ⚡ Get Started
+        </button>
+        <a class="btn btn-secondary" href="https://github.com/valraw/ntk" target="_blank" rel="noopener" data-i18n="hero.cta_github">
+          ☆ GitHub
+        </a>
+      </div>
+
+      <div style="margin-bottom:2rem">
+        <div class="install-strip" onclick="copyInstall(this)" title="Click to copy">
+          <span class="install-strip-label" data-i18n="hero.install_label">install</span>
+          <code>curl -fsSL https://ntk.valraw.com/install.sh | sh</code>
+          <span class="copy-icon">⎘</span>
+        </div>
+      </div>
+
+      <div class="stats-row fade-in">
+        <div class="stat-card">
+          <div class="stat-value" data-counter="99">0</div>
+          <div class="stat-label" data-i18n="hero.stat1">% max savings</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value" data-i18n="hero.stat2_val">&lt;1ms</div>
+          <div class="stat-label" data-i18n="hero.stat2">L1+L2 latency</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value" data-counter="3">0</div>
+          <div class="stat-label" data-i18n="hero.stat3">compression layers</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value" data-i18n="hero.stat4_val">0 deps</div>
+          <div class="stat-label" data-i18n="hero.stat4">runtime required</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- How it works -->
+  <section class="section">
+    <div class="container">
+      <div class="section-header fade-in">
+        <div class="section-badge section-badge-blue" data-i18n="how.badge">How it works</div>
+        <h2 class="section-title" data-i18n="how.title">Three layers, one result</h2>
+        <p class="section-desc" data-i18n="how.desc">Each layer activates only when needed, keeping latency near zero for small outputs.</p>
+      </div>
+      <div class="steps-grid fade-in">
+        <div class="step-card">
+          <div class="step-number">L1</div>
+          <div class="step-title" data-i18n="how.l1_title">Fast Filter</div>
+          <p class="step-desc" data-i18n="how.l1_desc">ANSI removal, line deduplication, test failure extraction. Always on. &lt;1ms.</p>
+        </div>
+        <div class="step-card">
+          <div class="step-number">L2</div>
+          <div class="step-title" data-i18n="how.l2_title">Tokenizer-Aware</div>
+          <p class="step-desc" data-i18n="how.l2_desc">cl100k_base BPE token counting, path shortening. Always on. &lt;5ms.</p>
+        </div>
+        <div class="step-card">
+          <div class="step-number">L3</div>
+          <div class="step-title" data-i18n="how.l3_title">Local Inference</div>
+          <p class="step-desc" data-i18n="how.l3_desc">Ollama/Phi-3 Mini with type-specific prompts. Only triggers when output &gt;300 tokens.</p>
+        </div>
+        <div class="step-card">
+          <div class="step-number">L4</div>
+          <div class="step-title" data-i18n="how.l4_title">Context Injection</div>
+          <p class="step-desc" data-i18n="how.l4_desc">Passes Claude's current intent to the model for context-aware compression. Optional.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Terminal demo -->
+  <section class="section section-alt">
+    <div class="container">
+      <div style="display:grid;grid-template-columns:1fr;gap:3rem;align-items:center">
+        <div class="fade-in" style="order:2">
+          <div class="section-badge section-badge-green" data-i18n="demo.badge">Live demo</div>
+          <h2 class="section-title" style="text-align:left;max-width:480px" data-i18n="demo.title">Installs in 30 seconds</h2>
+          <p style="color:var(--color-texto-terciario);margin-bottom:1.5rem;line-height:1.7;font-size:0.9375rem" data-i18n="demo.desc">
+            One command installs the binary, patches Claude Code's <code style="font-family:var(--font-mono);color:var(--color-primaria-clara)">settings.json</code>
+            with the PostToolUse hook, and creates the config file.
+          </p>
+          <button class="btn btn-primary" onclick="navigateTo('getstart')" data-i18n="demo.cta">View full guide →</button>
+        </div>
+        <div class="fade-in" style="order:1">
+          <div class="terminal">
+            <div class="terminal-bar">
+              <div class="terminal-dot terminal-dot-red"></div>
+              <div class="terminal-dot terminal-dot-yellow"></div>
+              <div class="terminal-dot terminal-dot-green"></div>
+              <div class="terminal-title">bash — ntk setup</div>
+            </div>
+            <div class="terminal-body">
+              <div><span class="prompt">$</span> <span class="cmd">curl -fsSL https://ntk.valraw.com/install.sh | sh</span></div>
+              <div class="success">✓  NTK v0.1.0 installed to /usr/local/bin/ntk</div>
+              <div></div>
+              <div><span class="prompt">$</span> <span class="cmd">ntk init -g</span></div>
+              <div class="info">⠙  Detecting environment...</div>
+              <div class="success">✓  Hook patched → ~/.claude/settings.json</div>
+              <div class="success">✓  Config created → ~/.ntk/config.json</div>
+              <div></div>
+              <div><span class="prompt">$</span> <span class="cmd">ntk model setup</span></div>
+              <div class="info">  [1] Ollama   — recommended, easiest</div>
+              <div class="dim">  [2] Candle   — in-process, no daemon</div>
+              <div class="dim">  [3] llama.cpp — advanced</div>
+              <div><span class="warn">💡  Recommendation: [1] Ollama</span></div>
+              <div></div>
+              <div><span class="prompt">$</span> <span class="cmd">ntk start &amp;&amp; ntk status</span></div>
+              <div class="success">✓  Daemon running on :8765</div>
+              <div class="highlight">  model: phi3:mini  backend: ollama  gpu: CUDA ✓</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Features -->
+  <section class="section">
+    <div class="container">
+      <div class="section-header fade-in">
+        <div class="section-badge section-badge-violet" data-i18n="features.badge">Features</div>
+        <h2 class="section-title" data-i18n="features.title">Built for developer workflows</h2>
+      </div>
+      <div class="features-grid fade-in">
+        <div class="feature-card">
+          <div class="feature-icon">⚡</div>
+          <div>
+            <div class="feature-title" data-i18n="feat.fast_title">Sub-millisecond L1+L2</div>
+            <div class="feature-desc" data-i18n="feat.fast_desc">Regex + tokenizer layers add &lt;5ms overhead to every Bash tool call.</div>
+          </div>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon">🧠</div>
+          <div>
+            <div class="feature-title" data-i18n="feat.ai_title">Local AI, zero cloud</div>
+            <div class="feature-desc" data-i18n="feat.ai_desc">Phi-3 Mini runs 100% on your machine. No API keys, no data sent to the cloud.</div>
+          </div>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon">🔌</div>
+          <div>
+            <div class="feature-title" data-i18n="feat.rtk_title">RTK compatible</div>
+            <div class="feature-desc" data-i18n="feat.rtk_desc">Works alongside RTK. RTK filters first, NTK semantically summarizes the result.</div>
+          </div>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon">🎯</div>
+          <div>
+            <div class="feature-title" data-i18n="feat.type_title">Type-aware compression</div>
+            <div class="feature-desc" data-i18n="feat.type_desc">Different prompts for test output, build errors, logs, diffs. Extracts exactly what matters.</div>
+          </div>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon">🖥</div>
+          <div>
+            <div class="feature-title" data-i18n="feat.gpu_title">GPU acceleration</div>
+            <div class="feature-desc" data-i18n="feat.gpu_desc">Auto-detects CUDA, Metal, AMX, AVX-512. L3 latency drops from 800ms to &lt;100ms on GPU.</div>
+          </div>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon">🌐</div>
+          <div>
+            <div class="feature-title" data-i18n="feat.cross_title">Cross-platform</div>
+            <div class="feature-desc" data-i18n="feat.cross_desc">Single Rust binary. Works on Windows, macOS, and Linux without any runtime dependencies.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <div class="divider"></div>
+</div><!-- /page-home -->
+
+<!-- ════════════════════════ PAGE: GET STARTED ════════════════════════ -->
+<div id="page-getstart" class="page">
+  <div class="container gs-layout">
+
+    <!-- Sidebar TOC -->
+    <aside class="gs-sidebar">
+      <ul class="gs-toc" id="tocList">
+        <li><a href="#step1" class="active" data-i18n="gs.toc1">1. Prerequisites</a></li>
+        <li><a href="#step2" data-i18n="gs.toc2">2. Install NTK</a></li>
+        <li><a href="#step3" data-i18n="gs.toc3">3. Initialize hook</a></li>
+        <li><a href="#step4" data-i18n="gs.toc4">4. Install model</a></li>
+        <li><a href="#step5" data-i18n="gs.toc5">5. Start daemon</a></li>
+        <li><a href="#step6" data-i18n="gs.toc6">6. Verify</a></li>
+        <li><a href="#step7" data-i18n="gs.toc7">Configuration</a></li>
+        <li><a href="#step8" data-i18n="gs.toc8">Uninstall</a></li>
+      </ul>
+    </aside>
+
+    <!-- Content -->
+    <main class="gs-content">
+      <div class="section-badge section-badge-blue" style="margin-bottom:1rem" data-i18n="gs.badge">Installation guide</div>
+      <h1 class="section-title" style="text-align:left;margin-bottom:0.5rem" data-i18n="gs.title">Get Started with NTK</h1>
+      <p style="color:var(--color-texto-terciario);margin-bottom:3rem;font-size:0.9375rem" data-i18n="gs.intro">
+        NTK is a single Rust binary. The setup takes under 5 minutes.
+      </p>
+
+      <!-- Step 1 -->
+      <div class="step-block" id="step1">
+        <div class="step-block-header">
+          <div class="step-num-circle">1</div>
+          <div class="step-block-title" data-i18n="gs.step1_title">Prerequisites</div>
+        </div>
+        <p data-i18n="gs.step1_desc">NTK requires <strong>Claude Code</strong> (the CLI) installed and configured. Layer 3 inference requires <strong>Ollama</strong> (recommended) or a compatible backend. CPU-only mode works without any AI backend.</p>
+        <div class="code-block">
+          <div class="code-block-header">
+            <span>bash</span>
+            <button class="copy-btn" onclick="copyCode(this)">⎘ copy</button>
+          </div>
+          <pre><span style="color:var(--color-texto-mutado)"># Check Claude Code is installed</span>
+claude --version
+
+<span style="color:var(--color-texto-mutado)"># Install Ollama (optional, recommended for L3)</span>
+curl -fsSL https://ollama.ai/install.sh | sh
+ollama serve &amp;</pre>
+        </div>
+      </div>
+
+      <!-- Step 2 -->
+      <div class="step-block" id="step2">
+        <div class="step-block-header">
+          <div class="step-num-circle">2</div>
+          <div class="step-block-title" data-i18n="gs.step2_title">Install NTK</div>
+        </div>
+        <p data-i18n="gs.step2_desc">The install script downloads the latest release binary for your OS and architecture:</p>
+        <div class="code-block">
+          <div class="code-block-header"><span>bash — Linux / macOS</span><button class="copy-btn" onclick="copyCode(this)">⎘ copy</button></div>
+          <pre>curl -fsSL https://ntk.valraw.com/install.sh | sh</pre>
+        </div>
+        <div class="code-block">
+          <div class="code-block-header"><span>PowerShell — Windows</span><button class="copy-btn" onclick="copyCode(this)">⎘ copy</button></div>
+          <pre>irm https://ntk.valraw.com/install.ps1 | iex</pre>
+        </div>
+        <p data-i18n="gs.step2_alt">Or install from source:</p>
+        <div class="code-block">
+          <div class="code-block-header"><span>bash — from source</span><button class="copy-btn" onclick="copyCode(this)">⎘ copy</button></div>
+          <pre>cargo install ntk</pre>
+        </div>
+      </div>
+
+      <!-- Step 3 -->
+      <div class="step-block" id="step3">
+        <div class="step-block-header">
+          <div class="step-num-circle">3</div>
+          <div class="step-block-title" data-i18n="gs.step3_title">Initialize hook</div>
+        </div>
+        <p data-i18n="gs.step3_desc">This patches <code style="font-family:var(--font-mono);color:var(--color-primaria-clara)">~/.claude/settings.json</code> to add the PostToolUse hook, copies the hook script, and creates <code style="font-family:var(--font-mono);color:var(--color-primaria-clara)">~/.ntk/config.json</code>:</p>
+        <div class="code-block">
+          <div class="code-block-header"><span>bash</span><button class="copy-btn" onclick="copyCode(this)">⎘ copy</button></div>
+          <pre>ntk init -g</pre>
+        </div>
+        <p data-i18n="gs.step3_note">The <code style="font-family:var(--font-mono);color:var(--color-primaria-clara)">-g</code> flag patches the global settings. Use without it for per-project setup. The operation is idempotent — safe to run multiple times.</p>
+      </div>
+
+      <!-- Step 4 -->
+      <div class="step-block" id="step4">
+        <div class="step-block-header">
+          <div class="step-num-circle">4</div>
+          <div class="step-block-title" data-i18n="gs.step4_title">Install model</div>
+        </div>
+        <p data-i18n="gs.step4_desc">Pull Phi-3 Mini (~2GB) via Ollama for Layer 3 semantic compression:</p>
+        <div class="code-block">
+          <div class="code-block-header"><span>bash</span><button class="copy-btn" onclick="copyCode(this)">⎘ copy</button></div>
+          <pre>ntk model pull          <span style="color:var(--color-texto-mutado)"># pulls phi3:mini Q5_K_M</span>
+
+<span style="color:var(--color-texto-mutado)"># Or choose a specific quantization:</span>
+ntk model pull --quant q4_k_m  <span style="color:var(--color-texto-mutado)"># smaller, faster</span>
+ntk model pull --quant q6_k   <span style="color:var(--color-texto-mutado)"># higher quality</span></pre>
+        </div>
+        <p data-i18n="gs.step4_skip">Skip this step to run in L1+L2 only mode (no neural inference, &lt;5ms latency).</p>
+      </div>
+
+      <!-- Step 5 -->
+      <div class="step-block" id="step5">
+        <div class="step-block-header">
+          <div class="step-num-circle">5</div>
+          <div class="step-block-title" data-i18n="gs.step5_title">Start daemon</div>
+        </div>
+        <div class="code-block">
+          <div class="code-block-header"><span>bash</span><button class="copy-btn" onclick="copyCode(this)">⎘ copy</button></div>
+          <pre>ntk start               <span style="color:var(--color-texto-mutado)"># CPU mode</span>
+ntk start --gpu         <span style="color:var(--color-texto-mutado)"># GPU acceleration (CUDA/Metal auto-detected)</span></pre>
+        </div>
+      </div>
+
+      <!-- Step 6 -->
+      <div class="step-block" id="step6">
+        <div class="step-block-header">
+          <div class="step-num-circle">6</div>
+          <div class="step-block-title" data-i18n="gs.step6_title">Verify installation</div>
+        </div>
+        <div class="code-block">
+          <div class="code-block-header"><span>bash</span><button class="copy-btn" onclick="copyCode(this)">⎘ copy</button></div>
+          <pre>ntk status              <span style="color:var(--color-texto-mutado)"># daemon status + model info</span>
+ntk test-compress file  <span style="color:var(--color-texto-mutado)"># test on a captured output</span>
+ntk gain                <span style="color:var(--color-texto-mutado)"># view token savings</span></pre>
+        </div>
+      </div>
+
+      <!-- Step 7: Config -->
+      <div class="step-block" id="step7">
+        <div class="step-block-header">
+          <div class="step-num-circle" style="background:linear-gradient(135deg,#7C4DFF,#2979FF)">⚙</div>
+          <div class="step-block-title" data-i18n="gs.step7_title">Configuration</div>
+        </div>
+        <p data-i18n="gs.step7_desc">Edit <code style="font-family:var(--font-mono);color:var(--color-primaria-clara)">~/.ntk/config.json</code> or place a <code style="font-family:var(--font-mono);color:var(--color-primaria-clara)">.ntk.json</code> in your project root for per-project overrides:</p>
+        <div class="code-block">
+          <div class="code-block-header"><span>~/.ntk/config.json</span><button class="copy-btn" onclick="copyCode(this)">⎘ copy</button></div>
+          <pre>{
+  <span style="color:var(--color-primaria-clara)">"compression"</span>: {
+    <span style="color:var(--color-primaria-clara)">"inference_threshold_tokens"</span>: <span style="color:var(--color-acento-verde-claro)">300</span>
+  },
+  <span style="color:var(--color-primaria-clara)">"model"</span>: {
+    <span style="color:var(--color-primaria-clara)">"provider"</span>: <span style="color:var(--color-secundaria-clara)">"ollama"</span>,
+    <span style="color:var(--color-primaria-clara)">"quantization"</span>: <span style="color:var(--color-secundaria-clara)">"q5_k_m"</span>,
+    <span style="color:var(--color-primaria-clara)">"gpu_layers"</span>: <span style="color:var(--color-acento-verde-claro)">-1</span>,
+    <span style="color:var(--color-primaria-clara)">"fallback_to_layer1_on_timeout"</span>: <span style="color:var(--color-acento-verde-claro)">true</span>
+  },
+  <span style="color:var(--color-primaria-clara)">"exclusions"</span>: {
+    <span style="color:var(--color-primaria-clara)">"commands"</span>: [<span style="color:var(--color-secundaria-clara)">"cat"</span>, <span style="color:var(--color-secundaria-clara)">"echo"</span>]
+  },
+  <span style="color:var(--color-primaria-clara)">"telemetry"</span>: { <span style="color:var(--color-primaria-clara)">"enabled"</span>: <span style="color:var(--color-acento-verde-claro)">true</span> }
+}</pre>
+        </div>
+      </div>
+
+      <!-- Step 8: Uninstall -->
+      <div class="step-block" id="step8">
+        <div class="step-block-header">
+          <div class="step-num-circle" style="background:rgba(255,23,68,0.6)">✕</div>
+          <div class="step-block-title" data-i18n="gs.step8_title">Uninstall</div>
+        </div>
+        <div class="code-block">
+          <div class="code-block-header"><span>bash</span><button class="copy-btn" onclick="copyCode(this)">⎘ copy</button></div>
+          <pre>ntk stop
+ntk init --uninstall    <span style="color:var(--color-texto-mutado)"># removes hook from settings.json</span>
+rm -rf ~/.ntk           <span style="color:var(--color-texto-mutado)"># remove config &amp; data</span></pre>
+        </div>
+      </div>
+    </main>
+  </div>
+</div><!-- /page-getstart -->
+
+<!-- ════════════════════════ PAGE: COMMANDS ════════════════════════ -->
+<div id="page-commands" class="page">
+  <div class="container commands-page">
+    <div class="section-badge section-badge-blue" style="margin-bottom:1rem" data-i18n="cmd.badge">Reference</div>
+    <h1 class="section-title" style="text-align:left;margin-bottom:0.5rem" data-i18n="cmd.title">Command Reference</h1>
+    <p style="color:var(--color-texto-terciario);margin-bottom:2rem;font-size:0.9375rem" data-i18n="cmd.intro">All NTK commands. Prefix every command with <code style="font-family:var(--font-mono);color:var(--color-primaria-clara)">ntk</code>.</p>
+
+    <input type="text" class="commands-search" id="cmdSearch" placeholder="Search commands…" data-i18n-placeholder="cmd.search" oninput="filterCmds(this.value)" />
+
+    <div id="cmdGroups">
+      <!-- Daemon -->
+      <div class="cmd-group" data-group="daemon">
+        <div class="cmd-group-title" data-i18n="cmd.g_daemon">Daemon</div>
+        <div class="cmd-row" data-cmd="start"><div class="cmd-name">start</div><div class="cmd-desc" data-i18n="cmd.start">Start the compression daemon on port 8765.</div></div>
+        <div class="cmd-row" data-cmd="start --gpu"><div class="cmd-name">start <span class="cmd-arg">--gpu</span></div><div class="cmd-desc" data-i18n="cmd.start_gpu">Start with GPU acceleration (CUDA/Metal auto-detected).</div></div>
+        <div class="cmd-row" data-cmd="stop"><div class="cmd-name">stop</div><div class="cmd-desc" data-i18n="cmd.stop">Stop the daemon.</div></div>
+        <div class="cmd-row" data-cmd="status"><div class="cmd-name">status</div><div class="cmd-desc" data-i18n="cmd.status">Show daemon status, loaded model, GPU info, and uptime.</div></div>
+      </div>
+
+      <!-- Setup -->
+      <div class="cmd-group" data-group="setup">
+        <div class="cmd-group-title" data-i18n="cmd.g_setup">Setup &amp; Init</div>
+        <div class="cmd-row" data-cmd="init -g"><div class="cmd-name">init <span class="cmd-arg">-g</span></div><div class="cmd-desc" data-i18n="cmd.init_g">Initialize globally: patch settings.json, create ~/.ntk/config.json.</div></div>
+        <div class="cmd-row" data-cmd="init --show"><div class="cmd-name">init <span class="cmd-arg">--show</span></div><div class="cmd-desc" data-i18n="cmd.init_show">Display current hook installation status.</div></div>
+        <div class="cmd-row" data-cmd="init --uninstall"><div class="cmd-name">init <span class="cmd-arg">--uninstall</span></div><div class="cmd-desc" data-i18n="cmd.init_uninstall">Remove the PostToolUse hook from settings.json.</div></div>
+        <div class="cmd-row" data-cmd="init --auto-patch"><div class="cmd-name">init <span class="cmd-arg">--auto-patch</span></div><div class="cmd-desc" data-i18n="cmd.init_auto">Non-interactive mode for CI/CD pipelines.</div></div>
+      </div>
+
+      <!-- Model -->
+      <div class="cmd-group" data-group="model">
+        <div class="cmd-group-title" data-i18n="cmd.g_model">Model</div>
+        <div class="cmd-row" data-cmd="model pull"><div class="cmd-name">model <span class="cmd-arg">pull</span></div><div class="cmd-desc" data-i18n="cmd.model_pull">Download phi3:mini (default Q5_K_M, ~2GB) via Ollama.</div></div>
+        <div class="cmd-row" data-cmd="model pull --quant"><div class="cmd-name">model <span class="cmd-arg">pull --quant q4_k_m</span></div><div class="cmd-desc" data-i18n="cmd.model_quant">Download a specific quantization (q4_k_m, q5_k_m, q6_k).</div></div>
+        <div class="cmd-row" data-cmd="model setup"><div class="cmd-name">model <span class="cmd-arg">setup</span></div><div class="cmd-desc" data-i18n="cmd.model_setup">Interactive backend selector (Ollama / Candle / llama.cpp).</div></div>
+        <div class="cmd-row" data-cmd="model test"><div class="cmd-name">model <span class="cmd-arg">test</span></div><div class="cmd-desc" data-i18n="cmd.model_test">Test model latency and output quality with a sample prompt.</div></div>
+        <div class="cmd-row" data-cmd="model bench"><div class="cmd-name">model <span class="cmd-arg">bench</span></div><div class="cmd-desc" data-i18n="cmd.model_bench">Benchmark CPU vs GPU inference latency.</div></div>
+      </div>
+
+      <!-- Compression -->
+      <div class="cmd-group" data-group="compress">
+        <div class="cmd-group-title" data-i18n="cmd.g_compress">Compression</div>
+        <div class="cmd-row" data-cmd="test-compress"><div class="cmd-name">test-compress <span class="cmd-arg">&lt;file&gt;</span></div><div class="cmd-desc" data-i18n="cmd.test_compress">Run the full pipeline on a captured output file and print result.</div></div>
+      </div>
+
+      <!-- Metrics -->
+      <div class="cmd-group" data-group="metrics">
+        <div class="cmd-group-title" data-i18n="cmd.g_metrics">Metrics &amp; Analytics</div>
+        <div class="cmd-row" data-cmd="metrics"><div class="cmd-name">metrics</div><div class="cmd-desc" data-i18n="cmd.metrics">Session metrics table in stdout (plain text).</div></div>
+        <div class="cmd-row" data-cmd="graph"><div class="cmd-name">graph</div><div class="cmd-desc" data-i18n="cmd.graph">ASCII bar chart + sparkline of savings over time.</div></div>
+        <div class="cmd-row" data-cmd="gain"><div class="cmd-name">gain</div><div class="cmd-desc" data-i18n="cmd.gain">Token savings summary (RTK-compatible output format).</div></div>
+        <div class="cmd-row" data-cmd="discover"><div class="cmd-name">discover</div><div class="cmd-desc" data-i18n="cmd.discover">Analyze Claude Code session for missed compression opportunities.</div></div>
+      </div>
+    </div>
+
+    <p style="margin-top:2rem;font-size:0.8125rem;color:var(--color-texto-mutado)" data-i18n="cmd.rtk_note">
+      💡 RTK users: prefix with <code style="font-family:var(--font-mono)">rtk ntk &lt;cmd&gt;</code> to also compress NTK's own output.
+    </p>
+  </div>
+</div><!-- /page-commands -->
+
+<!-- ════════════════════════ PAGE: METRICS ════════════════════════ -->
+<div id="page-metrics" class="page">
+  <div class="container metrics-page">
+    <div class="section-badge section-badge-green" style="margin-bottom:1rem" data-i18n="met.badge">Token savings</div>
+    <h1 class="section-title" style="text-align:left;margin-bottom:0.5rem" data-i18n="met.title">Savings by Command Type</h1>
+    <p style="color:var(--color-texto-terciario);margin-bottom:2rem;font-size:0.9375rem" data-i18n="met.intro">
+      Measured against real-world command output captured during development sessions.
+    </p>
+
+    <!-- KPI row -->
+    <div class="kpi-grid" style="margin-bottom:3rem">
+      <div class="kpi-card fade-in">
+        <div class="kpi-icon kpi-icon-green">⚡</div>
+        <div class="kpi-value gradient-text-green">99%</div>
+        <div class="kpi-label" data-i18n="met.kpi1">Max savings (vitest)</div>
+        <div class="kpi-sublabel" data-i18n="met.kpi1_sub">L1+L2+L3</div>
+      </div>
+      <div class="kpi-card fade-in">
+        <div class="kpi-icon kpi-icon-blue">🧠</div>
+        <div class="kpi-value gradient-text-blue">~85%</div>
+        <div class="kpi-label" data-i18n="met.kpi2">Avg NTK+RTK combined</div>
+        <div class="kpi-sublabel" data-i18n="met.kpi2_sub">across all commands</div>
+      </div>
+      <div class="kpi-card fade-in">
+        <div class="kpi-icon kpi-icon-blue" style="background:var(--color-secundaria-dim);border-color:var(--color-secundaria-border);color:var(--color-secundaria-clara)">⏱</div>
+        <div class="kpi-value" style="background:linear-gradient(135deg,#448AFF,#B388FF);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text">&lt;1ms</div>
+        <div class="kpi-label" data-i18n="met.kpi3">L1+L2 overhead</div>
+        <div class="kpi-sublabel" data-i18n="met.kpi3_sub">always on, zero impact</div>
+      </div>
+      <div class="kpi-card fade-in">
+        <div class="kpi-icon kpi-icon-green" style="background:rgba(0,230,118,0.1)">📉</div>
+        <div class="kpi-value gradient-text-green">3×</div>
+        <div class="kpi-label" data-i18n="met.kpi4">Faster responses</div>
+        <div class="kpi-sublabel" data-i18n="met.kpi4_sub">less context = less latency</div>
+      </div>
+    </div>
+
+    <!-- Tabs: NTK only / NTK+RTK -->
+    <div class="metrics-tab-group">
+      <button class="metrics-tab active" onclick="switchMetricsTab('ntk')" data-i18n="met.tab_ntk">NTK only</button>
+      <button class="metrics-tab" onclick="switchMetricsTab('combined')" data-i18n="met.tab_combined">NTK + RTK combined</button>
+    </div>
+
+    <!-- NTK only panel -->
+    <div class="metrics-panel active" id="panel-ntk">
+      <div class="savings-table-wrap fade-in">
+        <div class="savings-tabs-wrap">
+          <table class="savings-table" id="table-ntk">
+            <thead>
+              <tr>
+                <th data-i18n="met.th_category">Category</th>
+                <th data-i18n="met.th_commands">Commands</th>
+                <th data-i18n="met.th_savings">NTK Savings</th>
+                <th class="progress-cell" data-i18n="met.th_visual">Visual</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><strong data-i18n="met.cat_tests">Tests</strong></td>
+                <td><span style="font-family:var(--font-mono);font-size:0.8125rem">vitest, playwright, cargo test</span></td>
+                <td><span class="range-badge">90–99%</span></td>
+                <td class="progress-cell"><div class="progress-bar-bg"><div class="progress-bar-fill" data-width="99"></div></div></td>
+              </tr>
+              <tr>
+                <td><strong data-i18n="met.cat_build">Build</strong></td>
+                <td><span style="font-family:var(--font-mono);font-size:0.8125rem">next build, tsc, cargo build</span></td>
+                <td><span class="range-badge">70–87%</span></td>
+                <td class="progress-cell"><div class="progress-bar-bg"><div class="progress-bar-fill" data-width="87"></div></div></td>
+              </tr>
+              <tr>
+                <td><strong data-i18n="met.cat_git">Git</strong></td>
+                <td><span style="font-family:var(--font-mono);font-size:0.8125rem">status, log, diff, add, commit</span></td>
+                <td><span class="range-badge">59–80%</span></td>
+                <td class="progress-cell"><div class="progress-bar-bg"><div class="progress-bar-fill" data-width="80"></div></div></td>
+              </tr>
+              <tr>
+                <td><strong data-i18n="met.cat_gh">GitHub CLI</strong></td>
+                <td><span style="font-family:var(--font-mono);font-size:0.8125rem">gh pr, gh run, gh issue</span></td>
+                <td><span class="range-badge">26–87%</span></td>
+                <td class="progress-cell"><div class="progress-bar-bg"><div class="progress-bar-fill" data-width="87"></div></div></td>
+              </tr>
+              <tr>
+                <td><strong data-i18n="met.cat_pkg">Package Managers</strong></td>
+                <td><span style="font-family:var(--font-mono);font-size:0.8125rem">pnpm, npm, npx, cargo</span></td>
+                <td><span class="range-badge">70–90%</span></td>
+                <td class="progress-cell"><div class="progress-bar-bg"><div class="progress-bar-fill" data-width="90"></div></div></td>
+              </tr>
+              <tr>
+                <td><strong data-i18n="met.cat_files">Files / Search</strong></td>
+                <td><span style="font-family:var(--font-mono);font-size:0.8125rem">ls, grep, find, read</span></td>
+                <td><span class="range-badge">60–75%</span></td>
+                <td class="progress-cell"><div class="progress-bar-bg"><div class="progress-bar-fill" data-width="75"></div></div></td>
+              </tr>
+              <tr>
+                <td><strong data-i18n="met.cat_infra">Infrastructure</strong></td>
+                <td><span style="font-family:var(--font-mono);font-size:0.8125rem">docker, kubectl</span></td>
+                <td><span class="range-badge">85%</span></td>
+                <td class="progress-cell"><div class="progress-bar-bg"><div class="progress-bar-fill" data-width="85"></div></div></td>
+              </tr>
+              <tr>
+                <td><strong data-i18n="met.cat_net">Network</strong></td>
+                <td><span style="font-family:var(--font-mono);font-size:0.8125rem">curl, wget</span></td>
+                <td><span class="range-badge">65–70%</span></td>
+                <td class="progress-cell"><div class="progress-bar-bg"><div class="progress-bar-fill" data-width="70"></div></div></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- NTK+RTK combined panel -->
+    <div class="metrics-panel" id="panel-combined">
+      <p style="font-size:0.875rem;color:var(--color-texto-mutado);margin-bottom:1rem" data-i18n="met.combined_note">
+        Combined savings formula: <code style="font-family:var(--font-mono)">1 − (1 − rtk%) × (1 − ntk_incremental%)</code>
+      </p>
+      <div class="savings-table-wrap fade-in">
+        <div class="savings-tabs-wrap">
+          <table class="savings-table">
+            <thead>
+              <tr>
+                <th data-i18n="met.th_category">Category</th>
+                <th data-i18n="met.th_rtk">RTK alone</th>
+                <th data-i18n="met.th_ntk_inc">NTK incremental</th>
+                <th data-i18n="met.th_combined">NTK+RTK combined</th>
+                <th class="progress-cell" data-i18n="met.th_visual">Visual</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><strong data-i18n="met.cat_tests">Tests</strong></td>
+                <td><span class="range-badge" style="color:var(--color-texto-terciario)">90%</span></td>
+                <td><span class="range-badge" style="color:var(--color-texto-terciario)">~9%</span></td>
+                <td><span class="range-badge combined">~99%</span></td>
+                <td class="progress-cell"><div class="progress-bar-bg"><div class="progress-bar-fill combined" data-width="99"></div></div></td>
+              </tr>
+              <tr>
+                <td><strong data-i18n="met.cat_build">Build</strong></td>
+                <td><span class="range-badge" style="color:var(--color-texto-terciario)">83%</span></td>
+                <td><span class="range-badge" style="color:var(--color-texto-terciario)">~24%</span></td>
+                <td><span class="range-badge combined">~96%</span></td>
+                <td class="progress-cell"><div class="progress-bar-bg"><div class="progress-bar-fill combined" data-width="96"></div></div></td>
+              </tr>
+              <tr>
+                <td><strong data-i18n="met.cat_git">Git</strong></td>
+                <td><span class="range-badge" style="color:var(--color-texto-terciario)">70%</span></td>
+                <td><span class="range-badge" style="color:var(--color-texto-terciario)">~33%</span></td>
+                <td><span class="range-badge combined">~79%</span></td>
+                <td class="progress-cell"><div class="progress-bar-bg"><div class="progress-bar-fill combined" data-width="79"></div></div></td>
+              </tr>
+              <tr>
+                <td><strong data-i18n="met.cat_gh">GitHub CLI</strong></td>
+                <td><span class="range-badge" style="color:var(--color-texto-terciario)">80%</span></td>
+                <td><span class="range-badge" style="color:var(--color-texto-terciario)">~35%</span></td>
+                <td><span class="range-badge combined">~87%</span></td>
+                <td class="progress-cell"><div class="progress-bar-bg"><div class="progress-bar-fill combined" data-width="87"></div></div></td>
+              </tr>
+              <tr>
+                <td><strong data-i18n="met.cat_pkg">Package Managers</strong></td>
+                <td><span class="range-badge" style="color:var(--color-texto-terciario)">85%</span></td>
+                <td><span class="range-badge" style="color:var(--color-texto-terciario)">~33%</span></td>
+                <td><span class="range-badge combined">~90%</span></td>
+                <td class="progress-cell"><div class="progress-bar-bg"><div class="progress-bar-fill combined" data-width="90"></div></div></td>
+              </tr>
+              <tr>
+                <td><strong data-i18n="met.cat_infra">Infrastructure</strong></td>
+                <td><span class="range-badge" style="color:var(--color-texto-terciario)">85%</span></td>
+                <td><span class="range-badge" style="color:var(--color-texto-terciario)">0%</span></td>
+                <td><span class="range-badge combined">~85%</span></td>
+                <td class="progress-cell"><div class="progress-bar-bg"><div class="progress-bar-fill combined" data-width="85"></div></div></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- How savings are measured -->
+    <div style="margin-top:3rem;padding:1.5rem;border-radius:var(--radius-2xl);background:rgba(255,255,255,0.03);border:1px solid var(--color-borda-sutil)">
+      <h3 style="font-size:1rem;font-weight:600;margin-bottom:0.75rem" data-i18n="met.how_title">How savings are measured</h3>
+      <p style="font-size:0.875rem;color:var(--color-texto-terciario);line-height:1.7" data-i18n="met.how_desc">
+        Token counts use <strong>cl100k_base</strong> (tiktoken-rs), the same tokenizer as Claude/GPT. Measurements are taken on real captured outputs from development sessions: cargo test suites, tsc compiler errors, vitest runs, git operations, and docker logs. Layer 3 activates only when post-L1+L2 output exceeds 300 tokens, so small outputs incur zero neural inference latency.
+      </p>
+    </div>
+  </div>
+</div><!-- /page-metrics -->
+
+<!-- ════════════════════════ FOOTER ════════════════════════ -->
+<footer class="footer" id="site-footer">
+  <div class="container">
+    <div class="footer-grid">
+      <div class="footer-brand">
+        <div class="logo" style="cursor:default">
+          <span>NTK</span>
+          <span class="logo-badge">v0.1</span>
+        </div>
+        <p data-i18n="footer.desc">Neural Token Killer — semantic compression proxy for Claude Code. Built with Rust.</p>
+      </div>
+      <div>
+        <div class="footer-col-title" data-i18n="footer.docs">Docs</div>
+        <ul class="footer-links">
+          <li><a onclick="navigateTo('getstart')" data-i18n="footer.install">Installation</a></li>
+          <li><a onclick="navigateTo('commands')" data-i18n="footer.commands">Commands</a></li>
+          <li><a onclick="navigateTo('metrics')"  data-i18n="footer.metrics">Metrics</a></li>
+        </ul>
+      </div>
+      <div>
+        <div class="footer-col-title" data-i18n="footer.project">Project</div>
+        <ul class="footer-links">
+          <li><a href="https://github.com/valraw/ntk" target="_blank" rel="noopener">GitHub</a></li>
+          <li><a href="https://github.com/valraw/ntk/releases" target="_blank" rel="noopener" data-i18n="footer.releases">Releases</a></li>
+          <li><a href="https://github.com/valraw/ntk/issues" target="_blank" rel="noopener" data-i18n="footer.issues">Issues</a></li>
+        </ul>
+      </div>
+      <div>
+        <div class="footer-col-title" data-i18n="footer.ecosystem">Ecosystem</div>
+        <ul class="footer-links">
+          <li><a href="https://valraw.com.br" target="_blank" rel="noopener">VALRAW</a></li>
+          <li><a href="https://github.com/valraw/rtk" target="_blank" rel="noopener">RTK</a></li>
+          <li><a href="https://ollama.ai" target="_blank" rel="noopener">Ollama</a></li>
+        </ul>
+      </div>
+    </div>
+    <div class="footer-bottom">
+      <span data-i18n="footer.copy">© 2025 VALRAW. MIT License.</span>
+      <span>
+        <span data-i18n="footer.made">Made with</span>
+        <span style="color:var(--color-acento-verde)">♥</span>
+        <span data-i18n="footer.rust">in Rust</span>
+      </span>
+    </div>
+  </div>
+</footer>
+
+<script src="app.js"></script>
+</body>
+</html>
