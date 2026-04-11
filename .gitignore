@@ -1,0 +1,53 @@
+# Build output
+/target/
+
+# Cargo lock (keep for binaries, remove line below if this were a library)
+# Cargo.lock
+
+# IDE / editor
+.vscode/
+.idea/
+*.iml
+*.suo
+*.user
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Env / secrets
+.env
+.env.*
+!.env.example
+
+# NTK runtime files (generated at install/runtime — not source)
+~/.ntk/
+
+# Downloaded model files (large binaries — never commit)
+*.gguf
+*.bin
+tokenizer.json
+tokenizer_config.json
+config.json
+
+# Temporary files
+*.tmp
+*.bak
+*.ntk.bak
+
+# Benchmark / profiling artifacts
+flamegraph.svg
+perf.data
+perf.data.old
+
+# Snapshot test review pending diffs (insta)
+*.snap.new
+
+# Coverage output
+lcov.info
+coverage/
+tarpaulin-report.html
+
+# Logs
+*.log

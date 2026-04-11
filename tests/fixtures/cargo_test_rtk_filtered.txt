@@ -1,0 +1,23 @@
+[×8] test compressor::layer1::test_remove_ansi_codes ... ok
+[×3] test compressor::layer2::test_token_count_accuracy ... ok
+test detector::test_detects_cargo_test_output ... FAILED
+test detector::test_detects_git_diff ... FAILED
+[×5] test config::tests::* ... ok
+
+failures:
+
+---- detector::test_detects_cargo_test_output stdout ----
+thread panicked at 'assertion failed: left == right
+  left: Build
+ right: Test', tests/unit/detector_tests.rs:12:5
+
+---- detector::test_detects_git_diff stdout ----
+thread panicked at 'assertion failed: left == right
+  left: Generic
+ right: Diff', tests/unit/detector_tests.rs:48:5
+
+failures:
+    detector::test_detects_cargo_test_output
+    detector::test_detects_git_diff
+
+test result: FAILED. 16 passed; 2 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s

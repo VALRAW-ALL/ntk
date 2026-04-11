@@ -1,0 +1,28 @@
+src/components/auth/LoginForm.tsx(42,5): error TS2345: Argument of type 'string | undefined' is not assignable to parameter of type 'string'.
+  Type 'undefined' is not assignable to type 'string'.
+src/components/auth/LoginForm.tsx(67,12): error TS2339: Property 'userId' does not exist on type 'Session'.
+src/hooks/useAuth.ts(15,3): error TS2322: Type 'number' is not assignable to type 'string'.
+src/hooks/useAuth.ts(28,7): error TS7006: Parameter 'event' implicitly has an 'any' type.
+src/hooks/useAuth.ts(35,1): error TS2554: Expected 2 arguments, but got 1.
+src/api/client.ts(10,18): error TS2307: Cannot find module '@/types/api' or its corresponding type declarations.
+src/api/client.ts(55,22): error TS2345: Argument of type 'Response' is not assignable to parameter of type 'ApiResponse'.
+src/api/client.ts(72,5): error TS2304: Cannot find name 'RequestInit'.
+src/utils/format.ts(8,14): error TS2551: Property 'toLocaleDateStr' does not exist on type 'Date'. Did you mean 'toLocaleDateString'?
+src/utils/format.ts(23,9): error TS7005: Variable 'result' implicitly has an 'any' type.
+src/pages/dashboard/index.tsx(101,8): error TS2739: Type '{}' is missing the following properties from type 'DashboardProps': data, isLoading, onRefresh
+src/pages/dashboard/index.tsx(145,3): error TS2322: Type 'string | null' is not assignable to type 'string'.
+src/pages/settings/index.tsx(33,14): error TS2345: Argument of type 'FormEvent<HTMLFormElement>' is not assignable to parameter of type 'Event'.
+src/pages/settings/index.tsx(88,6): error TS2362: The left-hand side of an arithmetic operation must be of type 'any', 'number', 'bigint' or an enum type.
+src/store/userSlice.ts(19,3): error TS2322: Type 'null' is not assignable to type 'User'.
+src/store/userSlice.ts(44,7): error TS2345: Argument of type 'PayloadAction<undefined>' is not assignable to parameter of type 'PayloadAction<User>'.
+
+Found 16 errors in 7 files.
+
+Errors  Files
+     2  src/components/auth/LoginForm.tsx
+     3  src/hooks/useAuth.ts
+     3  src/api/client.ts
+     2  src/utils/format.ts
+     3  src/pages/dashboard/index.tsx
+     1  src/pages/settings/index.tsx
+     2  src/store/userSlice.ts

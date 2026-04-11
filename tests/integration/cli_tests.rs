@@ -1,0 +1,233 @@
+// Etapa 13 — CLI integration tests via assert_cmd
+//
+// These tests invoke the compiled `ntk` binary and verify its behavior
+// without requiring a running daemon.
+
+use assert_cmd::Command;
+use tempfile::TempDir;
+
+// ---------------------------------------------------------------------------
+// Helper
+// ---------------------------------------------------------------------------
+
+fn ntk() -> Command {
+    Command::cargo_bin("ntk").expect("ntk binary not found")
+}
+
+// ---------------------------------------------------------------------------
+// Tests
+// ---------------------------------------------------------------------------
+
+/// `ntk status` without a daemon should print a human-readable error message
+/// (not panic or produce a stack trace).
+#[test]
+fn test_ntk_status_without_daemon() {
+    let mut cmd = ntk();
+    cmd.arg("status");
+    // The command may succeed or fail, but it must NOT produce a panic/backtrace
+    // and must produce some useful output.
+    let output = cmd.output().expect("failed to run ntk status");
+    let combined = format!(
+        "{}{}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
+    );
+    // Must mention daemon, NTK, or "unreachable" in its output.
+    assert!(
+        combined.contains("daemon")
+            || combined.contains("NTK")
+            || combined.contains("unreachable")
+            || combined.contains("health")
+            || combined.contains("running"),
+        "unexpected status output: {combined}"
+    );
+    // Must not contain a Rust panic backtrace.
+    assert!(
+        !combined.contains("thread 'main' panicked"),
+        "status produced a panic: {combined}"
+    );
+}
+
+/// `ntk init --show` (read-only) should not crash and should mention hook or config.
+#[test]
+fn test_ntk_init_show_does_not_crash() {
+    let mut cmd = ntk();
+    cmd.args(["init", "--show"]);
+    let output = cmd.output().expect("failed to run ntk init --show");
+    let combined = format!(
+        "{}{}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
+    );
+    // Must not panic.
+    assert!(
+        !combined.contains("thread 'main' panicked"),
+        "ntk init --show panicked: {combined}"
+    );
+    // Should mention hook or config or status keywords.
+    assert!(
+        combined.contains("Hook")
+            || combined.contains("Config")
+            || combined.contains("NTK")
+            || combined.contains("not found")
+            || combined.contains("✓")
+            || combined.contains("✗"),
+        "unexpected show output: {combined}"
+    );
+}
+
+/// `ntk init --global` on a temp home dir should create the hook script and
+/// a config.json without error.
+#[test]
+fn test_ntk_install_creates_hook() {
+    let home = TempDir::new().expect("tempdir");
+    let home_path = home.path();
+
+    // NTK_HOME overrides dirs::home_dir() in the installer — works cross-platform.
+    let mut cmd = ntk();
+    cmd.args(["init", "--global", "--auto-patch"])
+        .env("NTK_HOME", home_path);
+
+    let output = cmd.output().expect("failed to run ntk init");
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let stderr = String::from_utf8_lossy(&output.stderr);
+
+    // Command must succeed.
+    assert!(
+        output.status.success(),
+        "ntk init failed:\nstdout: {stdout}\nstderr: {stderr}"
+    );
+
+    // Hook script must exist.
+    #[cfg(target_os = "windows")]
+    let hook_name = "ntk-hook.ps1";
+    #[cfg(not(target_os = "windows"))]
+    let hook_name = "ntk-hook.sh";
+
+    let hook_path = home_path.join(".ntk").join("bin").join(hook_name);
+    assert!(
+        hook_path.exists(),
+        "hook script not found at {}: stdout={stdout} stderr={stderr}",
+        hook_path.display()
+    );
+
+    // Config must exist.
+    let config_path = home_path.join(".ntk").join("config.json");
+    assert!(
+        config_path.exists(),
+        "config.json not found at {}",
+        config_path.display()
+    );
+
+    // settings.json should contain the NTK marker.
+    // NTK_HOME also controls where editor settings are looked up.
+    let settings = home_path.join(".claude").join("settings.json");
+    let settings_content = std::fs::read_to_string(&settings).unwrap_or_default();
+    assert!(
+        settings_content.contains("ntk-hook"),
+        "settings.json missing ntk-hook marker: {settings_content}"
+    );
+}
+
+/// `ntk init --uninstall` should remove the NTK hook from a previously patched settings.json.
+#[test]
+fn test_ntk_uninstall_removes_hook() {
+    let home = TempDir::new().expect("tempdir");
+    let home_path = home.path();
+
+    // First install.
+    ntk()
+        .args(["init", "--global", "--auto-patch"])
+        .env("NTK_HOME", home_path)
+        .output()
+        .expect("install failed");
+
+    // Verify hook was installed.
+    let settings = home_path.join(".claude").join("settings.json");
+    let before = std::fs::read_to_string(&settings).unwrap_or_default();
+    assert!(before.contains("ntk-hook"), "hook not installed before uninstall test");
+
+    // Now uninstall.
+    let output = ntk()
+        .args(["init", "--global", "--uninstall"])
+        .env("NTK_HOME", home_path)
+        .output()
+        .expect("uninstall failed");
+
+    assert!(
+        output.status.success(),
+        "uninstall failed: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+
+    let after = std::fs::read_to_string(&settings).unwrap_or_default();
+    assert!(
+        !after.contains("ntk-hook"),
+        "ntk-hook marker still present after uninstall: {after}"
+    );
+}
+
+/// `ntk test-compress <fixture>` should print a compression ratio and not crash.
+#[test]
+fn test_ntk_test_compress_file() {
+    let fixture = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("tests/fixtures/cargo_test_output.txt");
+
+    assert!(fixture.exists(), "fixture not found: {}", fixture.display());
+
+    let output = ntk()
+        .args(["test-compress", fixture.to_str().expect("fixture path")])
+        .output()
+        .expect("test-compress failed");
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let stderr = String::from_utf8_lossy(&output.stderr);
+
+    assert!(
+        output.status.success(),
+        "test-compress failed:\nstdout: {stdout}\nstderr: {stderr}"
+    );
+
+    // Output must mention compression ratio.
+    assert!(
+        stdout.contains("Compression") || stdout.contains("%"),
+        "expected compression ratio in output: {stdout}"
+    );
+
+    // Must not panic.
+    assert!(
+        !stdout.contains("thread 'main' panicked"),
+        "test-compress panicked: {stdout}"
+    );
+}
+
+/// `ntk gain` without a daemon should print a readable message (not panic).
+#[test]
+fn test_ntk_gain_format_rtk_compatible() {
+    let output = ntk()
+        .arg("gain")
+        .output()
+        .expect("ntk gain failed");
+
+    let combined = format!(
+        "{}{}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
+    );
+
+    // Must not panic.
+    assert!(
+        !combined.contains("thread 'main' panicked"),
+        "ntk gain panicked: {combined}"
+    );
+
+    // Should mention NTK or tokens or savings.
+    assert!(
+        combined.contains("NTK")
+            || combined.contains("token")
+            || combined.contains("daemon")
+            || combined.contains("unreachable")
+            || combined.contains("saved"),
+        "unexpected gain output: {combined}"
+    );
+}

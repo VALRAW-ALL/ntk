@@ -1,0 +1,122 @@
+[package]
+name = "ntk"
+version = "0.1.0"
+edition = "2021"
+description = "Neural Token Killer — semantic compression proxy for Claude Code"
+license = "Apache-2.0"
+
+[lib]
+name = "ntk"
+path = "src/lib.rs"
+
+[[bin]]
+name = "ntk"
+path = "src/main.rs"
+
+[dependencies]
+axum = "0.7"
+tokio = { version = "1", features = ["full"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+anyhow = "1"
+thiserror = "1"
+tiktoken-rs = "0.5"
+strip-ansi-escapes = "0.2"
+sqlx = { version = "0.7", features = ["sqlite", "runtime-tokio-rustls"] }
+libsqlite3-sys = { version = "0.27", features = ["bundled"], optional = true }
+dirs = "5"
+reqwest = { version = "0.11", features = ["json"] }
+clap = { version = "4", features = ["derive"] }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+ratatui = "0.28"
+
+# Optional: Candle in-process inference (--features candle)
+candle-core         = { version = "0.8", optional = true }
+candle-nn           = { version = "0.8", optional = true }
+candle-transformers = { version = "0.8", optional = true }
+tokenizers          = { version = "0.19", default-features = false, features = ["onig"], optional = true }
+zip = { version = "2", default-features = false, features = ["deflate"] }
+sha2 = "0.10"
+uuid = { version = "1", features = ["v4"] }
+url = "2"
+chrono = { version = "0.4", features = ["serde"] }
+
+[target.'cfg(unix)'.dependencies]
+nix = { version = "0.27", features = ["signal"] }
+
+[target.'cfg(windows)'.dependencies]
+windows-sys = { version = "0.52", features = ["Win32_System_Threading", "Win32_System_Console"] }
+
+[dev-dependencies]
+tempfile = "3"
+wiremock = "0.6"
+axum-test = "14"
+proptest = "1"
+insta = "1"
+assert_cmd = "2"
+criterion = { version = "0.5", features = ["html_reports"] }
+tokio-test = "0.4"
+predicates = "3"
+
+[features]
+default = ["sqlite-bundled"]
+sqlite-bundled = ["libsqlite3-sys/bundled"]
+candle = ["dep:candle-core", "dep:candle-nn", "dep:candle-transformers", "dep:tokenizers"]
+cuda   = ["candle", "candle-core/cuda",   "candle-nn/cuda",   "candle-transformers/cuda"]
+metal  = ["candle", "candle-core/metal",  "candle-nn/metal",  "candle-transformers/metal"]
+
+[profile.profiling]
+inherits = "release"
+debug = true
+lto = "thin"
+codegen-units = 1
+
+[[test]]
+name = "layer1_tests"
+path = "tests/unit/layer1_tests.rs"
+
+[[test]]
+name = "detector_tests"
+path = "tests/unit/detector_tests.rs"
+
+[[test]]
+name = "layer2_tests"
+path = "tests/unit/layer2_tests.rs"
+
+[[test]]
+name = "endpoint_tests"
+path = "tests/integration/endpoint_tests.rs"
+
+[[test]]
+name = "compression_pipeline_tests"
+path = "tests/integration/compression_pipeline_tests.rs"
+
+[[test]]
+name = "cli_tests"
+path = "tests/integration/cli_tests.rs"
+
+[[test]]
+name = "ollama_mock_tests"
+path = "tests/integration/ollama_mock_tests.rs"
+
+[[test]]
+name = "llamacpp_mock_tests"
+path = "tests/integration/llamacpp_mock_tests.rs"
+
+[[test]]
+name = "quality_regression_tests"
+path = "tests/integration/quality_regression_tests.rs"
+
+[[test]]
+name = "compression_invariants"
+path = "tests/proptest/compression_invariants.rs"
+
+[[test]]
+name = "snapshot_tests"
+path = "tests/integration/snapshot_tests.rs"
+
+[[bench]]
+name = "compression_bench"
+path = "tests/benchmarks/compression_bench.rs"
+harness = false

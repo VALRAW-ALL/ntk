@@ -1,0 +1,135 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+
+jobs:
+  test:
+    name: Test (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy, rustfmt
+
+      - name: Cache cargo registry + build
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-
+
+      # ---------------------------------------------------------------------------
+      # Build
+      # ---------------------------------------------------------------------------
+
+      - name: Build (debug)
+        run: cargo build --all-targets
+
+      - name: Build (release)
+        run: cargo build --release
+
+      # ---------------------------------------------------------------------------
+      # Lint
+      # ---------------------------------------------------------------------------
+
+      - name: Rustfmt check
+        run: cargo fmt --check
+
+      - name: Clippy (security gate — production code only)
+        run: >
+          cargo clippy --
+          -W clippy::unwrap_used
+          -W clippy::expect_used
+          -W clippy::panic
+          -W clippy::arithmetic_side_effects
+          -D warnings
+
+      # ---------------------------------------------------------------------------
+      # Unit + integration tests (excludes slow proptest suite)
+      # ---------------------------------------------------------------------------
+
+      - name: Unit tests
+        run: |
+          cargo test --test layer1_tests
+          cargo test --test layer2_tests
+          cargo test --test detector_tests
+
+      - name: Integration tests
+        run: |
+          cargo test --test compression_pipeline_tests
+          cargo test --test endpoint_tests
+          cargo test --test quality_regression_tests
+
+      - name: Snapshot tests
+        run: cargo test --test snapshot_tests
+
+      # CLI binary tests require the binary to be built first.
+      - name: CLI + Ollama mock tests
+        run: |
+          cargo test --test cli_tests
+          cargo test --test ollama_mock_tests
+
+      # ---------------------------------------------------------------------------
+      # Property-based tests (run with reduced cases on CI for speed)
+      # ---------------------------------------------------------------------------
+
+      - name: Property-based tests
+        env:
+          PROPTEST_CASES: 256
+        run: cargo test --test compression_invariants
+
+      # ---------------------------------------------------------------------------
+      # Security audit (dependency vulnerabilities)
+      # ---------------------------------------------------------------------------
+
+      - name: Install cargo-audit
+        run: cargo install cargo-audit --quiet
+
+      - name: Security audit
+        run: cargo audit
+
+  # ---------------------------------------------------------------------------
+  # Benchmark smoke test (does not compare numbers, just ensures no panic)
+  # ---------------------------------------------------------------------------
+
+  bench-smoke:
+    name: Benchmark smoke test
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ubuntu-bench-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Run benchmarks (1 sample — smoke only)
+        run: cargo bench -- --sample-size 10 2>&1 | tail -20

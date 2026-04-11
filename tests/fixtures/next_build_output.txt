@@ -1,0 +1,29 @@
+   Creating an optimized production build ...
+ ✓ Compiled successfully
+ ✓ Linting and checking validity of types
+ ✓ Collecting page data
+ ✓ Generating static pages (24/24)
+ ✓ Collecting build traces
+ ✓ Finalizing page optimization
+
+Route (app)                              Size     First Load JS
+┌ ○ /                                    5.12 kB        98.3 kB
+├ ○ /_not-found                          875 B          87.8 kB
+├ ƒ /api/auth/[...nextauth]              0 B                0 B
+├ ƒ /api/compress                        0 B                0 B
+├ ƒ /api/metrics                         0 B                0 B
+├ ○ /dashboard                           12.4 kB         108 kB
+├ ○ /dashboard/metrics                   8.9 kB         105 kB
+├ ○ /login                               4.2 kB         97.5 kB
+├ ○ /settings                            6.8 kB         100 kB
+└ ○ /settings/model                      3.1 kB         96.4 kB
+
+○  (Static)   prerendered as static content
+ƒ  (Dynamic)  server-rendered on demand
+
++ First Load JS shared by all             87.0 kB
+  ├ chunks/framework-aec844d2e21e0b5a.js  44.9 kB
+  ├ chunks/main-app-2c4b2d4f3a1e8b7c.js   29.3 kB
+  └ other shared chunks (total)           12.8 kB
+
+Build completed in 18.4s

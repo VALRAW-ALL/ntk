@@ -1,0 +1,992 @@
+use anyhow::{anyhow, Context, Result};
+use std::path::{Path, PathBuf};
+
+use crate::output::terminal as term;
+
+// ---------------------------------------------------------------------------
+// Public types
+// ---------------------------------------------------------------------------
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum EditorTarget {
+    ClaudeCode,
+    OpenCode,
+}
+
+pub struct Installer {
+    pub editor: EditorTarget,
+    pub auto_patch: bool,
+    pub hook_only: bool,
+}
+
+// ---------------------------------------------------------------------------
+// Hook JSON block injected into settings.json
+// ---------------------------------------------------------------------------
+
+const NTK_HOOK_MARKER: &str = "ntk-hook";
+
+fn hook_command() -> String {
+    #[cfg(target_os = "windows")]
+    {
+        // PowerShell does NOT expand `~` when receiving a path via the `-File`
+        // command-line argument — expand the home directory at install time so
+        // the stored command is always an absolute path.
+        if let Ok(home) = home_dir() {
+            let ps1 = home.join(".ntk").join("bin").join("ntk-hook.ps1");
+            return format!(
+                "powershell -NoProfile -File \"{}\"",
+                ps1.display()
+            );
+        }
+        // Fallback if home dir is unavailable (should never happen in practice).
+        "powershell -NoProfile -File \"%USERPROFILE%\\.ntk\\bin\\ntk-hook.ps1\"".to_owned()
+    }
+
+    #[cfg(not(target_os = "windows"))]
+    {
+        // Unix shells expand `~` before passing the argument — safe to use here.
+        "~/.ntk/bin/ntk-hook.sh".to_owned()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Step outcome — drives the summary icons
+// ---------------------------------------------------------------------------
+
+#[derive(PartialEq)]
+enum StepOutcome {
+    Ok,
+    Warn,
+    #[allow(dead_code)]
+    Err,
+}
+
+impl StepOutcome {
+    fn icon(&self) -> &'static str {
+        match self {
+            StepOutcome::Ok => "🟢",
+            StepOutcome::Warn => "🟡",
+            StepOutcome::Err => "🔴",
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// impl Installer
+// ---------------------------------------------------------------------------
+
+impl Installer {
+    /// Execute the installation.
+    pub fn run(&self) -> Result<()> {
+        let ntk_bin_dir = ntk_bin_dir()?;
+
+        println!(
+            "\n{}{}  Installing NTK globally…{}\n",
+            term::bold(),
+            term::bright_cyan(),
+            term::reset()
+        );
+
+        // Collect per-step status for the final summary.
+        // (label, detail, StepOutcome)
+        let mut summary: Vec<(&str, String, StepOutcome)> = Vec::new();
+
+        // Step 1: Create ~/.ntk/bin/
+        let sp = term::Spinner::start("Creating ~/.ntk/bin …");
+        match ensure_dir(&ntk_bin_dir) {
+            Ok(()) => sp.finish_ok("directory ready"),
+            Err(e) => {
+                sp.finish_err(&e.to_string());
+                return Err(e);
+            }
+        }
+
+        // Step 2: Copy NTK binary to ~/.ntk/bin/ntk[.exe]
+        let sp = term::Spinner::start("Installing NTK binary …");
+        match install_ntk_binary(&ntk_bin_dir) {
+            Ok(msg) => {
+                sp.finish_ok(&msg);
+                summary.push(("Binary ", msg, StepOutcome::Ok));
+            }
+            Err(e) => {
+                sp.finish_err(&e.to_string());
+                return Err(e);
+            }
+        }
+
+        // Step 3: Copy hook script
+        let hook_path = ntk_bin_dir.join(hook_script_name());
+        let sp = term::Spinner::start("Installing hook script …");
+        match copy_hook_script(&ntk_bin_dir) {
+            Ok(()) => {
+                let msg = hook_path.display().to_string();
+                sp.finish_ok(&msg);
+                summary.push(("Hook   ", msg, StepOutcome::Ok));
+            }
+            Err(e) => {
+                sp.finish_err(&e.to_string());
+                return Err(e);
+            }
+        }
+
+        // Step 4: Add ~/.ntk/bin to user PATH
+        let sp = term::Spinner::start("Updating PATH …");
+        match add_dir_to_path(&ntk_bin_dir) {
+            Ok(msg) => sp.finish_ok(&msg),
+            Err(e) => {
+                sp.finish_err(&e.to_string());
+                return Err(e);
+            }
+        }
+
+        // Step 5: Detect / install Ollama (non-fatal if it fails)
+        let sp = term::Spinner::start("Configuring Ollama …");
+        let ollama_outcome = match setup_ollama_path() {
+            Ok(msg) => {
+                sp.finish_ok(&msg);
+                (msg, StepOutcome::Ok)
+            }
+            Err(e) => {
+                let msg = e.to_string();
+                sp.finish_warn(&msg);
+                (msg, StepOutcome::Warn)
+            }
+        };
+        summary.push(("Ollama ", ollama_outcome.0, ollama_outcome.1));
+
+        // Step 6: Patch editor settings.json
+        let settings_path = editor_settings_path(self.editor)?;
+        let sp = term::Spinner::start("Patching editor settings …");
+        match patch_settings(&settings_path, self.auto_patch) {
+            Ok(()) => {
+                let msg = settings_path.display().to_string();
+                sp.finish_ok(&msg);
+                summary.push(("Editor ", msg, StepOutcome::Ok));
+            }
+            Err(e) => {
+                sp.finish_err(&e.to_string());
+                return Err(e);
+            }
+        }
+
+        // Step 7: Create default config (unless --hook-only)
+        let config_path = global_config_path()?;
+        if !self.hook_only {
+            let sp = term::Spinner::start("Creating config …");
+            match create_default_config() {
+                Ok(msg) => {
+                    sp.finish_ok(&msg);
+                    summary.push(("Config ", msg, StepOutcome::Ok));
+                }
+                Err(e) => {
+                    sp.finish_err(&e.to_string());
+                    return Err(e);
+                }
+            }
+        }
+
+        // Summary
+        let has_warn = summary.iter().any(|(_, _, o)| *o == StepOutcome::Warn);
+        println!();
+        if has_warn {
+            println!(
+                "  {}{}✓ NTK installed (with warnings){}",
+                term::bold(),
+                term::bright_yellow(),
+                term::reset()
+            );
+        } else {
+            println!(
+                "  {}{}✓ NTK installed successfully!{}",
+                term::bold(),
+                term::bright_green(),
+                term::reset()
+            );
+        }
+        println!();
+
+        // Per-step status line: icon + label + detail
+        let bin_path = ntk_bin_dir.join(ntk_binary_name());
+        // Always show binary and hook even if we didn't push them (edge case safety).
+        let _ = (&bin_path, &hook_path, &config_path, &settings_path);
+
+        for (label, detail, outcome) in &summary {
+            println!("  {} {}{}{}  {}", outcome.icon(), term::bold(), label, term::reset(), detail);
+        }
+
+        println!();
+        if has_warn {
+            println!(
+                "  {}ℹ  Layers 1+2 (fast compression) are active. Layer 3 (AI inference) requires Ollama.{}",
+                term::dim(),
+                term::reset()
+            );
+        }
+        println!(
+            "  {}💡 Open a new terminal, then run `ntk start` to start the daemon.{}",
+            term::dim(),
+            term::reset()
+        );
+        println!();
+        Ok(())
+    }
+
+    /// Show current installation status without modifying anything.
+    pub fn show_status(&self) -> Result<()> {
+        term::print_header(
+            "NTK Installation Status",
+            "───────────────────────────────────────",
+        );
+        println!();
+
+        let hook_path = ntk_bin_dir()?.join(hook_script_name());
+        print_status_line("🔗 Hook script ", &hook_path);
+
+        let config_path = global_config_path()?;
+        print_status_line("⚙  Config      ", &config_path);
+
+        let settings_path = editor_settings_path(self.editor)?;
+        let hook_installed = settings_path.exists()
+            && std::fs::read_to_string(&settings_path)
+                .map(|s| s.contains(NTK_HOOK_MARKER))
+                .unwrap_or(false);
+        let mark = if hook_installed {
+            term::ok_mark()
+        } else {
+            term::err_mark()
+        };
+        let suffix = if hook_installed {
+            String::new()
+        } else {
+            format!("  {}(not installed){}", term::bright_red(), term::reset())
+        };
+        println!(
+            "  {}🎯 Editor hook{}  {}  {}{}",
+            term::bold(),
+            term::reset(),
+            settings_path.display(),
+            mark,
+            suffix
+        );
+        println!();
+        Ok(())
+    }
+
+    /// Remove the NTK hook from editor settings.json.
+    pub fn uninstall(&self) -> Result<()> {
+        let settings_path = editor_settings_path(self.editor)?;
+        if !settings_path.exists() {
+            println!(
+                "  {} Editor settings not found — nothing to uninstall.",
+                term::warn_mark()
+            );
+            return Ok(());
+        }
+
+        let contents = std::fs::read_to_string(&settings_path)
+            .with_context(|| format!("reading {}", settings_path.display()))?;
+
+        if !contents.contains(NTK_HOOK_MARKER) {
+            println!(
+                "  {} NTK hook not found in settings — nothing to uninstall.",
+                term::warn_mark()
+            );
+            return Ok(());
+        }
+
+        let sp = term::Spinner::start("Removing NTK hook …");
+        let new_contents = remove_ntk_hook_from_json(&contents)?;
+        match write_atomic(&settings_path, &new_contents) {
+            Ok(()) => sp.finish_ok(&format!(
+                "hook removed from {}",
+                settings_path.display()
+            )),
+            Err(e) => {
+                sp.finish_err(&e.to_string());
+                return Err(e);
+            }
+        }
+
+        println!(
+            "  {}💾 Config and metrics preserved at ~/.ntk/{}",
+            term::dim(),
+            term::reset()
+        );
+        Ok(())
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Path helpers
+// ---------------------------------------------------------------------------
+
+/// Resolve home directory: `NTK_HOME` env var overrides `dirs::home_dir()`.
+/// This allows tests (and advanced users) to point NTK at a custom location.
+fn home_dir() -> Result<PathBuf> {
+    if let Ok(v) = std::env::var("NTK_HOME") {
+        return Ok(PathBuf::from(v));
+    }
+    dirs::home_dir().ok_or_else(|| anyhow!("cannot determine home directory"))
+}
+
+fn ntk_bin_dir() -> Result<PathBuf> {
+    Ok(home_dir()?.join(".ntk").join("bin"))
+}
+
+fn global_config_path() -> Result<PathBuf> {
+    Ok(home_dir()?.join(".ntk").join("config.json"))
+}
+
+fn editor_settings_path(editor: EditorTarget) -> Result<PathBuf> {
+    let home = home_dir()?;
+    let rel = match editor {
+        EditorTarget::ClaudeCode => Path::new(".claude").join("settings.json"),
+        EditorTarget::OpenCode => Path::new(".opencode").join("settings.json"),
+    };
+    Ok(home.join(rel))
+}
+
+#[cfg(target_os = "windows")]
+fn hook_script_name() -> &'static str {
+    "ntk-hook.ps1"
+}
+
+#[cfg(not(target_os = "windows"))]
+fn hook_script_name() -> &'static str {
+    "ntk-hook.sh"
+}
+
+#[cfg(target_os = "windows")]
+fn ntk_binary_name() -> &'static str {
+    "ntk.exe"
+}
+
+#[cfg(not(target_os = "windows"))]
+fn ntk_binary_name() -> &'static str {
+    "ntk"
+}
+
+// ---------------------------------------------------------------------------
+// Filesystem helpers
+// ---------------------------------------------------------------------------
+
+fn ensure_dir(path: &Path) -> Result<()> {
+    std::fs::create_dir_all(path)
+        .with_context(|| format!("creating directory {}", path.display()))
+}
+
+fn print_status_line(label: &str, path: &Path) {
+    let (mark, color) = if path.exists() {
+        (term::ok_mark(), "")
+    } else {
+        (term::err_mark(), "")
+    };
+    let _ = color;
+    println!("  {}{}{}  {}  {}", term::bold(), label, term::reset(), path.display(), mark);
+}
+
+/// Write file atomically: write to .tmp, then rename (atomic on NTFS + Unix).
+pub fn write_atomic(path: &Path, content: &str) -> Result<()> {
+    let tmp = path.with_extension("ntk.tmp");
+    std::fs::write(&tmp, content)
+        .with_context(|| format!("writing temp file {}", tmp.display()))?;
+    std::fs::rename(&tmp, path)
+        .with_context(|| format!("renaming {} → {}", tmp.display(), path.display()))
+}
+
+fn copy_hook_script(bin_dir: &Path) -> Result<()> {
+    let dest = bin_dir.join(hook_script_name());
+
+    // Embed the hook scripts at compile time.
+    #[cfg(target_os = "windows")]
+    let content = include_str!("../scripts/ntk-hook.ps1");
+    #[cfg(not(target_os = "windows"))]
+    let content = include_str!("../scripts/ntk-hook.sh");
+
+    std::fs::write(&dest, content)
+        .with_context(|| format!("writing hook script to {}", dest.display()))?;
+
+    // Set executable bit on Unix.
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        std::fs::set_permissions(&dest, std::fs::Permissions::from_mode(0o700))
+            .with_context(|| format!("setting permissions on {}", dest.display()))?;
+    }
+
+    Ok(())
+}
+
+fn create_default_config() -> Result<String> {
+    let config_path = global_config_path()?;
+    if config_path.exists() {
+        return Ok(format!("already exists — {}", config_path.display()));
+    }
+    let config_dir = config_path
+        .parent()
+        .ok_or_else(|| anyhow!("invalid config path"))?;
+    ensure_dir(config_dir)?;
+
+    let default_json = serde_json::to_string_pretty(&crate::config::NtkConfig::default())
+        .context("serializing default config")?;
+    write_atomic(&config_path, &default_json)?;
+
+    // Restrict permissions on Unix: config may contain sensitive paths.
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        std::fs::set_permissions(&config_path, std::fs::Permissions::from_mode(0o600))
+            .with_context(|| format!("setting permissions on {}", config_path.display()))?;
+    }
+
+    Ok(config_path.display().to_string())
+}
+
+// ---------------------------------------------------------------------------
+// Binary installation
+// ---------------------------------------------------------------------------
+
+/// Copy the currently running NTK binary to `~/.ntk/bin/ntk[.exe]`.
+/// Skipped if already running from that location.
+fn install_ntk_binary(bin_dir: &Path) -> Result<String> {
+    let current_exe = std::env::current_exe().context("getting current executable path")?;
+    let dest = bin_dir.join(ntk_binary_name());
+
+    // Canonicalize both paths to avoid copying a file over itself.
+    let canon_src = current_exe.canonicalize().unwrap_or_else(|_| current_exe.clone());
+    let canon_dst = dest.canonicalize().unwrap_or_else(|_| dest.clone());
+    if canon_src == canon_dst {
+        return Ok(format!("already installed — {}", dest.display()));
+    }
+
+    std::fs::copy(&current_exe, &dest)
+        .with_context(|| format!("copying ntk binary to {}", dest.display()))?;
+
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        std::fs::set_permissions(&dest, std::fs::Permissions::from_mode(0o755))
+            .with_context(|| format!("setting permissions on {}", dest.display()))?;
+    }
+
+    Ok(dest.display().to_string())
+}
+
+// ---------------------------------------------------------------------------
+// PATH management
+// ---------------------------------------------------------------------------
+
+/// Add `dir` to the persistent user PATH. Idempotent.
+fn add_dir_to_path(dir: &Path) -> Result<String> {
+    let dir_str = dir.to_string_lossy().into_owned();
+
+    #[cfg(target_os = "windows")]
+    {
+        windows_add_to_path(&dir_str)
+    }
+
+    #[cfg(not(target_os = "windows"))]
+    {
+        unix_add_to_path(&dir_str)
+    }
+}
+
+#[cfg(target_os = "windows")]
+fn windows_add_to_path(dir: &str) -> Result<String> {
+    // Read current user PATH via PowerShell.
+    let output = std::process::Command::new("powershell")
+        .args([
+            "-NoProfile",
+            "-Command",
+            "[Environment]::GetEnvironmentVariable('PATH', 'User')",
+        ])
+        .output()
+        .context("reading user PATH via PowerShell")?;
+
+    let current = String::from_utf8_lossy(&output.stdout).trim().to_owned();
+
+    // Idempotence: skip if already present (case-insensitive on Windows).
+    if current
+        .split(';')
+        .any(|p| p.trim().eq_ignore_ascii_case(dir))
+    {
+        return Ok(format!("already in PATH — {dir}"));
+    }
+
+    let new_path = format!("{current};{dir}");
+    let cmd = format!(
+        "[Environment]::SetEnvironmentVariable('PATH', '{}', 'User')",
+        new_path.replace('\'', "''") // escape single quotes
+    );
+
+    let status = std::process::Command::new("powershell")
+        .args(["-NoProfile", "-Command", &cmd])
+        .status()
+        .context("setting user PATH via PowerShell")?;
+
+    if !status.success() {
+        return Err(anyhow!("PowerShell failed to update PATH"));
+    }
+
+    Ok(format!("added {dir} — open a new terminal to apply"))
+}
+
+#[cfg(not(target_os = "windows"))]
+fn unix_add_to_path(dir: &str) -> Result<String> {
+    let shell = std::env::var("SHELL").unwrap_or_default();
+    let rc_files = shell_rc_files(&shell);
+
+    let export_line = format!("export PATH=\"$PATH:{dir}\"");
+
+    // Idempotence: check all candidate rc files first.
+    for rc in &rc_files {
+        if rc.exists() {
+            let content = std::fs::read_to_string(rc)
+                .with_context(|| format!("reading {}", rc.display()))?;
+            if content.contains(&export_line) {
+                return Ok(format!("already in PATH — {dir}"));
+            }
+        }
+    }
+
+    // Write to the first existing rc file, or ~/.profile as fallback.
+    let target = rc_files
+        .iter()
+        .find(|p| p.exists())
+        .cloned()
+        .unwrap_or_else(|| dirs::home_dir().unwrap_or_default().join(".profile"));
+
+    let mut file = std::fs::OpenOptions::new()
+        .append(true)
+        .create(true)
+        .open(&target)
+        .with_context(|| format!("opening {}", target.display()))?;
+
+    let block = format!("\n# NTK — Neural Token Killer\n{export_line}\n");
+    std::io::Write::write_all(&mut file, block.as_bytes())
+        .with_context(|| format!("writing to {}", target.display()))?;
+
+    Ok(format!("added to {} — run: source {}", target.display(), target.display()))
+}
+
+#[cfg(not(target_os = "windows"))]
+fn shell_rc_files(shell: &str) -> Vec<PathBuf> {
+    let home = dirs::home_dir().unwrap_or_default();
+    if shell.contains("zsh") {
+        vec![home.join(".zshrc"), home.join(".zprofile")]
+    } else if shell.contains("fish") {
+        let fish_config = dirs::config_dir()
+            .unwrap_or_else(|| home.join(".config"))
+            .join("fish")
+            .join("config.fish");
+        vec![fish_config]
+    } else {
+        // bash or unknown
+        vec![
+            home.join(".bashrc"),
+            home.join(".bash_profile"),
+            home.join(".profile"),
+        ]
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Ollama PATH detection
+// ---------------------------------------------------------------------------
+
+/// Detect, install (if missing), and configure Ollama in PATH.
+/// Tries silent installation via the platform's package manager or official installer.
+fn setup_ollama_path() -> Result<String> {
+    // Already in PATH — nothing to do.
+    if ollama_in_path() {
+        return Ok("already in PATH".to_owned());
+    }
+
+    // Installed but not in PATH — just add the dir.
+    let candidates = ollama_candidates();
+    for candidate in &candidates {
+        if candidate.exists() {
+            let dir = candidate
+                .parent()
+                .ok_or_else(|| anyhow!("cannot get parent of {}", candidate.display()))?;
+            add_dir_to_path(dir)?;
+            return Ok(format!("found at {} — added to PATH", candidate.display()));
+        }
+    }
+
+    // Not installed — attempt automatic installation.
+    match install_ollama() {
+        Ok(()) => {
+            // After installation, add to PATH (some installers do it, some don't).
+            let candidates = ollama_candidates();
+            for candidate in &candidates {
+                if candidate.exists() {
+                    let dir = candidate
+                        .parent()
+                        .ok_or_else(|| anyhow!("cannot get parent of {}", candidate.display()))?;
+                    add_dir_to_path(dir)?;
+                    return Ok(format!(
+                        "installed at {} — run `ntk model pull`",
+                        candidate.display()
+                    ));
+                }
+            }
+            Ok("installed — open a new terminal and run `ntk model pull`".to_owned())
+        }
+        Err(_) => Err(anyhow!(
+            "not found — Layer 3 inference disabled.\n    Install Ollama later: https://ollama.com/download\n    Then run: ntk model pull"
+        )),
+    }
+}
+
+/// Attempt to install Ollama using the platform's standard method.
+#[cfg(target_os = "windows")]
+fn install_ollama() -> Result<()> {
+    // Try winget first (available on Windows 10 1709+ / Windows 11).
+    let winget = std::process::Command::new("winget")
+        .args(["install", "--id", "Ollama.Ollama", "--silent", "--accept-package-agreements", "--accept-source-agreements"])
+        .status();
+
+    match winget {
+        Ok(s) if s.success() => return Ok(()),
+        Ok(_) => {} // winget ran but failed — try direct download
+        Err(_) => {} // winget not available — try direct download
+    }
+
+    // Fallback: download the official installer and run it silently.
+    let installer_url = "https://ollama.com/download/OllamaSetup.exe";
+    let tmp = std::env::temp_dir().join("OllamaSetup.exe");
+
+    download_file(installer_url, &tmp)?;
+
+    let status = std::process::Command::new(&tmp)
+        .args(["/S"]) // NSIS silent install flag
+        .status()
+        .context("running OllamaSetup.exe /S")?;
+
+    if !status.success() {
+        return Err(anyhow!("Ollama installer exited with error"));
+    }
+    Ok(())
+}
+
+#[cfg(target_os = "macos")]
+fn install_ollama() -> Result<()> {
+    // Try Homebrew first (most common on macOS).
+    let brew = std::process::Command::new("brew")
+        .args(["install", "ollama"])
+        .status();
+
+    match brew {
+        Ok(s) if s.success() => return Ok(()),
+        _ => {} // Homebrew unavailable or failed — try official .zip
+    }
+
+    // Fallback: download the official macOS app (.zip) and install to /Applications.
+    let url = "https://ollama.com/download/Ollama-darwin.zip";
+    let tmp_zip = std::env::temp_dir().join("Ollama-darwin.zip");
+    download_file(url, &tmp_zip)?;
+
+    // Unzip to /Applications.
+    let status = std::process::Command::new("unzip")
+        .args(["-o", &tmp_zip.to_string_lossy(), "-d", "/Applications"])
+        .status()
+        .context("unzipping Ollama-darwin.zip")?;
+
+    if !status.success() {
+        return Err(anyhow!("unzip failed for Ollama-darwin.zip"));
+    }
+
+    // The CLI is inside the .app bundle; symlink it to /usr/local/bin.
+    let cli = std::path::Path::new("/Applications/Ollama.app/Contents/MacOS/ollama");
+    let link = std::path::Path::new("/usr/local/bin/ollama");
+    if cli.exists() && !link.exists() {
+        std::os::unix::fs::symlink(cli, link).context("symlinking ollama CLI")?;
+    }
+    Ok(())
+}
+
+#[cfg(all(not(target_os = "windows"), not(target_os = "macos")))]
+fn install_ollama() -> Result<()> {
+    // Official Linux install script.
+    let status = std::process::Command::new("sh")
+        .args(["-c", "curl -fsSL https://ollama.com/install.sh | sh"])
+        .status()
+        .context("running Ollama install script")?;
+
+    if !status.success() {
+        return Err(anyhow!("Ollama install script failed"));
+    }
+    Ok(())
+}
+
+/// Download `url` to `dest` using reqwest (blocking via new runtime).
+fn download_file(url: &str, dest: &std::path::Path) -> Result<()> {
+    let rt = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .context("building tokio runtime for download")?;
+
+    rt.block_on(async {
+        let client = reqwest::Client::builder()
+            .timeout(std::time::Duration::from_secs(300)) // 5 min for large downloads
+            .build()
+            .context("building HTTP client")?;
+
+        let mut response = client
+            .get(url)
+            .send()
+            .await
+            .with_context(|| format!("downloading {url}"))?;
+
+        if !response.status().is_success() {
+            return Err(anyhow!("HTTP {} downloading {url}", response.status()));
+        }
+
+        let mut file = std::fs::File::create(dest)
+            .with_context(|| format!("creating {}", dest.display()))?;
+
+        while let Some(chunk) = response.chunk().await.context("reading download chunk")? {
+            std::io::Write::write_all(&mut file, &chunk)
+                .with_context(|| format!("writing to {}", dest.display()))?;
+        }
+        Ok(())
+    })
+}
+
+fn ollama_in_path() -> bool {
+    let cmd = if cfg!(target_os = "windows") {
+        "where"
+    } else {
+        "which"
+    };
+    std::process::Command::new(cmd)
+        .arg("ollama")
+        .output()
+        .map(|o| o.status.success())
+        .unwrap_or(false)
+}
+
+fn ollama_candidates() -> Vec<PathBuf> {
+    #[cfg(target_os = "windows")]
+    {
+        let local = std::env::var("LOCALAPPDATA").unwrap_or_default();
+        vec![
+            PathBuf::from(&local)
+                .join("Programs")
+                .join("Ollama")
+                .join("ollama.exe"),
+            PathBuf::from(r"C:\Program Files\Ollama\ollama.exe"),
+        ]
+    }
+
+    #[cfg(target_os = "macos")]
+    {
+        let home = dirs::home_dir().unwrap_or_default();
+        vec![
+            PathBuf::from("/usr/local/bin/ollama"),
+            PathBuf::from("/opt/homebrew/bin/ollama"),
+            home.join(".local").join("bin").join("ollama"),
+        ]
+    }
+
+    #[cfg(all(not(target_os = "windows"), not(target_os = "macos")))]
+    {
+        let home = dirs::home_dir().unwrap_or_default();
+        vec![
+            PathBuf::from("/usr/local/bin/ollama"),
+            PathBuf::from("/usr/bin/ollama"),
+            home.join(".local").join("bin").join("ollama"),
+        ]
+    }
+}
+
+// ---------------------------------------------------------------------------
+// settings.json patch / unpatch
+// ---------------------------------------------------------------------------
+
+/// Inject the NTK PostToolUse hook into editor settings.json.
+/// Idempotent: if the hook is already present, does nothing.
+fn patch_settings(settings_path: &Path, auto_patch: bool) -> Result<()> {
+    // Ensure parent dir exists.
+    if let Some(parent) = settings_path.parent() {
+        ensure_dir(parent)?;
+    }
+
+    // Load or start with empty JSON object.
+    let existing = if settings_path.exists() {
+        std::fs::read_to_string(settings_path)
+            .with_context(|| format!("reading {}", settings_path.display()))?
+    } else {
+        "{}".to_owned()
+    };
+
+    // Idempotence: hook already present.
+    // On Windows, also check that the stored command is not the broken `~` form
+    // (written by older NTK versions). If so, replace the entry with the correct
+    // absolute path so the hook actually works.
+    if existing.contains(NTK_HOOK_MARKER) {
+        #[cfg(target_os = "windows")]
+        if existing.contains("File ~/.ntk") {
+            // Remove stale entry then re-inject with the corrected command below.
+            let cleaned = remove_ntk_hook_from_json(&existing)?;
+            let new_json = inject_ntk_hook(&cleaned)?;
+            let backup = settings_path.with_extension("ntk.bak");
+            if settings_path.exists() && !backup.exists() {
+                std::fs::copy(settings_path, &backup)
+                    .with_context(|| format!("creating backup {}", backup.display()))?;
+            }
+            return write_atomic(settings_path, &new_json);
+        }
+        return Ok(());
+    }
+
+    let new_json = inject_ntk_hook(&existing)?;
+
+    // In non-auto mode, always proceed (interactive prompt not supported in
+    // library code — callers can add prompting around this function).
+    let _ = auto_patch;
+
+    // Backup before modifying.
+    let backup = settings_path.with_extension("ntk.bak");
+    if settings_path.exists() && !backup.exists() {
+        std::fs::copy(settings_path, &backup)
+            .with_context(|| format!("creating backup {}", backup.display()))?;
+    }
+
+    write_atomic(settings_path, &new_json)
+}
+
+/// Inject the NTK hook entry into the JSON string without losing existing content.
+fn inject_ntk_hook(json_str: &str) -> Result<String> {
+    let mut root: serde_json::Value =
+        serde_json::from_str(json_str).with_context(|| "parsing settings.json")?;
+
+    let hook_entry = serde_json::json!({
+        "matcher": "Bash",
+        "hooks": [{
+            "type": "command",
+            "command": hook_command()
+        }],
+        "_ntk": NTK_HOOK_MARKER
+    });
+
+    // Ensure root["hooks"]["PostToolUse"] exists as an array.
+    let hooks = root
+        .as_object_mut()
+        .ok_or_else(|| anyhow!("settings.json root is not an object"))?
+        .entry("hooks")
+        .or_insert_with(|| serde_json::json!({}))
+        .as_object_mut()
+        .ok_or_else(|| anyhow!("settings.json[\"hooks\"] is not an object"))?
+        .entry("PostToolUse")
+        .or_insert_with(|| serde_json::json!([]))
+        .as_array_mut()
+        .ok_or_else(|| anyhow!("settings.json[\"hooks\"][\"PostToolUse\"] is not an array"))?;
+
+    hooks.push(hook_entry);
+
+    serde_json::to_string_pretty(&root).context("serializing patched settings.json")
+}
+
+/// Remove the NTK hook entry from the JSON string.
+fn remove_ntk_hook_from_json(json_str: &str) -> Result<String> {
+    let mut root: serde_json::Value =
+        serde_json::from_str(json_str).with_context(|| "parsing settings.json")?;
+
+    if let Some(post_tool_use) = root
+        .pointer_mut("/hooks/PostToolUse")
+        .and_then(|v| v.as_array_mut())
+    {
+        post_tool_use.retain(|entry| {
+            entry
+                .get("_ntk")
+                .and_then(|v| v.as_str())
+                .map(|s| s != NTK_HOOK_MARKER)
+                .unwrap_or(true)
+        });
+    }
+
+    serde_json::to_string_pretty(&root).context("serializing cleaned settings.json")
+}
+
+// ---------------------------------------------------------------------------
+// Tests
+// ---------------------------------------------------------------------------
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use tempfile::TempDir;
+
+    fn temp_settings(content: &str) -> (TempDir, PathBuf) {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let path = dir.path().join("settings.json");
+        std::fs::write(&path, content).unwrap();
+        (dir, path)
+    }
+
+    #[test]
+    fn test_patch_adds_hook() {
+        let (_dir, path) = temp_settings("{}");
+        patch_settings(&path, true).unwrap();
+        let content = std::fs::read_to_string(&path).unwrap();
+        assert!(content.contains(NTK_HOOK_MARKER));
+        assert!(content.contains("PostToolUse"));
+    }
+
+    #[test]
+    fn test_idempotent_patch() {
+        let (_dir, path) = temp_settings("{}");
+        patch_settings(&path, true).unwrap();
+        let first = std::fs::read_to_string(&path).unwrap();
+        patch_settings(&path, true).unwrap();
+        let second = std::fs::read_to_string(&path).unwrap();
+        // Hook must not be duplicated.
+        assert_eq!(
+            first.matches(NTK_HOOK_MARKER).count(),
+            second.matches(NTK_HOOK_MARKER).count()
+        );
+    }
+
+    #[test]
+    fn test_uninstall_removes_hook() {
+        let (_dir, path) = temp_settings("{}");
+        patch_settings(&path, true).unwrap();
+        assert!(std::fs::read_to_string(&path).unwrap().contains(NTK_HOOK_MARKER));
+
+        let content = std::fs::read_to_string(&path).unwrap();
+        let cleaned = remove_ntk_hook_from_json(&content).unwrap();
+        std::fs::write(&path, &cleaned).unwrap();
+        assert!(!std::fs::read_to_string(&path).unwrap().contains(NTK_HOOK_MARKER));
+    }
+
+    #[test]
+    fn test_backup_created_before_patch() {
+        let (_dir, path) = temp_settings("{\"existing\": true}");
+        patch_settings(&path, true).unwrap();
+        let backup = path.with_extension("ntk.bak");
+        assert!(backup.exists(), "backup file should be created");
+        let bak_content = std::fs::read_to_string(&backup).unwrap();
+        assert!(bak_content.contains("\"existing\""));
+    }
+
+    #[test]
+    fn test_inject_preserves_existing_json() {
+        let original = serde_json::json!({
+            "theme": "dark",
+            "hooks": {
+                "PreToolUse": [{"matcher": "Read"}]
+            }
+        })
+        .to_string();
+        let patched = inject_ntk_hook(&original).unwrap();
+        let v: serde_json::Value = serde_json::from_str(&patched).unwrap();
+        // Original keys preserved.
+        assert_eq!(v["theme"], "dark");
+        // PreToolUse preserved.
+        assert!(v["hooks"]["PreToolUse"].as_array().is_some());
+        // NTK hook added.
+        assert!(patched.contains(NTK_HOOK_MARKER));
+    }
+}

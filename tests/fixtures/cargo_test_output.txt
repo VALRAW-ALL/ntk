@@ -1,0 +1,65 @@
+   Compiling ntk v0.1.0 (/home/user/project)
+    Finished test [unoptimized + debuginfo] target(s) in 4.23s
+     Running unittests src/lib.rs (target/debug/deps/ntk-a1b2c3d4e5f6)
+
+running 47 tests
+test compressor::layer1::test_collapse_blank_lines ... ok
+test compressor::layer1::test_detect_rtk_filtered_output ... ok
+test compressor::layer1::test_group_repeated_lines ... ok
+test compressor::layer1::test_keep_only_failures_cargo_test ... ok
+test compressor::layer1::test_remove_ansi_codes ... ok
+test compressor::layer1::test_remove_progress_bars ... ok
+test compressor::layer2::test_no_data_loss_in_reformatting ... ok
+test compressor::layer2::test_path_shortening_reduces_tokens ... ok
+test compressor::layer2::test_prefix_consolidation ... ok
+test compressor::layer2::test_threshold_not_triggered_below_300 ... ok
+test compressor::layer2::test_token_count_accuracy ... ok
+test config::tests::test_expand_tilde_in_storage_path ... ok
+test config::tests::test_load_default_when_file_missing ... ok
+test config::tests::test_load_full_config_from_file ... ok
+test config::tests::test_merge_does_not_affect_unspecified_fields ... ok
+test config::tests::test_merge_local_config_overrides_global ... ok
+test config::tests::test_validate_ollama_url_localhost_ok ... ok
+test config::tests::test_validate_ollama_url_remote_rejected ... ok
+test detector::tests::test_detects_cargo_test_output ... ok
+test detector::tests::test_detects_docker_logs ... ok
+test detector::tests::test_detects_git_diff ... FAILED
+test detector::tests::test_detects_tsc_output ... ok
+test detector::tests::test_detects_vitest_output ... ok
+test detector::tests::test_unknown_falls_back_to_generic ... ok
+test metrics::tests::test_empty_store_summary ... ok
+test metrics::tests::test_ratio_calculation ... ok
+test metrics::tests::test_recent_returns_last_n ... ok
+test metrics::tests::test_record_and_summary ... ok
+test server::tests::test_health_handler_returns_ok ... ok
+test server::tests::test_compress_short_input ... ok
+test server::tests::test_metrics_increments ... ok
+test output::graph::tests::test_bar_chart_empty ... ok
+test output::graph::tests::test_bar_chart_single ... ok
+test output::graph::tests::test_sparkline_single_value ... ok
+test output::table::tests::test_table_formats_ratio ... ok
+test output::table::tests::test_table_empty ... ok
+test output::table::tests::test_table_formats_layer ... ok
+test gpu::tests::test_gpu_detection_runs ... ok
+test telemetry::tests::test_disabled_via_env ... ok
+test telemetry::tests::test_payload_has_no_paths ... ok
+test telemetry::tests::test_salt_generated_once ... ok
+test installer::tests::test_idempotent_patch ... ok
+test installer::tests::test_patch_adds_hook ... ok
+test installer::tests::test_uninstall_removes_hook ... ok
+test installer::tests::test_backup_created_before_patch ... ok
+test installer::tests::test_show_status_no_panic ... ok
+test compressor::layer3::tests::test_stub_returns_input ... ok
+
+failures:
+
+---- detector::tests::test_detects_git_diff stdout ----
+thread 'detector::tests::test_detects_git_diff' panicked at 'assertion `left == right` failed
+  left: Generic
+ right: Diff', src/detector.rs:48:5
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+failures:
+    detector::tests::test_detects_git_diff
+
+test result: FAILED. 46 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.08s
