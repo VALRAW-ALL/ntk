@@ -666,17 +666,51 @@ fn run_graph() -> Result<()> {
 }
 
 fn run_gain() -> Result<()> {
-    let url = daemon_url()?;
-    let response = ureq_get(&format!("{url}/metrics"))?;
-    // Parse and reformat as RTK-compatible gain output.
-    if let Ok(val) = serde_json::from_str::<serde_json::Value>(&response) {
-        let saved = val["total_tokens_saved"].as_u64().unwrap_or(0);
-        let calls = val["total_compressions"].as_u64().unwrap_or(0);
-        let pct = val["average_ratio"].as_f64().unwrap_or(0.0) * 100.0;
-        println!("NTK: {saved} tokens saved across {calls} compressions ({pct:.0}% avg)");
-    } else {
-        println!("{response}");
+    let url = match daemon_url() {
+        Ok(u) => u,
+        Err(_) => {
+            println!("NTK: 0 tokens saved across 0 compressions (0% avg)");
+            println!("[ntk gain] daemon unreachable — start with: ntk start");
+            return Ok(());
+        }
+    };
+
+    // Fetch all session records for the bar chart.
+    let records: Vec<ntk::metrics::CompressionRecord> = match ureq_get(&format!("{url}/records")) {
+        Ok(body) => serde_json::from_str(&body).unwrap_or_default(),
+        Err(_) => vec![],
+    };
+
+    if records.is_empty() {
+        // No data yet — print the RTK-compatible one-liner and exit.
+        let response = ureq_get(&format!("{url}/metrics")).unwrap_or_default();
+        if let Ok(val) = serde_json::from_str::<serde_json::Value>(&response) {
+            let saved = val["total_tokens_saved"].as_u64().unwrap_or(0);
+            let calls = val["total_compressions"].as_u64().unwrap_or(0);
+            let pct = val["average_ratio"].as_f64().unwrap_or(0.0) * 100.0;
+            println!("NTK: {saved} tokens saved across {calls} compressions ({pct:.0}% avg)");
+        }
+        return Ok(());
     }
+
+    // Show the bar chart (includes footer with totals).
+    ntk::output::graph::print_bar_chart(&records);
+
+    // RTK-compatible one-liner below the chart (for piping/scripting).
+    let saved: u64 = records
+        .iter()
+        .map(|r| r.original_tokens.saturating_sub(r.compressed_tokens) as u64)
+        .sum();
+    let calls = records.len() as u64;
+    let avg_pct = if records.iter().map(|r| r.original_tokens).sum::<usize>() > 0 {
+        let orig: u64 = records.iter().map(|r| r.original_tokens as u64).sum();
+        saved as f64 / orig as f64 * 100.0
+    } else {
+        0.0
+    };
+    println!();
+    println!("NTK: {saved} tokens saved across {calls} compressions ({avg_pct:.0}% avg)");
+
     Ok(())
 }
 
@@ -2644,7 +2678,7 @@ fn run_model_test(debug: bool) -> Result<()> {
                     println!("  │ {line}");
                 }
                 if sp_lines.len() > 6 {
-                    println!("  │ … ({} more lines)", sp_lines.len() - 6);
+                    println!("  │ … ({} more lines)", sp_lines.len().saturating_sub(6));
                 }
                 println!();
             }
@@ -2712,7 +2746,7 @@ fn run_model_test(debug: bool) -> Result<()> {
         "  {}Ratio  :{} {}{}% compression{}  (output is {}% of input)  {}Speed: {tok_per_s:.2} tok/s{}",
         term::bold(),
         term::reset(),
-        term::ratio_color(100 - ratio_pct),
+        term::ratio_color(100_usize.saturating_sub(ratio_pct)),
         compression_pct,
         term::reset(),
         ratio_pct,

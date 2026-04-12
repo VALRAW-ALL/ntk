@@ -206,6 +206,7 @@ pub async fn run_live_dashboard(
 // Render loop (500 ms tick)
 // ---------------------------------------------------------------------------
 
+#[allow(clippy::too_many_arguments)]
 async fn dashboard_loop(
     terminal: &mut Terminal<CrosstermBackend<Stdout>>,
     metrics: Arc<Mutex<MetricsStore>>,
@@ -316,7 +317,7 @@ fn render_header(
     // The art lines are padded to a fixed width so the info column is stable.
     let info: [String; 6] = [
         String::new(),
-        format!("  Neural Token Killer"),
+        "  Neural Token Killer".to_string(),
         format!("  v{version}  •  {addr}"),
         format!("  Uptime: {uptime_str}"),
         format!("  Backend: {backend_name}"),
@@ -431,12 +432,16 @@ fn layer_line<'a>(
     bar_w: usize,
     color: Color,
 ) -> Line<'a> {
-    let filled = if total > 0 {
-        (count * bar_w / total).min(bar_w)
-    } else {
-        0
-    };
-    let bar = format!("{}{}", "█".repeat(filled), "░".repeat(bar_w - filled));
+    let filled = count
+        .saturating_mul(bar_w)
+        .checked_div(total)
+        .unwrap_or(0)
+        .min(bar_w);
+    let bar = format!(
+        "{}{}",
+        "█".repeat(filled),
+        "░".repeat(bar_w.saturating_sub(filled))
+    );
     Line::from(vec![
         Span::styled(format!("  {label}  "), Style::default().fg(Color::DarkGray)),
         Span::styled(bar, Style::default().fg(color)),
@@ -686,7 +691,7 @@ async fn attach_loop(terminal: &mut Terminal<CrosstermBackend<Stdout>>, url: Str
 /// Format a number with thousands separators: 1234567 → "1,234,567".
 fn fmt_num(n: usize) -> String {
     let s = n.to_string();
-    let mut out = String::with_capacity(s.len() + s.len() / 3);
+    let mut out = String::with_capacity(s.len().saturating_add(s.len() / 3));
     for (i, c) in s.chars().rev().enumerate() {
         if i > 0 && i % 3 == 0 {
             out.push(',');

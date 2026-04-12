@@ -205,7 +205,7 @@ impl CandleBackend {
         let mut generated: Vec<u32> = Vec::with_capacity(self.max_new_tokens);
         let mut logits_processor = LogitsProcessor::new(42, Some(0.1_f64), None);
 
-        for pos in input_token_count..input_token_count + self.max_new_tokens {
+        for pos in input_token_count..input_token_count.saturating_add(self.max_new_tokens) {
             let step_tensor = Tensor::new(&[last_token], &loaded.device)?.unsqueeze(0)?;
             let logits = loaded
                 .model

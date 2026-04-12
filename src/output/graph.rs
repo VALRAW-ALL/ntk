@@ -66,7 +66,7 @@ fn vis_chars(s: &str) -> usize {
                     esc = false;
                 }
             }
-            _ => n += 1,
+            _ => n = n.saturating_add(1),
         }
     }
     n
@@ -78,7 +78,7 @@ fn pad_to(s: &str, width: usize) -> String {
     if v >= width {
         s.to_owned()
     } else {
-        format!("{s}{:pad$}", "", pad = width - v)
+        format!("{s}{:pad$}", "", pad = width.saturating_sub(v))
     }
 }
 
@@ -107,13 +107,14 @@ pub fn print_bar_chart(records: &[CompressionRecord]) {
             .unwrap_or("?")
             .to_string();
         let sv = r.original_tokens.saturating_sub(r.compressed_tokens) as u64;
-        *savings_map.entry(base).or_insert(0) += sv;
+        let entry = savings_map.entry(base).or_insert(0);
+        *entry = entry.saturating_add(sv);
         let li = r.layer_used.saturating_sub(1) as usize;
         if li < 3 {
-            layer_counts[li] += 1;
+            layer_counts[li] = layer_counts[li].saturating_add(1);
         }
-        total_orig += r.original_tokens as u64;
-        total_comp += r.compressed_tokens as u64;
+        total_orig = total_orig.saturating_add(r.original_tokens as u64);
+        total_comp = total_comp.saturating_add(r.compressed_tokens as u64);
     }
 
     let total_saved = total_orig.saturating_sub(total_comp);
@@ -144,14 +145,14 @@ pub fn print_bar_chart(records: &[CompressionRecord]) {
         .max()
         .unwrap_or(4)
         .min(14);
-    let bar_w = W.saturating_sub(cmd_w + 23).max(8);
+    let bar_w = W.saturating_sub(cmd_w.saturating_add(23)).max(8);
     let max_sv = entries[0].1.max(1);
 
     let p = Palette::new();
 
     // ── Header ────────────────────────────────────────────────────────
     let title = " NTK · Token Savings ";
-    let dashes = W.saturating_sub(title.len() + 2);
+    let dashes = W.saturating_sub(title.len().saturating_add(2));
     println!("┌─{title}{:─<dashes$}─┐", "");
     println!("│{:W$}│", "");
 
@@ -159,7 +160,7 @@ pub fn print_bar_chart(records: &[CompressionRecord]) {
     for (cmd, sv) in &entries {
         let filled = (*sv as f64 / max_sv as f64 * bar_w as f64).round() as usize;
         let filled = filled.clamp(1, bar_w);
-        let empty = bar_w - filled;
+        let empty = bar_w.saturating_sub(filled);
         let pct = if total_saved > 0 {
             *sv as f64 / total_saved as f64 * 100.0
         } else {

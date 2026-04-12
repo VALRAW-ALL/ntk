@@ -77,6 +77,7 @@ pub fn build_router(state: AppState) -> Router {
     Router::new()
         .route("/compress", post(handle_compress))
         .route("/metrics", get(handle_metrics))
+        .route("/records", get(handle_records))
         .route("/health", get(handle_health))
         .route("/state", get(handle_state))
         .with_state(state)
@@ -212,6 +213,20 @@ async fn handle_compress(
 // ---------------------------------------------------------------------------
 
 // ---------------------------------------------------------------------------
+// GET /records — all in-memory compression records for the current session
+// ---------------------------------------------------------------------------
+
+async fn handle_records(
+    State(state): State<AppState>,
+) -> Result<RespJson<Vec<CompressionRecord>>, (StatusCode, String)> {
+    let records = state
+        .metrics
+        .lock()
+        .map(|m| m.recent(usize::MAX).to_vec())
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    Ok(RespJson(records))
+}
+
 // GET /metrics
 // ---------------------------------------------------------------------------
 

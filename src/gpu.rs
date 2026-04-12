@@ -144,7 +144,7 @@ fn amd_name() -> Option<String> {
     for line in stdout.lines() {
         let lower = line.to_lowercase();
         if lower.contains("card series") || lower.contains("product name") {
-            if let Some(val) = line.split(':').last() {
+            if let Some(val) = line.split(':').next_back() {
                 let name = val.trim().to_string();
                 if !name.is_empty() {
                     return Some(name);
