@@ -8,7 +8,7 @@ use sqlx::{sqlite::SqlitePool, Row};
 // Record — one compression event
 // ---------------------------------------------------------------------------
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, serde::Deserialize)]
 pub struct CompressionRecord {
     pub command: String,
     pub output_type: OutputType,
@@ -36,9 +36,11 @@ impl CompressionRecord {
 // SessionSummary — aggregate view returned by GET /metrics
 // ---------------------------------------------------------------------------
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, serde::Deserialize)]
 pub struct SessionSummary {
     pub total_compressions: usize,
+    pub total_original_tokens: usize,
+    pub total_compressed_tokens: usize,
     pub total_tokens_saved: usize,
     pub average_ratio: f32,
     /// Distribution: how many compressions used each layer.
@@ -81,6 +83,8 @@ impl MetricsStore {
         if self.records.is_empty() {
             return SessionSummary {
                 total_compressions: 0,
+                total_original_tokens: 0,
+                total_compressed_tokens: 0,
                 total_tokens_saved: 0,
                 average_ratio: 0.0,
                 layer_counts: [0; 3],
@@ -88,12 +92,17 @@ impl MetricsStore {
             };
         }
 
+        let mut total_original_tokens = 0usize;
+        let mut total_compressed_tokens = 0usize;
         let mut total_tokens_saved = 0usize;
         let mut ratio_sum = 0.0f32;
         let mut layer_counts = [0usize; 3];
         let mut rtk_pre_filtered_count = 0usize;
 
         for r in &self.records {
+            total_original_tokens = total_original_tokens.saturating_add(r.original_tokens);
+            total_compressed_tokens =
+                total_compressed_tokens.saturating_add(r.compressed_tokens);
             total_tokens_saved = total_tokens_saved
                 .saturating_add(r.original_tokens.saturating_sub(r.compressed_tokens));
             ratio_sum += r.ratio();
@@ -112,6 +121,8 @@ impl MetricsStore {
 
         SessionSummary {
             total_compressions: total,
+            total_original_tokens,
+            total_compressed_tokens,
             total_tokens_saved,
             average_ratio,
             layer_counts,
@@ -278,6 +289,22 @@ impl Serialize for OutputType {
             OutputType::Generic => "generic",
         };
         serializer.serialize_str(s)
+    }
+}
+
+impl<'de> serde::Deserialize<'de> for OutputType {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let s = String::deserialize(deserializer)?;
+        Ok(match s.as_str() {
+            "test"    => OutputType::Test,
+            "build"   => OutputType::Build,
+            "log"     => OutputType::Log,
+            "diff"    => OutputType::Diff,
+            _         => OutputType::Generic,
+        })
     }
 }
 

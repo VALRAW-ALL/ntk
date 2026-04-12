@@ -15,6 +15,8 @@ use std::fmt;
 pub enum GpuBackend {
     /// NVIDIA GPU via CUDA.
     CudaNvidia { device_id: u32, vram_mb: u64 },
+    /// AMD GPU via ROCm.
+    AmdGpu { device_id: u32, vram_mb: u64 },
     /// Apple Silicon GPU via Metal.
     MetalApple,
     /// Intel Advanced Matrix Extensions (Xeon 4th Gen / Core Ultra).
@@ -33,6 +35,9 @@ impl fmt::Display for GpuBackend {
             GpuBackend::CudaNvidia { device_id, vram_mb } => {
                 write!(f, "CUDA (device {device_id}, {vram_mb} MB VRAM)")
             }
+            GpuBackend::AmdGpu { device_id, vram_mb } => {
+                write!(f, "AMD ROCm (device {device_id}, {vram_mb} MB VRAM)")
+            }
             GpuBackend::MetalApple => write!(f, "Metal (Apple Silicon)"),
             GpuBackend::IntelAmx => write!(f, "Intel AMX"),
             GpuBackend::Avx512 => write!(f, "CPU AVX-512"),
@@ -47,9 +52,12 @@ impl fmt::Display for GpuBackend {
 // ---------------------------------------------------------------------------
 
 /// Detect the best available inference backend in priority order:
-/// CUDA → Metal → Intel AMX → AVX-512 → AVX2 → CPU scalar.
+/// CUDA → AMD ROCm → Metal → Intel AMX → AVX-512 → AVX2 → CPU scalar.
 pub fn detect_best_backend() -> GpuBackend {
     if let Some(b) = detect_cuda() {
+        return b;
+    }
+    if let Some(b) = detect_amd() {
         return b;
     }
     if detect_metal() {
@@ -58,9 +66,142 @@ pub fn detect_best_backend() -> GpuBackend {
     detect_cpu_backend()
 }
 
+/// Check for NVIDIA GPU via nvidia-smi. Returns the backend if found.
+pub fn detect_nvidia() -> Option<GpuBackend> {
+    detect_cuda()
+}
+
+/// Check for AMD GPU via rocm-smi. Returns the backend if found.
+pub fn detect_amd() -> Option<GpuBackend> {
+    run_rocm_smi()
+}
+
+/// Returns true if running on Apple Silicon (Metal available).
+pub fn is_metal_available() -> bool {
+    detect_metal()
+}
+
 /// One-line description for use in `ntk status`.
 pub fn backend_info(b: &GpuBackend) -> String {
     format!("Inference backend: {b}")
+}
+
+/// Returns the GPU model name string (NVIDIA or AMD), if a discrete GPU is detected.
+pub fn gpu_model_name() -> Option<String> {
+    if let Some(name) = nvidia_name() {
+        return Some(name);
+    }
+    amd_name()
+}
+
+/// Returns the CPU model name string (platform-specific).
+/// Falls back to an empty string if not determinable.
+pub fn cpu_model_name() -> Option<String> {
+    cpu_name_impl()
+}
+
+/// Short capability label for the current CPU (e.g. "AVX2").
+pub fn cpu_capability_label() -> &'static str {
+    match detect_cpu_backend() {
+        GpuBackend::IntelAmx => "AMX",
+        GpuBackend::Avx512 => "AVX-512",
+        GpuBackend::Avx2 => "AVX2",
+        _ => "Scalar",
+    }
+}
+
+fn nvidia_name() -> Option<String> {
+    let out = std::process::Command::new("nvidia-smi")
+        .args(["--query-gpu=name", "--format=csv,noheader,nounits"])
+        .output()
+        .ok()?;
+    if !out.status.success() {
+        return None;
+    }
+    let name = String::from_utf8_lossy(&out.stdout)
+        .lines()
+        .next()?
+        .trim()
+        .to_string();
+    if name.is_empty() {
+        None
+    } else {
+        Some(name)
+    }
+}
+
+fn amd_name() -> Option<String> {
+    // rocm-smi --showproductname prints lines like:
+    //   GPU[0]         : Card series:          Radeon RX 6800 XT
+    let out = std::process::Command::new("rocm-smi")
+        .args(["--showproductname"])
+        .output()
+        .ok()?;
+    if !out.status.success() {
+        return None;
+    }
+    let stdout = String::from_utf8_lossy(&out.stdout);
+    for line in stdout.lines() {
+        let lower = line.to_lowercase();
+        if lower.contains("card series") || lower.contains("product name") {
+            if let Some(val) = line.split(':').last() {
+                let name = val.trim().to_string();
+                if !name.is_empty() {
+                    return Some(name);
+                }
+            }
+        }
+    }
+    None
+}
+
+#[cfg(windows)]
+fn cpu_name_impl() -> Option<String> {
+    // wmic was deprecated in Windows 11; use PowerShell CIM instead.
+    let out = std::process::Command::new("powershell")
+        .args([
+            "-NoProfile",
+            "-Command",
+            "(Get-CimInstance Win32_Processor).Name",
+        ])
+        .output()
+        .ok()?;
+    let name = String::from_utf8_lossy(&out.stdout).trim().to_string();
+    if name.is_empty() {
+        None
+    } else {
+        Some(name)
+    }
+}
+
+#[cfg(target_os = "linux")]
+fn cpu_name_impl() -> Option<String> {
+    let cpuinfo = std::fs::read_to_string("/proc/cpuinfo").ok()?;
+    for line in cpuinfo.lines() {
+        if line.starts_with("model name") {
+            return line.split(':').nth(1).map(|s| s.trim().to_string());
+        }
+    }
+    None
+}
+
+#[cfg(target_os = "macos")]
+fn cpu_name_impl() -> Option<String> {
+    let out = std::process::Command::new("sysctl")
+        .args(["-n", "machdep.cpu.brand_string"])
+        .output()
+        .ok()?;
+    let s = String::from_utf8_lossy(&out.stdout).trim().to_string();
+    if s.is_empty() {
+        None
+    } else {
+        Some(s)
+    }
+}
+
+#[cfg(not(any(windows, target_os = "linux", target_os = "macos")))]
+fn cpu_name_impl() -> Option<String> {
+    None
 }
 
 // ---------------------------------------------------------------------------
@@ -106,6 +247,39 @@ fn run_nvidia_smi() -> Option<GpuBackend> {
         device_id: 0,
         vram_mb,
     })
+}
+
+// ---------------------------------------------------------------------------
+// AMD ROCm detection
+// ---------------------------------------------------------------------------
+
+/// Run `rocm-smi --showmeminfo vram --csv` and parse VRAM from the first GPU.
+fn run_rocm_smi() -> Option<GpuBackend> {
+    let output = std::process::Command::new("rocm-smi")
+        .args(["--showmeminfo", "vram", "--csv"])
+        .output()
+        .ok()?;
+
+    if !output.status.success() {
+        return None;
+    }
+
+    // CSV output format:
+    // device,VRAM Total Memory (B),VRAM Total Used Memory (B)
+    // card0,17163091968,10485760
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    for line in stdout.lines().skip(1) {
+        let parts: Vec<&str> = line.splitn(3, ',').collect();
+        if parts.len() >= 2 {
+            if let Ok(bytes) = parts[1].trim().parse::<u64>() {
+                return Some(GpuBackend::AmdGpu {
+                    device_id: 0,
+                    vram_mb: bytes / 1_048_576,
+                });
+            }
+        }
+    }
+    None
 }
 
 // ---------------------------------------------------------------------------
@@ -194,6 +368,13 @@ mod tests {
         };
         assert!(b.to_string().contains("CUDA"));
         assert!(b.to_string().contains("8192"));
+
+        let amd = GpuBackend::AmdGpu {
+            device_id: 0,
+            vram_mb: 16384,
+        };
+        assert!(amd.to_string().contains("AMD"));
+        assert!(amd.to_string().contains("16384"));
 
         assert!(GpuBackend::MetalApple.to_string().contains("Metal"));
         assert!(GpuBackend::Avx2.to_string().contains("AVX2"));

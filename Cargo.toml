@@ -1,6 +1,6 @@
 [package]
 name = "ntk"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2021"
 description = "Neural Token Killer — semantic compression proxy for Claude Code"
 license = "Apache-2.0"
@@ -28,8 +28,9 @@ dirs = "5"
 reqwest = { version = "0.11", features = ["json"] }
 clap = { version = "4", features = ["derive"] }
 tracing = "0.1"
-tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+tracing-subscriber = { version = "0.3", features = ["env-filter", "registry"] }
 ratatui = "0.28"
+crossterm = "0.28"
 
 # Optional: Candle in-process inference (--features candle)
 candle-core         = { version = "0.8", optional = true }

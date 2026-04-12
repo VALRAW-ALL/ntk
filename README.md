@@ -73,6 +73,7 @@ If the daemon is unreachable, the hook falls back gracefully to the original out
 |---|---|
 | [Ollama](https://ollama.com) | Recommended. Manages model download and GPU offloading. |
 | NVIDIA GPU (CUDA) | RTX series recommended; tested on RTX 3060+ |
+| AMD GPU (ROCm) | Detected via `rocm-smi`; ROCm 5.4+ |
 | Apple Silicon (Metal) | M1 and later |
 
 ---
@@ -91,6 +92,7 @@ cargo build --release
 cargo install --path .
 
 # Register the PostToolUse hook in Claude Code
+# (automatically launches ntk model setup after patching)
 ntk init -g
 ```
 
@@ -111,6 +113,9 @@ irm https://raw.githubusercontent.com/you/ntk/main/scripts/install.ps1 | iex
 1. Copies the hook script to `~/.ntk/bin/` (`ntk-hook.sh` on Unix, `ntk-hook.ps1` on Windows)
 2. Patches `~/.claude/settings.json` to register the `PostToolUse` hook (idempotent — safe to run multiple times)
 3. Creates `~/.ntk/config.json` with sensible defaults
+4. **Automatically launches `ntk model setup`** — the interactive wizard that detects your CPU/GPU hardware and configures the inference backend
+
+`--hook-only`, `--show`, and `--uninstall` skip the model setup step.
 
 ```json
 // ~/.claude/settings.json  (added by ntk init -g)
@@ -149,10 +154,54 @@ ntk init --uninstall
 ### Daemon lifecycle
 
 ```bash
-ntk start           # Start daemon on 127.0.0.1:8765
+ntk start           # Start daemon on 127.0.0.1:8765  (opens live TUI dashboard)
+                    # If daemon is already running: attaches to the live TUI dashboard
 ntk start --gpu     # Start with GPU inference enabled
 ntk stop            # Stop the daemon
 ntk status          # Show daemon status, loaded model, GPU backend
+ntk dashboard       # Combined status + session gain + ASCII bar chart (plain text, non-interactive)
+```
+
+**Live dashboard** — `ntk start` opens a full-screen TUI that updates every 500 ms. If the daemon is already running in the background, `ntk start` detects it and **attaches** to the live TUI without restarting the daemon. Press **Ctrl+C** to exit the TUI — the daemon keeps running:
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│ ██╗  ██╗████████╗██╗  ██╗                                   │
+│ ████╗ ██║╚══██╔══╝██║ ██╔╝   Neural Token Killer            │
+│ ██╔██╗██║   ██║   █████╔╝    v0.2  •  127.0.0.1:8765       │
+│ ██║╚████║   ██║   ██╔═██╗    Uptime: 3m 12s                 │
+│ ██║ ╚███║   ██║   ██║  ██╗   Backend: ollama (phi3:mini)    │
+│ ╚═╝  ╚══╝   ╚═╝   ╚═╝  ╚═╝                                 │
+├─────────────────── SESSION METRICS ─────────────────────────┤
+│  Compressions: 47     Tokens In: 84,291  →  Out: 12,048     │
+│  Saved: 72,243 tokens  •  Avg ratio: 85%                    │
+│                                                             │
+│  L1  ████████████████░░░░  38 runs                          │
+│  L2  ██████░░░░░░░░░░░░░░   7 runs                          │
+│  L3  ██░░░░░░░░░░░░░░░░░░   2 runs                          │
+├─────────────────── RECENT COMMANDS ─────────────────────────┤
+│  10:14:22  cargo test              1,842  →  312    L2  83% saved │
+│  10:14:08  git diff HEAD~1           940  →  188    L2  80% saved │
+│  10:13:51  docker logs api         3,200  →  412    L2  87% saved │
+└─────────────────────────────────────────────────────────────┘
+```
+
+Press **Ctrl+C** in the **attached** TUI to exit the dashboard without stopping the daemon. Press **Ctrl+C** when you started the daemon (first `ntk start`) to stop it gracefully. When stdout is not a TTY (piped or CI), `ntk start` falls back to a single status line.
+
+**Static dashboard** — `ntk dashboard` prints a combined snapshot to stdout and exits immediately (no event loop, always safe to use in scripts or CI):
+
+```
+● NTK daemon  running  127.0.0.1:8765  up 3m 22s  backend: ollama (phi3:mini)
+  14382 tokens saved across 47 compressions (78% avg ratio)
+
+┌─ NTK · Token Savings ──────────────────────────────────────────────────────┐
+│                                                                              │
+│  cargo     ████████████████████████████████████████  41823 tok  58%         │
+│  git       ████████████████████                      21204 tok  29%         │
+│  docker    ████████                                   9101 tok  13%         │
+│                                                                              │
+│  47 compressions · 72128 tokens saved · 78% avg                             │
+└──────────────────────────────────────────────────────────────────────────────┘
 ```
 
 ### Metrics and history
@@ -219,6 +268,11 @@ Commands that perform inference show a real-time progress animation:
 ### Model management (Layer 3)
 
 ```bash
+# Interactive backend + hardware setup wizard
+# Runs automatically after ntk init / ntk init -g.
+# Can also be run manually to reconfigure at any time.
+ntk model setup
+
 # Download the default model via Ollama
 ntk model pull
 
@@ -226,8 +280,14 @@ ntk model pull
 ntk model pull --quant q4_k_m   # faster, less RAM
 ntk model pull --quant q6_k     # better quality, more RAM
 
-# Test inference latency
+# Test inference latency and output quality
 ntk model test
+
+# Test with verbose debug output:
+#   hardware config, thread counts, mlock status, system prompt preview,
+#   timing breakdown, and performance analysis with CPU-tier-aware targets
+#   (mobile/low-power ≥5 tok/s, desktop ≥10, high-end ≥15, GPU ≥40)
+ntk model test --debug
 
 # Benchmark CPU vs GPU
 ntk model bench
@@ -328,12 +388,15 @@ NTK auto-detects the best inference backend at startup:
 
 ```
 1. NVIDIA CUDA  (detected via nvidia-smi)
-2. Apple Metal  (aarch64-apple-darwin compile target)
-3. Intel AMX    (Xeon 4th Gen / Core Ultra)
-4. AVX-512      (is_x86_feature_detected!)
-5. AVX2         (most modern x86)
-6. CPU Scalar   (fallback)
+2. AMD ROCm     (detected via rocm-smi)
+3. Apple Metal  (aarch64-apple-darwin compile target)
+4. Intel AMX    (Xeon 4th Gen / Core Ultra)
+5. AVX-512      (is_x86_feature_detected!)
+6. AVX2         (most modern x86)
+7. CPU Scalar   (fallback)
 ```
+
+The `ntk model setup` wizard detects your hardware at runtime and presents a GPU/CPU selection step, showing each option with availability status, VRAM, and expected latency. Your choice is saved to `config.model.gpu_layers` (`-1` = GPU, `0` = CPU).
 
 **Performance expectations — Phi-3 Mini 3.8B Q5_K_M (Layer 3 latency p95):**
 
@@ -341,6 +404,7 @@ NTK auto-detects the best inference backend at startup:
 |---|---|---|---|
 | CUDA | RTX 3060 | ~50ms | ~80ms |
 | CUDA | RTX 5060 Ti | ~30ms | ~50ms |
+| AMD ROCm | RX 6800 XT | ~80ms | ~130ms |
 | Metal | M2 MacBook Pro | ~80ms | ~150ms |
 | Intel AMX | Xeon 4th Gen | ~150ms | ~250ms |
 | AVX2 CPU | i7-12700 | ~300ms | ~500ms |
@@ -348,10 +412,13 @@ NTK auto-detects the best inference backend at startup:
 
 Layer 3 is skipped entirely for outputs below the threshold (default 300 tokens), so most small commands like `git add` or `ls` add zero latency.
 
-**Build with GPU support:**
+**Build options:**
 
 ```bash
-# CUDA (NVIDIA)
+# Default build — includes Candle (in-process inference, no Ollama needed)
+cargo build --release
+
+# CUDA (NVIDIA) — enables GPU offloading for Candle
 cargo build --release --features cuda
 
 # Metal (Apple Silicon)
@@ -474,7 +541,7 @@ cargo fmt --check
 ```
 src/
   main.rs                  — CLI (clap) + daemon entry point
-  server.rs                — HTTP routes: /compress, /metrics, /health
+  server.rs                — HTTP routes: /compress, /metrics, /health, /state
   config.rs                — Config deserialization + merge + validation
   detector.rs              — Output type detection (test/build/log/diff/generic)
   metrics.rs               — In-memory store + SQLite persistence (sqlx)
@@ -491,7 +558,8 @@ src/
   output/
     terminal.rs            — ANSI colors, TTY detection, Spinner + BenchSpinner
     table.rs               — Metrics tables for stdout
-    graph.rs               — ASCII bar charts + sparklines (ratatui TestBackend)
+    graph.rs               — ASCII bar charts + sparklines (stdout, non-interactive)
+    dashboard.rs           — ratatui TUI: live + attach-mode dashboard (polls /state endpoint)
 
 scripts/
   ntk-hook.sh              — PostToolUse hook (Unix/macOS)

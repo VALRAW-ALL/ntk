@@ -65,6 +65,16 @@ pub enum ModelProvider {
     LlamaCpp,
 }
 
+impl ModelProvider {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::Ollama => "ollama",
+            Self::Candle => "candle",
+            Self::LlamaCpp => "llama.cpp",
+        }
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(default)]
 pub struct ModelConfig {

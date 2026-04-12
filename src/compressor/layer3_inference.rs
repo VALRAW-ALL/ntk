@@ -124,7 +124,7 @@ fn prompt_file_name(output_type: OutputType) -> &'static str {
     }
 }
 
-pub(crate) fn load_system_prompt(output_type: OutputType, prompts_dir: &Path) -> Result<String> {
+pub fn load_system_prompt(output_type: OutputType, prompts_dir: &Path) -> Result<String> {
     let file_name = prompt_file_name(output_type);
     let path = prompts_dir.join(file_name);
     if path.exists() {

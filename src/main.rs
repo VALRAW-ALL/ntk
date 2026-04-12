@@ -92,6 +92,9 @@ enum Command {
         action: ModelAction,
     },
 
+    /// Show a combined dashboard: status, session gain, and token savings chart.
+    Dashboard,
+
     /// Analyze missed NTK/RTK opportunities in the current session.
     Discover,
 
@@ -128,7 +131,12 @@ enum ModelAction {
         backend: String,
     },
     /// Test model latency and output quality.
-    Test,
+    Test {
+        /// Enable verbose debug output: thread config, model path, raw LLM response,
+        /// timing breakdown (startup / prefill / generation), and llama-server args.
+        #[arg(long)]
+        debug: bool,
+    },
     /// Benchmark CPU vs GPU inference speed.
     Bench,
     /// List available models in the configured backend.
@@ -175,6 +183,8 @@ fn main() -> Result<()> {
 
         Some(Command::Model { action }) => run_model(action),
 
+        Some(Command::Dashboard) => run_dashboard(),
+
         Some(Command::Discover) => run_discover(),
 
         Some(Command::Test { l3 }) => run_test(l3),
@@ -210,15 +220,36 @@ fn run_init(
     };
 
     if show {
-        installer.show_status()
-    } else if uninstall {
-        installer.uninstall()
-    } else {
-        installer.run()
+        return installer.show_status();
     }
+    if uninstall {
+        return installer.uninstall();
+    }
+
+    // Normal init path — run installer, then launch model setup wizard.
+    installer.run()?;
+
+    // hook_only skips config.json, so model setup is not meaningful there.
+    if !hook_only {
+        run_model_setup()?;
+    }
+
+    Ok(())
 }
 
 fn run_daemon(gpu: bool) -> Result<()> {
+    // If the daemon is already running, attach to its live TUI dashboard
+    // instead of trying to bind the port again (which would just error out).
+    if let Ok(url) = daemon_url() {
+        let already_up = ureq_get(&format!("{url}/health")).is_ok();
+        if already_up {
+            return tokio::runtime::Builder::new_multi_thread()
+                .enable_all()
+                .build()?
+                .block_on(ntk::output::dashboard::run_attach_dashboard(url));
+        }
+    }
+
     tokio::runtime::Builder::new_multi_thread()
         .enable_all()
         .build()?
@@ -226,11 +257,17 @@ fn run_daemon(gpu: bool) -> Result<()> {
 }
 
 async fn async_run_daemon(gpu: bool) -> Result<()> {
-    tracing_subscriber::fmt()
-        .with_env_filter(
-            tracing_subscriber::EnvFilter::try_from_default_env()
-                .unwrap_or_else(|_| tracing_subscriber::EnvFilter::new("warn")),
-        )
+    use tracing_subscriber::prelude::*;
+
+    let warn_buf: ntk::output::dashboard::WarnBuffer =
+        Arc::new(Mutex::new(std::collections::VecDeque::new()));
+
+    let filter = tracing_subscriber::EnvFilter::try_from_default_env()
+        .unwrap_or_else(|_| tracing_subscriber::EnvFilter::new("warn"));
+
+    tracing_subscriber::registry()
+        .with(tracing_subscriber::fmt::layer().with_filter(filter))
+        .with(ntk::output::dashboard::WarnCaptureLayer::new(Arc::clone(&warn_buf)))
         .init();
 
     let cwd = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
@@ -292,18 +329,67 @@ async fn async_run_daemon(gpu: bool) -> Result<()> {
         });
     }
 
+    let started_at = std::time::Instant::now();
+    let metrics = Arc::new(Mutex::new(ntk::metrics::MetricsStore::new()));
+    let backend_name = backend.name().to_owned();
+
     let state = ntk::server::AppState {
         config: Arc::new(config),
-        metrics: Arc::new(Mutex::new(ntk::metrics::MetricsStore::new())),
+        metrics: Arc::clone(&metrics),
         db,
         backend,
+        started_at,
+        warn_log: Arc::clone(&warn_buf),
+        addr: addr.clone(),
+        backend_name: backend_name.clone(),
     };
 
     let router = ntk::server::build_router(state);
     let listener = tokio::net::TcpListener::bind(&addr).await?;
     tracing::info!("NTK daemon listening on {addr}");
-    println!("NTK daemon started on {addr}  (Ctrl-C to stop)");
-    axum::serve(listener, router).await?;
+
+    // Shutdown channel: either the OS sends SIGINT (Ctrl+C in normal mode)
+    // or the dashboard detects Ctrl+C as a raw key event and sends `true`.
+    // Both paths converge here so the server and dashboard stop together.
+    let (shutdown_tx, shutdown_rx) = tokio::sync::watch::channel(false);
+
+    // Clone so the dashboard can trigger shutdown (raw mode Ctrl+C path).
+    let dashboard_trigger_tx = shutdown_tx.clone();
+    // Clone so the server's graceful shutdown can watch the channel.
+    let mut shutdown_rx_server = shutdown_rx.clone();
+
+    // Spawn the live dashboard in a separate task.
+    let dashboard_handle = tokio::spawn(ntk::output::dashboard::run_live_dashboard(
+        Arc::clone(&metrics),
+        warn_buf,
+        started_at,
+        addr.clone(),
+        backend_name,
+        shutdown_rx,
+        dashboard_trigger_tx,
+    ));
+
+    // Serve HTTP until either:
+    //   • OS Ctrl+C  → SIGINT → tokio::signal::ctrl_c() fires
+    //   • Dashboard Ctrl+C key event → shutdown_rx_server fires
+    axum::serve(listener, router)
+        .with_graceful_shutdown(async move {
+            tokio::select! {
+                _ = tokio::signal::ctrl_c() => {}
+                _ = async {
+                    loop {
+                        if shutdown_rx_server.changed().await.is_err() { break; }
+                        if *shutdown_rx_server.borrow() { break; }
+                    }
+                } => {}
+            }
+            let _ = shutdown_tx.send(true); // ensure dashboard also stops
+        })
+        .await?;
+
+    // Wait for the dashboard to finish restoring the terminal before we exit.
+    let _ = dashboard_handle.await;
+
     Ok(())
 }
 
@@ -583,13 +669,49 @@ fn run_gain() -> Result<()> {
     // Parse and reformat as RTK-compatible gain output.
     if let Ok(val) = serde_json::from_str::<serde_json::Value>(&response) {
         let saved = val["total_tokens_saved"].as_u64().unwrap_or(0);
-        let calls = val["total_calls"].as_u64().unwrap_or(0);
+        let calls = val["total_compressions"].as_u64().unwrap_or(0);
         let pct = val["average_ratio"].as_f64().unwrap_or(0.0) * 100.0;
         println!("NTK: {saved} tokens saved across {calls} compressions ({pct:.0}% avg)");
     } else {
         println!("{response}");
     }
     Ok(())
+}
+
+fn run_dashboard() -> Result<()> {
+    // ── Status ───────────────────────────────────────────────────────────
+    run_status()?;
+
+    // ── Session gain (live from daemon /metrics) ──────────────────────
+    println!();
+    use ntk::output::terminal as term;
+    println!(
+        "{}{}Session Gain:{}",
+        term::bold(),
+        term::bright_cyan(),
+        term::reset()
+    );
+    let url = daemon_url()?;
+    match ureq_get(&format!("{url}/metrics")) {
+        Ok(response) => {
+            if let Ok(val) = serde_json::from_str::<serde_json::Value>(&response) {
+                let saved = val["total_tokens_saved"].as_u64().unwrap_or(0);
+                let calls = val["total_compressions"].as_u64().unwrap_or(0);
+                let pct = val["average_ratio"].as_f64().unwrap_or(0.0) * 100.0;
+                println!(
+                    "  {}{saved}{} tokens saved  ·  {}{calls}{} compressions  ·  {}{pct:.0}%{} avg",
+                    term::yellow(), term::reset(),
+                    term::yellow(), term::reset(),
+                    term::cyan(),   term::reset(),
+                );
+            }
+        }
+        Err(_) => println!("  {}(daemon not reachable){}", term::dim(), term::reset()),
+    }
+
+    // ── Historical bar chart ─────────────────────────────────────────
+    println!();
+    run_graph()
 }
 
 fn run_history() -> Result<()> {
@@ -700,7 +822,7 @@ fn run_model(action: ModelAction) -> Result<()> {
     match action {
         ModelAction::Setup => run_model_setup(),
         ModelAction::Pull { quant, backend } => run_model_pull(&quant, &backend),
-        ModelAction::Test => run_model_test(),
+        ModelAction::Test { debug } => run_model_test(debug),
         ModelAction::Bench => run_model_bench(),
         ModelAction::List => run_model_list(),
     }
@@ -884,8 +1006,6 @@ fn run_model_setup() -> Result<()> {
     let sp = term::Spinner::start("Detecting system…");
 
     let gpu_backend = gpu::detect_best_backend();
-    let gpu_str = gpu_backend.to_string();
-    let has_gpu = !gpu_str.contains("CPU") && !gpu_str.contains("Scalar");
 
     let cwd = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
     let config = ntk::config::load(&cwd).unwrap_or_default();
@@ -919,21 +1039,51 @@ fn run_model_setup() -> Result<()> {
         term::reset()
     );
 
-    let gpu_color = if has_gpu {
-        term::bright_green()
-    } else {
-        term::yellow()
+    // CPU line — show model name if available, always show capability tier
+    let cpu_cap = gpu::cpu_capability_label();
+    let cpu_label = match gpu::cpu_model_name() {
+        Some(name) => format!("{name}  {}({cpu_cap}){}", term::dim(), term::reset()),
+        None => format!("{}{cpu_cap}{}", term::dim(), term::reset()),
     };
-    let gpu_icon = if has_gpu { "✓" } else { "◌" };
     println!(
-        "  {}GPU / CPU{}    {}{} {}{}",
+        "  {}CPU{}          {}✓{} {}",
         term::dim(),
         term::reset(),
-        gpu_color,
-        gpu_icon,
-        gpu_str,
-        term::reset()
+        term::bright_green(),
+        term::reset(),
+        cpu_label
     );
+
+    // GPU line — show model name if discrete GPU found, otherwise "not detected"
+    let gpu_model = gpu::gpu_model_name();
+    if let Some(ref name) = gpu_model {
+        let vram_label = match &gpu_backend {
+            gpu::GpuBackend::CudaNvidia { vram_mb, .. } => {
+                format!("  {}({vram_mb} MB VRAM){}", term::dim(), term::reset())
+            }
+            gpu::GpuBackend::AmdGpu { vram_mb, .. } => {
+                format!("  {}({vram_mb} MB VRAM){}", term::dim(), term::reset())
+            }
+            _ => String::new(),
+        };
+        println!(
+            "  {}GPU{}          {}✓{} {}{}",
+            term::dim(),
+            term::reset(),
+            term::bright_green(),
+            term::reset(),
+            name,
+            vram_label
+        );
+    } else {
+        println!(
+            "  {}GPU{}          {}◌ not detected{}",
+            term::dim(),
+            term::reset(),
+            term::dim(),
+            term::reset()
+        );
+    }
 
     let ollama_color = if ollama_ok {
         term::bright_green()
@@ -1008,9 +1158,9 @@ fn run_model_setup() -> Result<()> {
     println!("  ├──────────────────┼─────────────────┼──────────────────────────────────────┤");
 
     let ollama_av = if ollama_ok {
-        "✓ running       "
+        "✓ running      "
     } else {
-        "◌ needs install  "
+        "◌ needs install"
     };
     println!(
         "  │ {}[1] Ollama{}       │ {} │ External daemon, any model, easiest  │",
@@ -1020,9 +1170,9 @@ fn run_model_setup() -> Result<()> {
     );
 
     let candle_av = if candle_compiled {
-        "✓ compiled      "
+        "✓ compiled     "
     } else {
-        "◌ needs rebuild  "
+        "◌ needs rebuild"
     };
     println!(
         "  │ {}[2] Candle{}       │ {} │ In-process GGUF, no daemon           │",
@@ -1032,9 +1182,9 @@ fn run_model_setup() -> Result<()> {
     );
 
     let llama_av = if llamacpp_ok {
-        "✓ found         "
+        "✓ found        "
     } else {
-        "◌ needs install  "
+        "◌ needs install"
     };
     println!(
         "  │ {}[3] llama.cpp{}    │ {} │ Subprocess, best CPU performance     │",
@@ -1086,7 +1236,7 @@ fn run_model_setup() -> Result<()> {
     println!();
 
     println!(
-        "  {}[2] Candle{}  {}(in-process — requires: cargo build --features candle){}",
+        "  {}[2] Candle{}  {}(in-process inference){}",
         term::bold(),
         term::reset(),
         term::dim(),
@@ -1108,17 +1258,12 @@ fn run_model_setup() -> Result<()> {
         term::reset()
     );
     println!(
-        "    {}−{} Requires recompiling NTK with --features candle",
-        term::bright_red(),
-        term::reset()
-    );
-    println!(
         "    {}−{} GGUF + tokenizer.json must be downloaded (~2.2 GB)",
         term::bright_red(),
         term::reset()
     );
     println!(
-        "    {}−{} Limited to GGUF-format models",
+        "    {}−{} Limited to GGUF-format models (Phi-3, Llama, Mistral…)",
         term::bright_red(),
         term::reset()
     );
@@ -1226,6 +1371,189 @@ fn run_model_setup() -> Result<()> {
         term::reset()
     );
     Ok(())
+}
+
+/// Prompt the user to select a compute backend (CPU / NVIDIA / AMD / Metal).
+/// Returns `(gpu_layers, gpu_auto_detect)` to be saved in config.
+///
+/// gpu_layers: 0 = CPU only, -1 = offload all layers to GPU.
+fn setup_gpu_selection() -> Result<(i32, bool)> {
+    use ntk::gpu::{detect_nvidia, detect_amd, is_metal_available, GpuBackend};
+    use ntk::output::terminal as term;
+    use std::io::{self, BufRead, Write};
+
+    let nvidia = detect_nvidia();
+    let amd = detect_amd();
+    let metal = is_metal_available();
+
+    println!(
+        "{}  GPU / Compute Selection{}",
+        term::bold(),
+        term::reset()
+    );
+    println!(
+        "{}  ────────────────────────────────────{}",
+        term::dim(),
+        term::reset()
+    );
+
+    // Determine what hardware was auto-detected
+    let detected_label = if let Some(GpuBackend::CudaNvidia { device_id: _, vram_mb }) = &nvidia {
+        format!("NVIDIA CUDA  ({vram_mb} MB VRAM)")
+    } else if let Some(GpuBackend::AmdGpu { device_id: _, vram_mb }) = &amd {
+        format!("AMD ROCm  ({vram_mb} MB VRAM)")
+    } else if metal {
+        "Apple Metal (Apple Silicon)".to_string()
+    } else {
+        // show best CPU tier
+        match ntk::gpu::detect_best_backend() {
+            GpuBackend::IntelAmx => "CPU  Intel AMX".to_string(),
+            GpuBackend::Avx512 => "CPU  AVX-512".to_string(),
+            GpuBackend::Avx2 => "CPU  AVX2".to_string(),
+            _ => "CPU  Scalar".to_string(),
+        }
+    };
+
+    println!(
+        "  {}Detected:{} {}",
+        term::dim(),
+        term::reset(),
+        detected_label
+    );
+    println!();
+
+    // Build option list: (number, label, status_line, is_available)
+    struct GpuOption {
+        num: u8,
+        label: &'static str,
+        status: String,
+        latency: &'static str,
+        available: bool,
+    }
+
+    let mut options: Vec<GpuOption> = vec![GpuOption {
+        num: 1,
+        label: "CPU only",
+        status: format!("{}✓ always available{}", term::bright_green(), term::reset()),
+        latency: "~300ms p50",
+        available: true,
+    }];
+
+    if let Some(GpuBackend::CudaNvidia { vram_mb, .. }) = &nvidia {
+        let hint = if *vram_mb >= 8_000 { "~50ms p50" } else { "~80ms p50" };
+        options.push(GpuOption {
+            num: 2,
+            label: "NVIDIA GPU  (CUDA)",
+            status: format!(
+                "{}✓{} {vram_mb} MB VRAM",
+                term::bright_green(),
+                term::reset()
+            ),
+            latency: hint,
+            available: true,
+        });
+    } else {
+        options.push(GpuOption {
+            num: 2,
+            label: "NVIDIA GPU  (CUDA)",
+            status: format!("{}◌ not detected{}", term::yellow(), term::reset()),
+            latency: "",
+            available: false,
+        });
+    }
+
+    if let Some(GpuBackend::AmdGpu { vram_mb, .. }) = &amd {
+        options.push(GpuOption {
+            num: 3,
+            label: "AMD GPU  (ROCm)",
+            status: format!(
+                "{}✓{} {vram_mb} MB VRAM",
+                term::bright_green(),
+                term::reset()
+            ),
+            latency: "~100ms p50",
+            available: true,
+        });
+    } else {
+        options.push(GpuOption {
+            num: 3,
+            label: "AMD GPU  (ROCm)",
+            status: format!("{}◌ not detected{}", term::yellow(), term::reset()),
+            latency: "",
+            available: false,
+        });
+    }
+
+    if metal {
+        options.push(GpuOption {
+            num: 4,
+            label: "Apple Metal",
+            status: format!("{}✓ Apple Silicon{}", term::bright_green(), term::reset()),
+            latency: "~80ms p50",
+            available: true,
+        });
+    }
+
+    // Default = first available GPU option, or CPU if none
+    let default_num = options
+        .iter()
+        .filter(|o| o.available && o.num > 1)
+        .map(|o| o.num)
+        .next()
+        .unwrap_or(1);
+
+    for opt in &options {
+        if opt.available {
+            println!(
+                "  {}[{}]{}  {:<24}  {}  {}{}{}",
+                term::bright_cyan(),
+                opt.num,
+                term::reset(),
+                opt.label,
+                opt.status,
+                term::dim(),
+                opt.latency,
+                term::reset()
+            );
+        } else {
+            println!(
+                "  {}[{}]  {:<24}  {}{}",
+                term::dim(),
+                opt.num,
+                opt.label,
+                opt.status,
+                term::reset()
+            );
+        }
+    }
+
+    println!();
+    print!(
+        "  {}Choose or Enter for [{}]:{} ",
+        term::bright_cyan(),
+        default_num,
+        term::reset()
+    );
+    io::stdout().flush()?;
+
+    let choice_str = io::stdin()
+        .lock()
+        .lines()
+        .next()
+        .unwrap_or(Ok(String::new()))?;
+    let choice = choice_str.trim().parse::<u8>().unwrap_or(default_num);
+
+    println!();
+
+    // Map choice to (gpu_layers, gpu_auto_detect)
+    let (gpu_layers, gpu_auto_detect) = match choice {
+        2 if nvidia.is_some() => (-1i32, false),
+        3 if amd.is_some() => (-1i32, false),
+        4 if metal => (-1i32, false),
+        _ => (0i32, false), // CPU only
+    };
+
+    Ok((gpu_layers, gpu_auto_detect))
 }
 
 fn setup_write_config(provider: &str, existing: &ntk::config::NtkConfig) -> Result<()> {
@@ -1433,10 +1761,14 @@ fn setup_candle(existing: &ntk::config::NtkConfig) -> Result<()> {
         println!();
     }
 
+    let (gpu_layers, gpu_auto_detect) = setup_gpu_selection()?;
+
     let mut config = existing.clone();
     config.model.provider = ntk::config::ModelProvider::Candle;
     config.model.model_path = Some(model_path);
     config.model.tokenizer_path = Some(tokenizer_path);
+    config.model.gpu_layers = gpu_layers;
+    config.model.gpu_auto_detect = gpu_auto_detect;
 
     let sp = term::Spinner::start("Saving configuration…");
     let global_path = ntk::config::global_config_path()?;
@@ -1447,11 +1779,13 @@ fn setup_candle(existing: &ntk::config::NtkConfig) -> Result<()> {
     }
     std::fs::write(&tmp, &json)?;
     std::fs::rename(&tmp, &global_path)?;
+    let compute_label = if gpu_layers == 0 { "cpu" } else { "gpu" };
     sp.finish_ok(&format!(
-        "{}~/.ntk/config.json{}  {}provider = candle{}",
+        "{}~/.ntk/config.json{}  {}provider = candle  compute = {}{}",
         term::bold(),
         term::reset(),
         term::dim(),
+        compute_label,
         term::reset()
     ));
     Ok(())
@@ -1664,9 +1998,13 @@ fn setup_llamacpp(existing: &ntk::config::NtkConfig) -> Result<()> {
         println!();
     }
 
+    let (gpu_layers, gpu_auto_detect) = setup_gpu_selection()?;
+
     let mut config = existing.clone();
     config.model.provider = ntk::config::ModelProvider::LlamaCpp;
     config.model.model_path = Some(model_path);
+    config.model.gpu_layers = gpu_layers;
+    config.model.gpu_auto_detect = gpu_auto_detect;
 
     let sp = term::Spinner::start("Saving configuration…");
     let global_path = ntk::config::global_config_path()?;
@@ -1677,11 +2015,13 @@ fn setup_llamacpp(existing: &ntk::config::NtkConfig) -> Result<()> {
     }
     std::fs::write(&tmp, &json)?;
     std::fs::rename(&tmp, &global_path)?;
+    let compute_label = if gpu_layers == 0 { "cpu" } else { "gpu" };
     sp.finish_ok(&format!(
-        "{}~/.ntk/config.json{}  {}provider = llama_cpp{}",
+        "{}~/.ntk/config.json{}  {}provider = llama_cpp  compute = {}{}",
         term::bold(),
         term::reset(),
         term::dim(),
+        compute_label,
         term::reset()
     ));
     Ok(())
@@ -2122,8 +2462,9 @@ fn download_file_with_progress(url: &str, dest: &std::path::Path) -> Result<()> 
     })
 }
 
-fn run_model_test() -> Result<()> {
+fn run_model_test(debug: bool) -> Result<()> {
     use ntk::compressor::layer3_backend::BackendKind;
+    use ntk::compressor::layer3_llamacpp::find_llama_server_binary;
     use ntk::detector::OutputType;
     use ntk::output::terminal as term;
 
@@ -2132,16 +2473,88 @@ fn run_model_test() -> Result<()> {
     // Use generous timeout for interactive test — first inference after model load can be slow.
     config.model.timeout_ms = 120_000;
 
-    let backend = BackendKind::from_config(&config)?;
-
     println!(
         "{}Backend:{} {}{}{}",
         term::bold(),
         term::reset(),
         term::bright_cyan(),
-        backend.name(),
+        config.model.provider.as_str(),
         term::reset()
     );
+
+    // ── Debug: hardware & config ──────────────────────────────────────────────
+    if debug {
+        let n_cpus = std::thread::available_parallelism()
+            .map(|n| n.get())
+            .unwrap_or(0);
+        let gpu_backend = ntk::gpu::detect_best_backend();
+        let gpu_layers = config.model.gpu_layers;
+        let use_gpu = gpu_layers != 0;
+
+        // generation threads mirrors layer3_llamacpp::generation_threads()
+        let gen_threads = if use_gpu { 4 } else { n_cpus.min(8) };
+
+        println!();
+        println!(
+            "{}[debug] Hardware / config{}",
+            term::bright_cyan(),
+            term::reset()
+        );
+        println!(
+            "  logical cpus     : {}",
+            if n_cpus == 0 {
+                "unknown".to_string()
+            } else {
+                n_cpus.to_string()
+            }
+        );
+        println!("  gpu backend      : {gpu_backend}");
+        println!("  gpu_layers       : {gpu_layers}  (0=CPU, -1=all on GPU)");
+        println!("  gen threads      : {gen_threads}  (generation loop)");
+        println!("  batch threads    : {n_cpus}  (prefill / prompt processing)");
+        println!(
+            "  mlock/no-mmap    : {}",
+            if use_gpu { "off (GPU mode)" } else { "on  (CPU mode, pins model in RAM)" }
+        );
+        println!(
+            "  flash-attn       : {}",
+            if use_gpu { "on  (GPU mode)" } else { "off (CPU mode)" }
+        );
+
+        // CPU model name
+        if let Some(cpu_name) = ntk::gpu::cpu_model_name() {
+            println!("  cpu model        : {cpu_name}");
+        }
+        if let Some(gpu_name) = ntk::gpu::gpu_model_name() {
+            println!("  gpu model        : {gpu_name}");
+        }
+
+        // llama.cpp binary and model file
+        if config.model.provider == ntk::config::ModelProvider::LlamaCpp {
+            match find_llama_server_binary() {
+                Ok(p) => println!("  llama-server bin : {}", p.display()),
+                Err(e) => println!("  llama-server bin : NOT FOUND — {e}"),
+            }
+            if let Some(ref mp) = config.model.model_path {
+                let size = std::fs::metadata(mp)
+                    .map(|m| {
+                        let mb = m.len() / 1_048_576;
+                        format!("{mb} MB")
+                    })
+                    .unwrap_or_else(|_| "file not found".to_string());
+                println!("  model path       : {}  ({})", mp.display(), size);
+            } else {
+                println!("  model path       : not set in config");
+            }
+        }
+
+        // Quantization
+        println!("  quantization     : {}", config.model.quantization);
+        println!("  context size     : 4096 tokens");
+        println!();
+    }
+
+    let backend = BackendKind::from_config(&config)?;
 
     let rt = tokio::runtime::Builder::new_current_thread()
         .enable_all()
@@ -2151,8 +2564,20 @@ fn run_model_test() -> Result<()> {
     if config.model.llama_server_auto_start {
         if let BackendKind::LlamaCpp(_) = &backend {
             let sp = term::Spinner::start("Starting llama-server …");
+            let server_start = std::time::Instant::now();
             match rt.block_on(backend.start_if_needed()) {
-                Ok(_) => sp.finish_ok("llama-server ready"),
+                Ok(_) => {
+                    let startup_ms = server_start.elapsed().as_millis();
+                    if debug {
+                        sp.finish_ok(&format!(
+                            "llama-server ready  {}(startup: {startup_ms}ms){}",
+                            term::dim(),
+                            term::reset()
+                        ));
+                    } else {
+                        sp.finish_ok("llama-server ready");
+                    }
+                }
                 Err(e) => {
                     sp.finish_err(&format!("llama-server failed: {e}"));
                     return Err(e);
@@ -2163,6 +2588,48 @@ fn run_model_test() -> Result<()> {
 
     let test_input = "running 42 tests\ntest result: FAILED. 1 failed; 41 passed; 0 ignored\n\nfailures:\n  test_foo::should_return_42 at src/lib.rs:17\n  left: 0\n  right: 42";
     let prompts_dir = ntk::config::resolve_prompts_dir();
+
+    // ── Debug: show the exact input and prompt ────────────────────────────────
+    if debug {
+        println!(
+            "{}[debug] Test input  ({} chars, {} lines){}",
+            term::bright_cyan(),
+            test_input.len(),
+            test_input.lines().count(),
+            term::reset()
+        );
+        for line in test_input.lines() {
+            println!("  │ {line}");
+        }
+        println!();
+
+        // Show the system prompt that will be sent
+        match ntk::compressor::layer3_inference::load_system_prompt(OutputType::Test, &prompts_dir)
+        {
+            Ok(sp) => {
+                let sp_lines: Vec<&str> = sp.lines().collect();
+                println!(
+                    "{}[debug] System prompt  ({} chars, {} lines){}",
+                    term::bright_cyan(),
+                    sp.len(),
+                    sp_lines.len(),
+                    term::reset()
+                );
+                for line in sp_lines.iter().take(6) {
+                    println!("  │ {line}");
+                }
+                if sp_lines.len() > 6 {
+                    println!("  │ … ({} more lines)", sp_lines.len() - 6);
+                }
+                println!();
+            }
+            Err(e) => println!(
+                "{}[debug] Could not load system prompt: {e}{}",
+                term::warn_color(),
+                term::reset()
+            ),
+        }
+    }
 
     let sp = term::Spinner::start("Running inference …");
     let start = std::time::Instant::now();
@@ -2178,6 +2645,12 @@ fn run_model_test() -> Result<()> {
     };
     let elapsed = start.elapsed();
 
+    let compression_pct = 100u64.saturating_sub(
+        (result.output_tokens as u64)
+            .saturating_mul(100)
+            .checked_div(result.input_tokens.max(1) as u64)
+            .unwrap_or(100),
+    );
     let ratio_pct = result
         .output_tokens
         .saturating_mul(100)
@@ -2211,15 +2684,136 @@ fn run_model_test() -> Result<()> {
         term::reset()
     );
     println!(
-        "  {}Ratio  :{} {}{ratio_pct}%{} of input  {}Speed: {tok_per_s:.2} tok/s{}",
+        "  {}Ratio  :{} {}{}% compression{}  (output is {}% of input)  {}Speed: {tok_per_s:.2} tok/s{}",
         term::bold(),
         term::reset(),
-        term::ratio_color(ratio_pct),
+        term::ratio_color(100 - ratio_pct),
+        compression_pct,
         term::reset(),
+        ratio_pct,
         term::dim(),
         term::reset()
     );
     println!();
+
+    // ── Debug: performance analysis ───────────────────────────────────────────
+    if debug {
+        // Derive performance targets from actual hardware rather than using a
+        // single desktop-class fixed value.
+        //
+        // Tiers (CPU mode, Q5_K_M Phi-3 Mini):
+        //   GPU            → ≥40 tok/s, <500ms  (conservative for CUDA RTX 3060+)
+        //   Mobile / ULP   → ≥5 tok/s,  <5000ms (Core Ultra U, Ryzen U, Snapdragon…)
+        //   Desktop        → ≥10 tok/s, <2000ms (i7/i5/Ryzen 5/7 desktop)
+        //   High-end / srv → ≥15 tok/s, <1500ms (Xeon, EPYC, Threadripper, i9, Ryzen 9)
+        let (expected_min_toks, expected_max_ms, tier_label): (f64, u128, &str) = {
+            let use_gpu = config.model.gpu_layers != 0;
+            if use_gpu {
+                (40.0, 500, "GPU")
+            } else {
+                let cpu_lower = ntk::gpu::cpu_model_name()
+                    .unwrap_or_default()
+                    .to_lowercase();
+                let last_word = cpu_lower.split_whitespace().last().unwrap_or("").to_string();
+
+                let is_mobile = cpu_lower.contains("ultra")        // Intel Core Ultra (always mobile)
+                    || last_word.ends_with('u')                    // "155u", "5500u", "1165g7u"
+                    || cpu_lower.contains("snapdragon")
+                    || cpu_lower.contains(" m1")
+                    || cpu_lower.contains(" m2")
+                    || cpu_lower.contains(" m3");
+
+                let is_highend = cpu_lower.contains("xeon")
+                    || cpu_lower.contains("epyc")
+                    || cpu_lower.contains("threadripper")
+                    || cpu_lower.contains("ryzen 9")
+                    || cpu_lower.contains("i9-");
+
+                if is_mobile {
+                    (5.0, 5000, "mobile/low-power CPU")
+                } else if is_highend {
+                    (15.0, 1500, "high-end desktop/server CPU")
+                } else {
+                    (10.0, 2000, "desktop CPU")
+                }
+            }
+        };
+
+        println!(
+            "{}[debug] Performance analysis{}",
+            term::bright_cyan(),
+            term::reset()
+        );
+        println!(
+            "  tok/s            : {:.2}  {}(target ≥{:.0} tok/s for {}){}",
+            tok_per_s,
+            term::dim(),
+            expected_min_toks,
+            tier_label,
+            term::reset()
+        );
+        if tok_per_s < expected_min_toks {
+            println!(
+                "  {}⚠ Slow throughput. Likely causes:{}",
+                term::warn_color(),
+                term::reset()
+            );
+            println!("    • Model pages swapped out (mlock not effective or disabled)");
+            println!("    • Too many threads causing cache thrashing");
+            println!("    • Another process competing for RAM/CPU");
+            println!("    • Model quantization too large for available RAM");
+        }
+        if elapsed.as_millis() > expected_max_ms {
+            println!(
+                "  {}⚠ High latency: {:.0}ms (target <{}ms on {}){}",
+                term::warn_color(),
+                elapsed.as_millis(),
+                expected_max_ms,
+                tier_label,
+                term::reset()
+            );
+        } else {
+            println!(
+                "  {}✓ Latency within target{}",
+                term::bright_green(),
+                term::reset()
+            );
+        }
+        if debug {
+            println!();
+            println!(
+                "{}[debug] Output quality check{}",
+                term::bright_cyan(),
+                term::reset()
+            );
+        }
+    }
+
+    // Quality checks — always computed so the confirmation banner is always shown.
+    // The test input intentionally contains 1 failing test; these 4 values must
+    // appear in the compressed output for the model to be considered working.
+    let out_lower = result.output.to_lowercase();
+    let checks: &[(&str, &str)] = &[
+        ("1 failed", "failure count (1 failed)"),
+        ("41 passed", "pass count (41 passed)"),
+        ("test_foo::should_return_42", "test name"),
+        ("src/lib.rs", "file location"),
+    ];
+    let all_passed = checks.iter().all(|(needle, _)| out_lower.contains(needle));
+
+    if debug {
+        for (needle, label) in checks {
+            let found = out_lower.contains(needle);
+            println!(
+                "  {} {label:40}  {}{needle}{}",
+                if found { "✓" } else { "✗" },
+                term::dim(),
+                term::reset(),
+            );
+        }
+        println!();
+    }
+
     println!(
         "{}{}Compressed output:{}",
         term::bold(),
@@ -2229,6 +2823,40 @@ fn run_model_test() -> Result<()> {
     println!("{}{}{}", term::dim(), "─".repeat(50), term::reset());
     println!("{}", result.output);
     println!("{}{}{}", term::dim(), "─".repeat(50), term::reset());
+    println!();
+
+    // Confirmation banner — always visible, not just in debug mode.
+    if all_passed {
+        println!(
+            "  {}{}✓  Output verified — all expected values preserved{}",
+            term::bold(),
+            term::bright_green(),
+            term::reset()
+        );
+        println!(
+            "  {}The model correctly identified: 1 failed · 41 passed · test name · file location{}",
+            term::dim(),
+            term::reset()
+        );
+        println!(
+            "  {}Note: \"1 failed\" is intentional — the test input contains a deliberate failure{}",
+            term::dim(),
+            term::reset()
+        );
+    } else {
+        println!(
+            "  {}{}✗  Output incomplete — some expected values missing{}",
+            term::bold(),
+            term::bright_red(),
+            term::reset()
+        );
+        println!(
+            "  {}Run with --debug to see which checks failed.{}",
+            term::dim(),
+            term::reset()
+        );
+    }
+
     Ok(())
 }
 
@@ -2558,15 +3186,7 @@ fn run_test(with_l3: bool) -> Result<()> {
         let cwd = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
         let config = ntk::config::load(&cwd).unwrap_or_default();
         let backend = ntk::compressor::layer3_backend::BackendKind::from_config(&config)
-            .unwrap_or_else(|_| {
-                ntk::compressor::layer3_backend::BackendKind::Ollama(
-                    ntk::compressor::layer3_inference::OllamaClient::new(
-                        "http://localhost:11434",
-                        2000,
-                        "phi3:mini",
-                    ),
-                )
-            });
+            .map_err(|e| anyhow::anyhow!("Layer 3 backend init failed ({provider}): {e}\nRun `ntk model setup` to reconfigure.", provider = config.model.provider.as_str()))?;
         println!("Layer 3 ({}):", backend.name());
         let prompts_dir = ntk::config::resolve_prompts_dir();
         let rt = tokio::runtime::Builder::new_current_thread()
@@ -2657,15 +3277,7 @@ fn run_bench(runs: usize, with_l3: bool) -> Result<()> {
         let cwd = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
         let config = ntk::config::load(&cwd).unwrap_or_default();
         let backend = ntk::compressor::layer3_backend::BackendKind::from_config(&config)
-            .unwrap_or_else(|_| {
-                ntk::compressor::layer3_backend::BackendKind::Ollama(
-                    ntk::compressor::layer3_inference::OllamaClient::new(
-                        "http://localhost:11434",
-                        2000,
-                        "phi3:mini",
-                    ),
-                )
-            });
+            .map_err(|e| anyhow::anyhow!("Layer 3 backend init failed ({provider}): {e}\nRun `ntk model setup` to reconfigure.", provider = config.model.provider.as_str()))?;
         println!(
             "Layer 3 — {} inference  ({runs} runs per payload)",
             backend.name()

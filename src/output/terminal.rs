@@ -113,6 +113,11 @@ color!(magenta, "\x1b[35m");
 color!(white, "\x1b[97m");
 color!(gray, "\x1b[90m");
 
+/// Warning color — bright yellow. Semantic alias for diagnostics output.
+pub fn warn_color() -> &'static str {
+    bright_yellow()
+}
+
 /// Color a ratio value: ≤40% green, ≤80% yellow, >80% red.
 pub fn ratio_color(ratio_pct: usize) -> &'static str {
     if !color_enabled() {

@@ -146,6 +146,8 @@ mod tests {
     fn test_print_session_summary() {
         let summary = SessionSummary {
             total_compressions: 5,
+            total_original_tokens: 8000,
+            total_compressed_tokens: 6000,
             total_tokens_saved: 2000,
             average_ratio: 0.75,
             layer_counts: [1, 3, 1],
@@ -158,6 +160,8 @@ mod tests {
     fn test_print_gain_rtk_compat() {
         let summary = SessionSummary {
             total_compressions: 10,
+            total_original_tokens: 27000,
+            total_compressed_tokens: 22000,
             total_tokens_saved: 5000,
             average_ratio: 0.82,
             layer_counts: [2, 5, 3],

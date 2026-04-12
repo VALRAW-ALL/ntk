@@ -17,6 +17,7 @@ fn test_server() -> TestServer {
         metrics,
         db: None,
         backend: default_backend(),
+        started_at: std::time::Instant::now(),
     };
     let router = build_router(state);
     TestServer::new(router).expect("test server")
@@ -104,6 +105,7 @@ async fn test_compress_rejects_oversized_input() {
         metrics: Arc::new(Mutex::new(MetricsStore::new())),
         db: None,
         backend: default_backend(),
+        started_at: std::time::Instant::now(),
     };
     let server = TestServer::new(build_router(state)).expect("test server");
 

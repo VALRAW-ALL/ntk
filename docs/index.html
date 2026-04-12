@@ -20,7 +20,7 @@
     <div class="header-inner">
       <div class="logo" onclick="navigateTo('home');" style="cursor:pointer">
         <span>NTK</span>
-        <span class="logo-badge">v0.1</span>
+        <span class="logo-badge">v0.2</span>
       </div>
       <nav class="nav" role="navigation">
         <button class="nav-link active" data-page="home"     onclick="navigateTo('home')"     data-i18n="nav.home">Home</button>
@@ -30,7 +30,7 @@
       </nav>
       <div class="header-cta">
         <button class="lang-btn" id="langToggle" onclick="toggleLang()" title="Switch language">EN</button>
-        <button class="btn btn-primary btn-sm" onclick="navigateTo('getstart')" data-i18n="nav.getstarted">Get Started</button>
+        <button class="btn btn-blue btn-sm" onclick="navigateTo('getstart')" data-i18n="nav.getstarted">Get Started</button>
         <button class="mobile-menu-btn" id="mobileMenuBtn" onclick="toggleMobileMenu()" aria-label="Menu">☰</button>
       </div>
     </div>
@@ -52,6 +52,7 @@
       <div class="hero-grid"></div>
       <div class="hero-orb-blue"></div>
       <div class="hero-orb-green"></div>
+      <div class="hero-orb-violet"></div>
       <div class="hero-fade"></div>
     </div>
     <div class="container hero-content">
@@ -143,45 +144,86 @@
     </div>
   </section>
 
-  <!-- Terminal demo -->
+  <!-- Demo section with NTK widget mockup -->
   <section class="section section-alt">
     <div class="container">
-      <div style="display:grid;grid-template-columns:1fr;gap:3rem;align-items:center">
-        <div class="fade-in" style="order:2">
+      <div class="demo-grid">
+        <div class="demo-text fade-in">
           <div class="section-badge section-badge-green" data-i18n="demo.badge">Live demo</div>
           <h2 class="section-title" style="text-align:left;max-width:480px" data-i18n="demo.title">Installs in 30 seconds</h2>
           <p style="color:var(--color-texto-terciario);margin-bottom:1.5rem;line-height:1.7;font-size:0.9375rem" data-i18n="demo.desc">
             One command installs the binary, patches Claude Code's <code style="font-family:var(--font-mono);color:var(--color-primaria-clara)">settings.json</code>
             with the PostToolUse hook, and creates the config file.
           </p>
-          <button class="btn btn-primary" onclick="navigateTo('getstart')" data-i18n="demo.cta">View full guide →</button>
+          <button class="btn btn-blue" onclick="navigateTo('getstart')" data-i18n="demo.cta">View full guide →</button>
         </div>
-        <div class="fade-in" style="order:1">
-          <div class="terminal">
-            <div class="terminal-bar">
+        <div class="demo-widget fade-in">
+          <!-- NTK glassmorphism dashboard widget -->
+          <div class="ntk-widget">
+            <div class="ntk-widget-bar">
               <div class="terminal-dot terminal-dot-red"></div>
               <div class="terminal-dot terminal-dot-yellow"></div>
               <div class="terminal-dot terminal-dot-green"></div>
-              <div class="terminal-title">bash — ntk setup</div>
+              <span style="font-family:var(--font-mono);font-size:0.6875rem;color:var(--color-texto-mutado);margin-left:0.25rem">ntk start — 127.0.0.1:8765</span>
             </div>
-            <div class="terminal-body">
-              <div><span class="prompt">$</span> <span class="cmd">curl -fsSL https://ntk.valraw.com/install.sh | sh</span></div>
-              <div class="success">✓  NTK v0.1.0 installed to /usr/local/bin/ntk</div>
-              <div></div>
-              <div><span class="prompt">$</span> <span class="cmd">ntk init -g</span></div>
-              <div class="info">⠙  Detecting environment...</div>
-              <div class="success">✓  Hook patched → ~/.claude/settings.json</div>
-              <div class="success">✓  Config created → ~/.ntk/config.json</div>
-              <div></div>
-              <div><span class="prompt">$</span> <span class="cmd">ntk model setup</span></div>
-              <div class="info">  [1] Ollama   — recommended, easiest</div>
-              <div class="dim">  [2] Candle   — in-process, no daemon</div>
-              <div class="dim">  [3] llama.cpp — advanced</div>
-              <div><span class="warn">💡  Recommendation: [1] Ollama</span></div>
-              <div></div>
-              <div><span class="prompt">$</span> <span class="cmd">ntk start &amp;&amp; ntk status</span></div>
-              <div class="success">✓  Daemon running on :8765</div>
-              <div class="highlight">  model: phi3:mini  backend: ollama  gpu: CUDA ✓</div>
+            <div class="ntk-widget-body">
+              <div class="ntk-widget-header-row">
+                <div class="ntk-widget-ascii">███╗   ██╗████████╗██╗  ██╗<br>████╗  ██║╚══██╔══╝██║ ██╔╝<br>██╔██╗ ██║   ██║   █████╔╝ </div>
+                <div class="ntk-widget-meta">
+                  Neural Token Killer<br>
+                  <strong>v0.2.0</strong> · phi3:mini<br>
+                  <span style="color:var(--color-acento-verde)">● RUNNING</span>
+                </div>
+              </div>
+
+              <div class="ntk-metrics-grid">
+                <div class="ntk-metric-box ntk-metric-box-green">
+                  <div class="ntk-metric-val ntk-metric-val-green">72,243</div>
+                  <div class="ntk-metric-label">tokens saved</div>
+                </div>
+                <div class="ntk-metric-box">
+                  <div class="ntk-metric-val ntk-metric-val-blue">85%</div>
+                  <div class="ntk-metric-label">avg ratio</div>
+                </div>
+                <div class="ntk-metric-box">
+                  <div class="ntk-metric-val">847</div>
+                  <div class="ntk-metric-label">compressions</div>
+                </div>
+              </div>
+
+              <div class="ntk-widget-section-title">Layer Distribution</div>
+              <div class="ntk-layer-row">
+                <span class="ntk-layer-l1 ntk-cmd-layer">L1</span>
+                <div class="ntk-layer-bar-bg"><div class="ntk-layer-bar-fill ntk-layer-bar-l1" style="width:42%"></div></div>
+                <span class="ntk-layer-count">42%</span>
+              </div>
+              <div class="ntk-layer-row">
+                <span class="ntk-layer-l2 ntk-cmd-layer">L2</span>
+                <div class="ntk-layer-bar-bg"><div class="ntk-layer-bar-fill ntk-layer-bar-l2" style="width:35%"></div></div>
+                <span class="ntk-layer-count">35%</span>
+              </div>
+              <div class="ntk-layer-row">
+                <span class="ntk-layer-l3 ntk-cmd-layer">L3</span>
+                <div class="ntk-layer-bar-bg"><div class="ntk-layer-bar-fill ntk-layer-bar-l3" style="width:23%"></div></div>
+                <span class="ntk-layer-count">23%</span>
+              </div>
+
+              <div class="ntk-widget-section-title" style="margin-top:0.875rem">Recent</div>
+              <div class="ntk-cmd-row">
+                <span class="ntk-layer-l3 ntk-cmd-layer">L3</span>
+                <span class="ntk-cmd-name">cargo test</span>
+                <span class="ntk-cmd-savings">−94%</span>
+              </div>
+              <div class="ntk-cmd-row">
+                <span class="ntk-layer-l1 ntk-cmd-layer">L1</span>
+                <span class="ntk-cmd-name">git status</span>
+                <span class="ntk-cmd-savings" style="color:var(--color-primaria-clara)">−62%</span>
+              </div>
+              <div class="ntk-cmd-row">
+                <span class="ntk-layer-l2 ntk-cmd-layer">L2</span>
+                <span class="ntk-cmd-name">tsc --noEmit</span>
+                <span class="ntk-cmd-savings">−83%</span>
+              </div>
             </div>
           </div>
         </div>
@@ -229,7 +271,14 @@
           <div class="feature-icon">🖥</div>
           <div>
             <div class="feature-title" data-i18n="feat.gpu_title">GPU acceleration</div>
-            <div class="feature-desc" data-i18n="feat.gpu_desc">Auto-detects CUDA, Metal, AMX, AVX-512. L3 latency drops from 800ms to &lt;100ms on GPU.</div>
+            <div class="feature-desc" data-i18n="feat.gpu_desc">Auto-detects CUDA (NVIDIA), ROCm (AMD), Metal (Apple Silicon), AMX, AVX-512. L3 latency drops from 800ms to &lt;100ms on GPU.</div>
+          </div>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon">📊</div>
+          <div>
+            <div class="feature-title" data-i18n="feat.dash_title">Live TUI dashboard</div>
+            <div class="feature-desc" data-i18n="feat.dash_desc"><code style="font-family:var(--font-mono);color:var(--color-primaria-clara)">ntk start</code> opens a full-screen dashboard with real-time metrics, per-layer stats, and a recent commands console. Updates every 500ms. Ctrl+C stops the daemon gracefully.</div>
           </div>
         </div>
         <div class="feature-card">
@@ -321,12 +370,12 @@ ollama serve &amp;</pre>
           <div class="step-num-circle">3</div>
           <div class="step-block-title" data-i18n="gs.step3_title">Initialize hook</div>
         </div>
-        <p data-i18n="gs.step3_desc">This patches <code style="font-family:var(--font-mono);color:var(--color-primaria-clara)">~/.claude/settings.json</code> to add the PostToolUse hook, copies the hook script, and creates <code style="font-family:var(--font-mono);color:var(--color-primaria-clara)">~/.ntk/config.json</code>:</p>
+        <p data-i18n="gs.step3_desc">This patches <code style="font-family:var(--font-mono);color:var(--color-primaria-clara)">~/.claude/settings.json</code> to add the PostToolUse hook, copies the hook script, creates <code style="font-family:var(--font-mono);color:var(--color-primaria-clara)">~/.ntk/config.json</code>, and <strong>automatically launches the model setup wizard</strong> to configure your inference backend:</p>
         <div class="code-block">
           <div class="code-block-header"><span>bash</span><button class="copy-btn" onclick="copyCode(this)">⎘ copy</button></div>
           <pre>ntk init -g</pre>
         </div>
-        <p data-i18n="gs.step3_note">The <code style="font-family:var(--font-mono);color:var(--color-primaria-clara)">-g</code> flag patches the global settings. Use without it for per-project setup. The operation is idempotent — safe to run multiple times.</p>
+        <p data-i18n="gs.step3_note">The <code style="font-family:var(--font-mono);color:var(--color-primaria-clara)">-g</code> flag patches the global settings. Use without it for per-project setup. The operation is idempotent — safe to run multiple times. Use <code style="font-family:var(--font-mono);color:var(--color-primaria-clara)">--hook-only</code> to skip the model wizard.</p>
       </div>
 
       <!-- Step 4 -->
@@ -355,8 +404,14 @@ ntk model pull --quant q6_k   <span style="color:var(--color-texto-mutado)"># hi
         </div>
         <div class="code-block">
           <div class="code-block-header"><span>bash</span><button class="copy-btn" onclick="copyCode(this)">⎘ copy</button></div>
-          <pre>ntk start               <span style="color:var(--color-texto-mutado)"># CPU mode</span>
-ntk start --gpu         <span style="color:var(--color-texto-mutado)"># GPU acceleration (CUDA/Metal auto-detected)</span></pre>
+          <pre>ntk start               <span style="color:var(--color-texto-mutado)"># CPU mode — opens live TUI dashboard</span>
+ntk start --gpu         <span style="color:var(--color-texto-mutado)"># GPU acceleration (CUDA/Metal auto-detected)</span>
+
+<span style="color:var(--color-texto-mutado)"># Daemon already running? ntk start attaches to the live TUI without restarting.</span>
+<span style="color:var(--color-texto-mutado)"># Ctrl+C exits the TUI — daemon stays running.</span>
+
+<span style="color:var(--color-texto-mutado)"># For a quick non-interactive snapshot:</span>
+ntk dashboard           <span style="color:var(--color-texto-mutado)"># status + gain + bar chart → stdout, then exit</span></pre>
         </div>
       </div>
 
@@ -431,19 +486,21 @@ rm -rf ~/.ntk           <span style="color:var(--color-texto-mutado)"># remove c
       <!-- Daemon -->
       <div class="cmd-group" data-group="daemon">
         <div class="cmd-group-title" data-i18n="cmd.g_daemon">Daemon</div>
-        <div class="cmd-row" data-cmd="start"><div class="cmd-name">start</div><div class="cmd-desc" data-i18n="cmd.start">Start the compression daemon on port 8765.</div></div>
-        <div class="cmd-row" data-cmd="start --gpu"><div class="cmd-name">start <span class="cmd-arg">--gpu</span></div><div class="cmd-desc" data-i18n="cmd.start_gpu">Start with GPU acceleration (CUDA/Metal auto-detected).</div></div>
+        <div class="cmd-row" data-cmd="start"><div class="cmd-name">start</div><div class="cmd-desc" data-i18n="cmd.start">Start the compression daemon on port 8765, opening the live TUI dashboard. If daemon is already running, attaches to the live TUI without restarting.</div></div>
+        <div class="cmd-row" data-cmd="start --gpu"><div class="cmd-name">start <span class="cmd-arg">--gpu</span></div><div class="cmd-desc" data-i18n="cmd.start_gpu">Start with GPU acceleration (CUDA/ROCm/Metal auto-detected).</div></div>
         <div class="cmd-row" data-cmd="stop"><div class="cmd-name">stop</div><div class="cmd-desc" data-i18n="cmd.stop">Stop the daemon.</div></div>
         <div class="cmd-row" data-cmd="status"><div class="cmd-name">status</div><div class="cmd-desc" data-i18n="cmd.status">Show daemon status, loaded model, GPU info, and uptime.</div></div>
+        <div class="cmd-row" data-cmd="dashboard"><div class="cmd-name">dashboard</div><div class="cmd-desc" data-i18n="cmd.dashboard">Combined static snapshot: daemon status + session gain + ASCII bar chart. Prints to stdout and exits immediately — safe for scripts and CI.</div></div>
       </div>
 
       <!-- Setup -->
       <div class="cmd-group" data-group="setup">
         <div class="cmd-group-title" data-i18n="cmd.g_setup">Setup &amp; Init</div>
-        <div class="cmd-row" data-cmd="init -g"><div class="cmd-name">init <span class="cmd-arg">-g</span></div><div class="cmd-desc" data-i18n="cmd.init_g">Initialize globally: patch settings.json, create ~/.ntk/config.json.</div></div>
+        <div class="cmd-row" data-cmd="init -g"><div class="cmd-name">init <span class="cmd-arg">-g</span></div><div class="cmd-desc" data-i18n="cmd.init_g">Initialize globally: patch settings.json, create ~/.ntk/config.json, then auto-launch model setup wizard.</div></div>
         <div class="cmd-row" data-cmd="init --show"><div class="cmd-name">init <span class="cmd-arg">--show</span></div><div class="cmd-desc" data-i18n="cmd.init_show">Display current hook installation status.</div></div>
         <div class="cmd-row" data-cmd="init --uninstall"><div class="cmd-name">init <span class="cmd-arg">--uninstall</span></div><div class="cmd-desc" data-i18n="cmd.init_uninstall">Remove the PostToolUse hook from settings.json.</div></div>
         <div class="cmd-row" data-cmd="init --auto-patch"><div class="cmd-name">init <span class="cmd-arg">--auto-patch</span></div><div class="cmd-desc" data-i18n="cmd.init_auto">Non-interactive mode for CI/CD pipelines.</div></div>
+        <div class="cmd-row" data-cmd="init --hook-only"><div class="cmd-name">init <span class="cmd-arg">--hook-only</span></div><div class="cmd-desc" data-i18n="cmd.init_hook_only">Install hook script only — skip config.json creation and model setup wizard.</div></div>
       </div>
 
       <!-- Model -->
@@ -451,8 +508,9 @@ rm -rf ~/.ntk           <span style="color:var(--color-texto-mutado)"># remove c
         <div class="cmd-group-title" data-i18n="cmd.g_model">Model</div>
         <div class="cmd-row" data-cmd="model pull"><div class="cmd-name">model <span class="cmd-arg">pull</span></div><div class="cmd-desc" data-i18n="cmd.model_pull">Download phi3:mini (default Q5_K_M, ~2GB) via Ollama.</div></div>
         <div class="cmd-row" data-cmd="model pull --quant"><div class="cmd-name">model <span class="cmd-arg">pull --quant q4_k_m</span></div><div class="cmd-desc" data-i18n="cmd.model_quant">Download a specific quantization (q4_k_m, q5_k_m, q6_k).</div></div>
-        <div class="cmd-row" data-cmd="model setup"><div class="cmd-name">model <span class="cmd-arg">setup</span></div><div class="cmd-desc" data-i18n="cmd.model_setup">Interactive backend selector (Ollama / Candle / llama.cpp).</div></div>
+        <div class="cmd-row" data-cmd="model setup"><div class="cmd-name">model <span class="cmd-arg">setup</span></div><div class="cmd-desc" data-i18n="cmd.model_setup">Interactive backend selector (Ollama / Candle / llama.cpp) with GPU/CPU hardware detection. Runs automatically after <code style="font-family:var(--font-mono)">ntk init</code>.</div></div>
         <div class="cmd-row" data-cmd="model test"><div class="cmd-name">model <span class="cmd-arg">test</span></div><div class="cmd-desc" data-i18n="cmd.model_test">Test model latency and output quality with a sample prompt.</div></div>
+        <div class="cmd-row" data-cmd="model test --debug"><div class="cmd-name">model <span class="cmd-arg">test --debug</span></div><div class="cmd-desc" data-i18n="cmd.model_test_debug">Verbose test: shows thread config, mlock status, system prompt preview, timing breakdown, and performance analysis with CPU-tier-aware targets (mobile ≥5 tok/s, desktop ≥10, high-end ≥15, GPU ≥40).</div></div>
         <div class="cmd-row" data-cmd="model bench"><div class="cmd-name">model <span class="cmd-arg">bench</span></div><div class="cmd-desc" data-i18n="cmd.model_bench">Benchmark CPU vs GPU inference latency.</div></div>
       </div>
 
@@ -662,6 +720,75 @@ rm -rf ~/.ntk           <span style="color:var(--color-texto-mutado)"># remove c
         Token counts use <strong>cl100k_base</strong> (tiktoken-rs), the same tokenizer as Claude/GPT. Measurements are taken on real captured outputs from development sessions: cargo test suites, tsc compiler errors, vitest runs, git operations, and docker logs. Layer 3 activates only when post-L1+L2 output exceeds 300 tokens, so small outputs incur zero neural inference latency.
       </p>
     </div>
+
+    <!-- GPU Latency comparison table -->
+    <div style="margin-top:2.5rem">
+      <div class="section-badge section-badge-violet" style="margin-bottom:1rem" data-i18n="met.gpu_badge">GPU Acceleration</div>
+      <h2 class="section-title" style="text-align:left;font-size:1.375rem;margin-bottom:0.5rem" data-i18n="met.gpu_title">Layer 3 Latency by Hardware</h2>
+      <p style="color:var(--color-texto-terciario);margin-bottom:1.5rem;font-size:0.9375rem" data-i18n="met.gpu_intro">
+        Phi-3 Mini Q5_K_M (3.8B). GPU drops p95 latency from ~900ms to under 100ms.
+      </p>
+      <div class="gpu-table-wrap fade-in" style="margin-top:0">
+        <table class="gpu-table">
+          <thead>
+            <tr>
+              <th data-i18n="met.gpu_th_hw">Hardware</th>
+              <th data-i18n="met.gpu_th_backend">Backend</th>
+              <th data-i18n="met.gpu_th_p50">p50 latency</th>
+              <th data-i18n="met.gpu_th_p95">p95 latency</th>
+              <th data-i18n="met.gpu_th_notes">Notes</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><strong>NVIDIA RTX 5060 Ti</strong></td>
+              <td><span class="gpu-badge-cuda">CUDA</span></td>
+              <td><span class="gpu-latency-fast">~30ms</span></td>
+              <td><span class="gpu-latency-fast">~50ms</span></td>
+              <td data-i18n="met.gpu_note_5060ti">Ada Lovelace, full offload</td>
+            </tr>
+            <tr>
+              <td><strong>NVIDIA RTX 3060</strong></td>
+              <td><span class="gpu-badge-cuda">CUDA</span></td>
+              <td><span class="gpu-latency-fast">~50ms</span></td>
+              <td><span class="gpu-latency-fast">~80ms</span></td>
+              <td data-i18n="met.gpu_note_3060">12GB VRAM, full offload</td>
+            </tr>
+            <tr>
+              <td><strong>Apple M2 MacBook Pro</strong></td>
+              <td><span class="gpu-badge-metal">Metal</span></td>
+              <td><span class="gpu-latency-fast">~80ms</span></td>
+              <td><span class="gpu-latency-mid">~150ms</span></td>
+              <td data-i18n="met.gpu_note_m2">Unified memory, via Ollama Metal</td>
+            </tr>
+            <tr>
+              <td><strong>Intel Xeon 4th Gen</strong></td>
+              <td><span class="gpu-badge-amx">AMX</span></td>
+              <td><span class="gpu-latency-mid">~150ms</span></td>
+              <td><span class="gpu-latency-mid">~250ms</span></td>
+              <td data-i18n="met.gpu_note_xeon">Sapphire Rapids, AMX tiles</td>
+            </tr>
+            <tr>
+              <td><strong>Intel Core i7-12700</strong></td>
+              <td><span class="gpu-badge-cpu">AVX2</span></td>
+              <td><span class="gpu-latency-mid">~300ms</span></td>
+              <td><span class="gpu-latency-slow">~500ms</span></td>
+              <td data-i18n="met.gpu_note_i7">12-core desktop, AVX2</td>
+            </tr>
+            <tr>
+              <td><strong>Intel Core i5-8250U</strong></td>
+              <td><span class="gpu-badge-cpu">AVX2</span></td>
+              <td><span class="gpu-latency-slow">~600ms</span></td>
+              <td><span class="gpu-latency-slow">~900ms</span></td>
+              <td data-i18n="met.gpu_note_i5">4-core laptop, baseline CPU</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <p style="font-size:0.8125rem;color:var(--color-texto-mutado);margin-top:0.75rem" data-i18n="met.gpu_footnote">
+        L3 only activates when output exceeds 300 tokens post-L1+L2. Small outputs always use L1+L2 (&lt;5ms).
+      </p>
+    </div>
   </div>
 </div><!-- /page-metrics -->
 
@@ -672,7 +799,7 @@ rm -rf ~/.ntk           <span style="color:var(--color-texto-mutado)"># remove c
       <div class="footer-brand">
         <div class="logo" style="cursor:default">
           <span>NTK</span>
-          <span class="logo-badge">v0.1</span>
+          <span class="logo-badge">v0.2</span>
         </div>
         <p data-i18n="footer.desc">Neural Token Killer — semantic compression proxy for Claude Code. Built with Rust.</p>
       </div>

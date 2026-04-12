@@ -103,15 +103,24 @@ impl LlamaCppBackend {
             .parse::<u16>()
             .unwrap_or(8766);
 
+        let gen_threads = generation_threads(self.n_gpu_layers);
+        let batch_threads = num_cpus();
+        let use_gpu = self.n_gpu_layers != 0;
+
         tracing::info!(
-            "llama.cpp: starting {} --model {} --port {}",
+            "llama.cpp: starting {} --model {} --port {} --threads {} --threads-batch {} --n-gpu-layers {} {}{}",
             binary.display(),
             self.model_path.display(),
             port,
+            gen_threads,
+            batch_threads,
+            self.n_gpu_layers,
+            if use_gpu { "--flash-attn " } else { "--mlock " },
+            if !use_gpu { "--no-mmap" } else { "" },
         );
 
-        let child = std::process::Command::new(&binary)
-            .arg("--model")
+        let mut cmd = std::process::Command::new(&binary);
+        cmd.arg("--model")
             .arg(&self.model_path)
             .arg("--port")
             .arg(port.to_string())
@@ -119,11 +128,32 @@ impl LlamaCppBackend {
             .arg(self.context_size.to_string())
             .arg("--n-gpu-layers")
             .arg(self.n_gpu_layers.to_string())
+            // Generation threads: sequential token-by-token loop.
+            // Beyond 8 adds locking overhead without throughput gain on most CPUs.
             .arg("--threads")
-            .arg(num_cpus().to_string())
+            .arg(gen_threads.to_string())
+            // Batch/prefill threads: processes the input prompt in parallel.
+            // Use all logical cores — this phase parallelises well.
+            .arg("--threads-batch")
+            .arg(batch_threads.to_string())
             .arg("--log-disable")
             .stdout(std::process::Stdio::null())
-            .stderr(std::process::Stdio::null())
+            .stderr(std::process::Stdio::null());
+
+        if use_gpu {
+            // Flash Attention reduces memory bandwidth during GPU inference.
+            cmd.arg("--flash-attn");
+        } else {
+            // CPU mode: pin the entire model in RAM.
+            // Without --mlock the OS can page out cold weight pages mid-inference,
+            // causing ~10× slowdown (4 tok/s instead of the expected 15+ tok/s).
+            // --no-mmap forces eager load so every weight page is resident before
+            // the first token is generated.
+            cmd.arg("--mlock");
+            cmd.arg("--no-mmap");
+        }
+
+        let child = cmd
             .spawn()
             .with_context(|| format!("spawning {}", binary.display()))?;
 
@@ -193,6 +223,23 @@ impl LlamaCppBackend {
     ) -> Result<Layer3Result> {
         let system_prompt = load_system_prompt(output_type, prompts_dir)?;
 
+        // Truncate input to avoid excessive prompt evaluation time on CPU.
+        // At ~33ms/token prompt eval + ~86ms/token generation (Phi-3 Mini Q5_K_M, CPU):
+        //   1000 chars ≈ 250 tokens → ~8s eval + generation.
+        // For GPU (n_gpu_layers > 0) the limit could be relaxed, but 1000 is safe for both.
+        const MAX_L3_INPUT_CHARS: usize = 1_000;
+        let truncated_input;
+        let input = if input.len() > MAX_L3_INPUT_CHARS {
+            truncated_input = &input[..input
+                .char_indices()
+                .nth(MAX_L3_INPUT_CHARS)
+                .map(|(i, _)| i)
+                .unwrap_or(input.len())];
+            truncated_input
+        } else {
+            input
+        };
+
         // Build the Phi-3 chat-format prompt.
         let prompt_text = format!(
             "<|system|>\n{system_prompt}<|end|>\n<|user|>\n{input}<|end|>\n<|assistant|>\n"
@@ -200,7 +247,7 @@ impl LlamaCppBackend {
 
         let request_body = serde_json::json!({
             "prompt": prompt_text,
-            "n_predict": 512,
+            "n_predict": 150,
             // temperature=0 → greedy decoding: eliminates stochastic hallucination.
             // top_k=1 reinforces greedy (top_p is irrelevant when temp=0).
             "temperature": 0.0,
@@ -390,6 +437,20 @@ fn num_cpus() -> usize {
     std::thread::available_parallelism()
         .map(|n| n.get())
         .unwrap_or(4)
+}
+
+/// Optimal thread count for autoregressive (token-by-token) generation.
+///
+/// Generation is a sequential matrix-vector loop: additional threads past ~8
+/// add synchronisation overhead without meaningful throughput gain on most
+/// consumer CPUs. In GPU mode the GPU handles the compute; a small host-side
+/// count reduces PCIe/host overhead.
+fn generation_threads(n_gpu_layers: i32) -> usize {
+    if n_gpu_layers != 0 {
+        4 // GPU carries the load; minimal host threads needed
+    } else {
+        num_cpus().min(8)
+    }
 }
 
 // ---------------------------------------------------------------------------

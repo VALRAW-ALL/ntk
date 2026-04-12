@@ -2,6 +2,7 @@ use crate::compressor::{layer1_filter, layer2_tokenizer, layer3_backend};
 use crate::config::NtkConfig;
 use crate::detector;
 use crate::metrics::{CompressionRecord, MetricsDb, MetricsStore};
+use crate::output::dashboard::{WarnBuffer, WarnEntry};
 use axum::{
     extract::{Json, State},
     http::StatusCode,
@@ -26,6 +27,14 @@ pub struct AppState {
     pub db: Option<Arc<MetricsDb>>,
     /// Layer 3 inference backend (Ollama / Candle / llama.cpp).
     pub backend: Arc<layer3_backend::BackendKind>,
+    /// Daemon start time — used to compute uptime in /health and /state.
+    pub started_at: std::time::Instant,
+    /// Captured WARN/ERROR log — served via /state for attach-mode TUI.
+    pub warn_log: WarnBuffer,
+    /// Bound address string (e.g. "127.0.0.1:8765") — served via /state.
+    pub addr: String,
+    /// GPU backend name — served via /state.
+    pub backend_name: String,
 }
 
 // ---------------------------------------------------------------------------
@@ -57,6 +66,7 @@ pub struct HealthResponse {
     pub status: &'static str,
     pub version: &'static str,
     pub model: String,
+    pub uptime_secs: u64,
 }
 
 // ---------------------------------------------------------------------------
@@ -68,6 +78,7 @@ pub fn build_router(state: AppState) -> Router {
         .route("/compress", post(handle_compress))
         .route("/metrics", get(handle_metrics))
         .route("/health", get(handle_health))
+        .route("/state", get(handle_state))
         .with_state(state)
 }
 
@@ -230,5 +241,45 @@ async fn handle_health(State(state): State<AppState>) -> RespJson<HealthResponse
             state.config.model.model_name,
             state.backend.name()
         ),
+        uptime_secs: state.started_at.elapsed().as_secs(),
     })
+}
+
+// ---------------------------------------------------------------------------
+// GET /state  — full dashboard snapshot for attach-mode TUI
+// ---------------------------------------------------------------------------
+
+#[derive(Debug, Serialize)]
+struct StateResponse {
+    summary: crate::metrics::SessionSummary,
+    recent: Vec<CompressionRecord>,
+    warns: Vec<WarnEntry>,
+    uptime_secs: u64,
+    addr: String,
+    backend_name: String,
+}
+
+async fn handle_state(
+    State(state): State<AppState>,
+) -> Result<RespJson<StateResponse>, (StatusCode, String)> {
+    let (summary, recent) = state
+        .metrics
+        .lock()
+        .map(|m| (m.session_summary(), m.recent(3).to_vec()))
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+
+    let warns = state
+        .warn_log
+        .lock()
+        .map(|b| b.iter().cloned().collect::<Vec<_>>())
+        .unwrap_or_default();
+
+    Ok(RespJson(StateResponse {
+        summary,
+        recent,
+        warns,
+        uptime_secs: state.started_at.elapsed().as_secs(),
+        addr: state.addr.clone(),
+        backend_name: state.backend_name.clone(),
+    }))
 }
