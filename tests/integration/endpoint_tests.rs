@@ -2,11 +2,17 @@ use axum_test::TestServer;
 use ntk::compressor::layer3_backend::BackendKind;
 use ntk::config::NtkConfig;
 use ntk::metrics::MetricsStore;
+use ntk::output::dashboard::WarnBuffer;
 use ntk::server::{build_router, AppState};
+use std::collections::VecDeque;
 use std::sync::{Arc, Mutex};
 
 fn default_backend() -> Arc<BackendKind> {
     Arc::new(BackendKind::from_config(&NtkConfig::default()).unwrap())
+}
+
+fn empty_warn_log() -> WarnBuffer {
+    Arc::new(Mutex::new(VecDeque::new()))
 }
 
 fn test_server() -> TestServer {
@@ -18,6 +24,9 @@ fn test_server() -> TestServer {
         db: None,
         backend: default_backend(),
         started_at: std::time::Instant::now(),
+        warn_log: empty_warn_log(),
+        addr: "127.0.0.1:8765".to_string(),
+        backend_name: "test".to_string(),
     };
     let router = build_router(state);
     TestServer::new(router).expect("test server")
@@ -106,6 +115,9 @@ async fn test_compress_rejects_oversized_input() {
         db: None,
         backend: default_backend(),
         started_at: std::time::Instant::now(),
+        warn_log: empty_warn_log(),
+        addr: "127.0.0.1:8765".to_string(),
+        backend_name: "test".to_string(),
     };
     let server = TestServer::new(build_router(state)).expect("test server");
 

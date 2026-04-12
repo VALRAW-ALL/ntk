@@ -33,7 +33,7 @@ fn is_stdout_tty() -> bool {
     {
         use std::os::unix::io::AsRawFd;
         // SAFETY: isatty is always safe to call with a valid fd.
-        unsafe { libc_isatty(std::io::stdout().as_raw_fd()) }
+        libc_isatty(std::io::stdout().as_raw_fd())
     }
     #[cfg(not(unix))]
     {

@@ -741,6 +741,7 @@ fn install_ollama() -> Result<()> {
 }
 
 /// Download `url` to `dest` using reqwest (blocking via new runtime).
+#[allow(dead_code)]
 fn download_file(url: &str, dest: &std::path::Path) -> Result<()> {
     let rt = tokio::runtime::Builder::new_current_thread()
         .enable_all()
