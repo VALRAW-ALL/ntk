@@ -98,7 +98,9 @@ impl<S: tracing::Subscriber> tracing_subscriber::Layer<S> for WarnCaptureLayer {
         if level > tracing::Level::WARN {
             return;
         }
-        let mut visitor = MessageVisitor { message: String::new() };
+        let mut visitor = MessageVisitor {
+            message: String::new(),
+        };
         event.record(&mut visitor);
         if visitor.message.is_empty() {
             return;
@@ -136,10 +138,10 @@ const NTK_ART: [(&str, u8); 6] = [
 
 fn art_color(idx: u8) -> Color {
     match idx {
-        0 => Color::Rgb(15, 80, 25),    // very dark green
-        1 => Color::Rgb(27, 107, 44),   // dark green
-        2 => Color::Rgb(36, 126, 56),   // medium dark green
-        _ => Color::Rgb(8, 45, 14),     // near-black green shadow
+        0 => Color::Rgb(15, 80, 25),  // very dark green
+        1 => Color::Rgb(27, 107, 44), // dark green
+        2 => Color::Rgb(36, 126, 56), // medium dark green
+        _ => Color::Rgb(8, 45, 14),   // near-black green shadow
     }
 }
 
@@ -250,7 +252,10 @@ async fn dashboard_loop(
             }
         };
 
-        let warns = warn_log.lock().map(|b| b.iter().cloned().collect::<Vec<_>>()).unwrap_or_default();
+        let warns = warn_log
+            .lock()
+            .map(|b| b.iter().cloned().collect::<Vec<_>>())
+            .unwrap_or_default();
 
         let uptime = started_at.elapsed();
         let addr = addr.as_str();
@@ -280,10 +285,10 @@ fn render(
     let chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
-            Constraint::Length(8),  // header: 6 art rows + 2 border rows
-            Constraint::Length(9),  // metrics panel
-            Constraint::Length(7),  // recent commands (3 entries + borders)
-            Constraint::Min(4),     // warnings & errors console
+            Constraint::Length(8), // header: 6 art rows + 2 border rows
+            Constraint::Length(9), // metrics panel
+            Constraint::Length(7), // recent commands (3 entries + borders)
+            Constraint::Min(4),    // warnings & errors console
         ])
         .split(area);
 
@@ -389,7 +394,10 @@ fn render_metrics(f: &mut Frame, area: ratatui::layout::Rect, s: &SessionSummary
                     .fg(Color::Rgb(0, 230, 118))
                     .add_modifier(Modifier::BOLD),
             ),
-            Span::styled(" tokens  •  Avg ratio: ", Style::default().fg(Color::DarkGray)),
+            Span::styled(
+                " tokens  •  Avg ratio: ",
+                Style::default().fg(Color::DarkGray),
+            ),
             Span::styled(
                 format!("{avg_pct}%"),
                 Style::default()
@@ -423,12 +431,19 @@ fn layer_line<'a>(
     bar_w: usize,
     color: Color,
 ) -> Line<'a> {
-    let filled = if total > 0 { (count * bar_w / total).min(bar_w) } else { 0 };
+    let filled = if total > 0 {
+        (count * bar_w / total).min(bar_w)
+    } else {
+        0
+    };
     let bar = format!("{}{}", "█".repeat(filled), "░".repeat(bar_w - filled));
     Line::from(vec![
         Span::styled(format!("  {label}  "), Style::default().fg(Color::DarkGray)),
         Span::styled(bar, Style::default().fg(color)),
-        Span::styled(format!("  {}", fmt_num(count)), Style::default().fg(Color::White)),
+        Span::styled(
+            format!("  {}", fmt_num(count)),
+            Style::default().fg(Color::White),
+        ),
         Span::styled(" runs", Style::default().fg(Color::DarkGray)),
     ])
 }
@@ -520,7 +535,7 @@ fn render_warn_log(f: &mut Frame, area: ratatui::layout::Rect, warns: &[WarnEntr
         for entry in warns.iter().rev().take(max_rows) {
             let ts = entry.timestamp.format("%H:%M:%S").to_string();
             let (level_str, level_color) = match entry.level {
-                WarnLevel::Warn  => ("WARN ", Color::Rgb(255, 180, 0)),
+                WarnLevel::Warn => ("WARN ", Color::Rgb(255, 180, 0)),
                 WarnLevel::Error => ("ERROR", Color::Rgb(220, 60, 60)),
             };
             let msg = if entry.message.len() > max_msg && max_msg > 1 {
@@ -529,13 +544,12 @@ fn render_warn_log(f: &mut Frame, area: ratatui::layout::Rect, warns: &[WarnEntr
                 entry.message.clone()
             };
             lines.push(Line::from(vec![
-                Span::styled(
-                    format!("  {ts}  "),
-                    Style::default().fg(Color::DarkGray),
-                ),
+                Span::styled(format!("  {ts}  "), Style::default().fg(Color::DarkGray)),
                 Span::styled(
                     format!("{level_str}  "),
-                    Style::default().fg(level_color).add_modifier(Modifier::BOLD),
+                    Style::default()
+                        .fg(level_color)
+                        .add_modifier(Modifier::BOLD),
                 ),
                 Span::styled(msg, Style::default().fg(Color::Rgb(200, 200, 200))),
             ]));
@@ -609,10 +623,7 @@ pub async fn run_attach_dashboard(url: String) -> Result<()> {
     res
 }
 
-async fn attach_loop(
-    terminal: &mut Terminal<CrosstermBackend<Stdout>>,
-    url: String,
-) -> Result<()> {
+async fn attach_loop(terminal: &mut Terminal<CrosstermBackend<Stdout>>, url: String) -> Result<()> {
     let client = reqwest::Client::builder()
         .timeout(Duration::from_millis(800))
         .build()?;

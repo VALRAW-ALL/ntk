@@ -150,9 +150,13 @@ impl CandleBackend {
 
                 // use_flash_attn=false: flash attention requires CUDA/Metal at runtime;
                 // CPU inference always uses the standard attention path.
-                let model =
-                    quantized_phi3::ModelWeights::from_gguf(false, content, &mut file, &device_clone)
-                        .map_err(|e| anyhow!("loading model weights: {e}"))?;
+                let model = quantized_phi3::ModelWeights::from_gguf(
+                    false,
+                    content,
+                    &mut file,
+                    &device_clone,
+                )
+                .map_err(|e| anyhow!("loading model weights: {e}"))?;
 
                 let tokenizer = Tokenizer::from_file(&tokenizer_path)
                     .map_err(|e| anyhow!("loading tokenizer: {e}"))?;

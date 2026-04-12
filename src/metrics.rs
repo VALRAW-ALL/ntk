@@ -101,8 +101,7 @@ impl MetricsStore {
 
         for r in &self.records {
             total_original_tokens = total_original_tokens.saturating_add(r.original_tokens);
-            total_compressed_tokens =
-                total_compressed_tokens.saturating_add(r.compressed_tokens);
+            total_compressed_tokens = total_compressed_tokens.saturating_add(r.compressed_tokens);
             total_tokens_saved = total_tokens_saved
                 .saturating_add(r.original_tokens.saturating_sub(r.compressed_tokens));
             ratio_sum += r.ratio();
@@ -299,11 +298,11 @@ impl<'de> serde::Deserialize<'de> for OutputType {
     {
         let s = String::deserialize(deserializer)?;
         Ok(match s.as_str() {
-            "test"    => OutputType::Test,
-            "build"   => OutputType::Build,
-            "log"     => OutputType::Log,
-            "diff"    => OutputType::Diff,
-            _         => OutputType::Generic,
+            "test" => OutputType::Test,
+            "build" => OutputType::Build,
+            "log" => OutputType::Log,
+            "diff" => OutputType::Diff,
+            _ => OutputType::Generic,
         })
     }
 }

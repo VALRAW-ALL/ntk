@@ -267,7 +267,9 @@ async fn async_run_daemon(gpu: bool) -> Result<()> {
 
     tracing_subscriber::registry()
         .with(tracing_subscriber::fmt::layer().with_filter(filter))
-        .with(ntk::output::dashboard::WarnCaptureLayer::new(Arc::clone(&warn_buf)))
+        .with(ntk::output::dashboard::WarnCaptureLayer::new(Arc::clone(
+            &warn_buf,
+        )))
         .init();
 
     let cwd = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
@@ -700,9 +702,12 @@ fn run_dashboard() -> Result<()> {
                 let pct = val["average_ratio"].as_f64().unwrap_or(0.0) * 100.0;
                 println!(
                     "  {}{saved}{} tokens saved  ·  {}{calls}{} compressions  ·  {}{pct:.0}%{} avg",
-                    term::yellow(), term::reset(),
-                    term::yellow(), term::reset(),
-                    term::cyan(),   term::reset(),
+                    term::yellow(),
+                    term::reset(),
+                    term::yellow(),
+                    term::reset(),
+                    term::cyan(),
+                    term::reset(),
                 );
             }
         }
@@ -1378,7 +1383,7 @@ fn run_model_setup() -> Result<()> {
 ///
 /// gpu_layers: 0 = CPU only, -1 = offload all layers to GPU.
 fn setup_gpu_selection() -> Result<(i32, bool)> {
-    use ntk::gpu::{detect_nvidia, detect_amd, is_metal_available, GpuBackend};
+    use ntk::gpu::{detect_amd, detect_nvidia, is_metal_available, GpuBackend};
     use ntk::output::terminal as term;
     use std::io::{self, BufRead, Write};
 
@@ -1386,11 +1391,7 @@ fn setup_gpu_selection() -> Result<(i32, bool)> {
     let amd = detect_amd();
     let metal = is_metal_available();
 
-    println!(
-        "{}  GPU / Compute Selection{}",
-        term::bold(),
-        term::reset()
-    );
+    println!("{}  GPU / Compute Selection{}", term::bold(), term::reset());
     println!(
         "{}  ────────────────────────────────────{}",
         term::dim(),
@@ -1398,9 +1399,17 @@ fn setup_gpu_selection() -> Result<(i32, bool)> {
     );
 
     // Determine what hardware was auto-detected
-    let detected_label = if let Some(GpuBackend::CudaNvidia { device_id: _, vram_mb }) = &nvidia {
+    let detected_label = if let Some(GpuBackend::CudaNvidia {
+        device_id: _,
+        vram_mb,
+    }) = &nvidia
+    {
         format!("NVIDIA CUDA  ({vram_mb} MB VRAM)")
-    } else if let Some(GpuBackend::AmdGpu { device_id: _, vram_mb }) = &amd {
+    } else if let Some(GpuBackend::AmdGpu {
+        device_id: _,
+        vram_mb,
+    }) = &amd
+    {
         format!("AMD ROCm  ({vram_mb} MB VRAM)")
     } else if metal {
         "Apple Metal (Apple Silicon)".to_string()
@@ -1434,13 +1443,21 @@ fn setup_gpu_selection() -> Result<(i32, bool)> {
     let mut options: Vec<GpuOption> = vec![GpuOption {
         num: 1,
         label: "CPU only",
-        status: format!("{}✓ always available{}", term::bright_green(), term::reset()),
+        status: format!(
+            "{}✓ always available{}",
+            term::bright_green(),
+            term::reset()
+        ),
         latency: "~300ms p50",
         available: true,
     }];
 
     if let Some(GpuBackend::CudaNvidia { vram_mb, .. }) = &nvidia {
-        let hint = if *vram_mb >= 8_000 { "~50ms p50" } else { "~80ms p50" };
+        let hint = if *vram_mb >= 8_000 {
+            "~50ms p50"
+        } else {
+            "~80ms p50"
+        };
         options.push(GpuOption {
             num: 2,
             label: "NVIDIA GPU  (CUDA)",
@@ -2514,11 +2531,19 @@ fn run_model_test(debug: bool) -> Result<()> {
         println!("  batch threads    : {n_cpus}  (prefill / prompt processing)");
         println!(
             "  mlock/no-mmap    : {}",
-            if use_gpu { "off (GPU mode)" } else { "on  (CPU mode, pins model in RAM)" }
+            if use_gpu {
+                "off (GPU mode)"
+            } else {
+                "on  (CPU mode, pins model in RAM)"
+            }
         );
         println!(
             "  flash-attn       : {}",
-            if use_gpu { "on  (GPU mode)" } else { "off (CPU mode)" }
+            if use_gpu {
+                "on  (GPU mode)"
+            } else {
+                "off (CPU mode)"
+            }
         );
 
         // CPU model name
@@ -2714,7 +2739,11 @@ fn run_model_test(debug: bool) -> Result<()> {
                 let cpu_lower = ntk::gpu::cpu_model_name()
                     .unwrap_or_default()
                     .to_lowercase();
-                let last_word = cpu_lower.split_whitespace().last().unwrap_or("").to_string();
+                let last_word = cpu_lower
+                    .split_whitespace()
+                    .last()
+                    .unwrap_or("")
+                    .to_string();
 
                 let is_mobile = cpu_lower.contains("ultra")        // Intel Core Ultra (always mobile)
                     || last_word.ends_with('u')                    // "155u", "5500u", "1165g7u"

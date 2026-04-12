@@ -22,24 +22,32 @@ struct Palette {
     bar: &'static str,
     val: &'static str,
     dim: &'static str,
-    l1:  &'static str,
-    l2:  &'static str,
-    l3:  &'static str,
+    l1: &'static str,
+    l2: &'static str,
+    l3: &'static str,
     rst: &'static str,
 }
 
 impl Palette {
     fn new() -> Self {
         if std::env::var("NO_COLOR").is_ok() {
-            Self { bar: "", val: "", dim: "", l1: "", l2: "", l3: "", rst: "" }
+            Self {
+                bar: "",
+                val: "",
+                dim: "",
+                l1: "",
+                l2: "",
+                l3: "",
+                rst: "",
+            }
         } else {
             Self {
-                bar: "\x1b[34m",   // blue
-                val: "\x1b[33m",   // yellow
-                dim: "\x1b[2m",    // dim
-                l1:  "\x1b[32m",   // green
-                l2:  "\x1b[33m",   // yellow
-                l3:  "\x1b[34m",   // blue
+                bar: "\x1b[34m", // blue
+                val: "\x1b[33m", // yellow
+                dim: "\x1b[2m",  // dim
+                l1: "\x1b[32m",  // green
+                l2: "\x1b[33m",  // yellow
+                l3: "\x1b[34m",  // blue
                 rst: "\x1b[0m",
             }
         }
@@ -54,7 +62,9 @@ fn vis_chars(s: &str) -> usize {
         match c {
             '\x1b' => esc = true,
             _ if esc => {
-                if c.is_ascii_alphabetic() { esc = false; }
+                if c.is_ascii_alphabetic() {
+                    esc = false;
+                }
             }
             _ => n += 1,
         }
@@ -90,7 +100,8 @@ pub fn print_bar_chart(records: &[CompressionRecord]) {
     let mut total_comp: u64 = 0;
 
     for r in records {
-        let base = r.command
+        let base = r
+            .command
             .split_whitespace()
             .next()
             .unwrap_or("?")
@@ -127,7 +138,12 @@ pub fn print_bar_chart(records: &[CompressionRecord]) {
     // visual:       2  +   cmd_w    +  2  +   bar_w     +  2  +    5    +   4   +   2  +   3    + 1 + 2
     //             = cmd_w + bar_w + 23 = W
     // bar_w = W - cmd_w - 23
-    let cmd_w = entries.iter().map(|(k, _)| k.len()).max().unwrap_or(4).min(14);
+    let cmd_w = entries
+        .iter()
+        .map(|(k, _)| k.len())
+        .max()
+        .unwrap_or(4)
+        .min(14);
     let bar_w = W.saturating_sub(cmd_w + 23).max(8);
     let max_sv = entries[0].1.max(1);
 
@@ -143,8 +159,12 @@ pub fn print_bar_chart(records: &[CompressionRecord]) {
     for (cmd, sv) in &entries {
         let filled = (*sv as f64 / max_sv as f64 * bar_w as f64).round() as usize;
         let filled = filled.clamp(1, bar_w);
-        let empty  = bar_w - filled;
-        let pct    = if total_saved > 0 { *sv as f64 / total_saved as f64 * 100.0 } else { 0.0 };
+        let empty = bar_w - filled;
+        let pct = if total_saved > 0 {
+            *sv as f64 / total_saved as f64 * 100.0
+        } else {
+            0.0
+        };
 
         // Build the line — visual widths are fixed, ANSI codes are zero-width.
         let line = format!(
@@ -179,7 +199,7 @@ pub fn print_bar_chart(records: &[CompressionRecord]) {
         let mut segs: Vec<String> = Vec::new();
         for i in 0..3 {
             let frac = layer_counts[i] as f64 / total_l as f64;
-            let bl   = if layer_counts[i] > 0 {
+            let bl = if layer_counts[i] > 0 {
                 (frac * LBAR as f64).round().max(1.0) as usize
             } else {
                 0
@@ -187,12 +207,12 @@ pub fn print_bar_chart(records: &[CompressionRecord]) {
             let pi = (frac * 100.0).round() as u64;
             segs.push(format!(
                 "{c}{lbl} {fill}{rst} {dim}{pi:>3}%{rst}",
-                c    = layer_colors[i],
-                lbl  = layer_labels[i],
+                c = layer_colors[i],
+                lbl = layer_labels[i],
                 fill = "█".repeat(bl),
-                rst  = p.rst,
-                dim  = p.dim,
-                pi   = pi,
+                rst = p.rst,
+                dim = p.dim,
+                pi = pi,
             ));
         }
 
@@ -320,7 +340,7 @@ mod tests {
         let records = vec![
             rec("cargo test", 1000, 200, 3),
             rec("cargo build", 800, 300, 2),
-            rec("cargo test", 600, 100, 3),  // should merge with first cargo
+            rec("cargo test", 600, 100, 3), // should merge with first cargo
         ];
         print_bar_chart(&records);
     }
@@ -333,7 +353,10 @@ mod tests {
 
     #[test]
     fn test_sparkline_weekly_empty() {
-        let ws = WeeklySummary { daily_savings: vec![], day_labels: vec![] };
+        let ws = WeeklySummary {
+            daily_savings: vec![],
+            day_labels: vec![],
+        };
         print_sparkline_weekly(&ws);
     }
 
@@ -341,8 +364,15 @@ mod tests {
     fn test_sparkline_weekly_data() {
         let ws = WeeklySummary {
             daily_savings: vec![0, 500, 1200, 800, 300, 1500, 700],
-            day_labels: vec!["Mon".into(), "Tue".into(), "Wed".into(), "Thu".into(),
-                             "Fri".into(), "Sat".into(), "Sun".into()],
+            day_labels: vec![
+                "Mon".into(),
+                "Tue".into(),
+                "Wed".into(),
+                "Thu".into(),
+                "Fri".into(),
+                "Sat".into(),
+                "Sun".into(),
+            ],
         };
         print_sparkline_weekly(&ws);
     }
