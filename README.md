@@ -170,7 +170,7 @@ ntk dashboard       # Combined status + session gain + ASCII bar chart (plain te
 │ ████╗ ██║╚══██╔══╝██║ ██╔╝   Neural Token Killer            │
 │ ██╔██╗██║   ██║   █████╔╝    v0.2  •  127.0.0.1:8765       │
 │ ██║╚████║   ██║   ██╔═██╗    Uptime: 3m 12s                 │
-│ ██║ ╚███║   ██║   ██║  ██╗   Backend: candle   Model: phi3:mini q5_k_m  [GPU] │
+│ ██║ ╚███║   ██║   ██║  ██╗   Backend: candle [GPU] phi3:mini│
 │ ╚═╝  ╚══╝   ╚═╝   ╚═╝  ╚═╝                                 │
 ├─────────────────── SESSION METRICS ─────────────────────────┤
 │  Compressions: 47     Tokens In: 84,291  →  Out: 12,048     │
@@ -191,7 +191,7 @@ Press **Ctrl+C** in the **attached** TUI to exit the dashboard without stopping 
 **Static dashboard** - `ntk dashboard` prints a combined snapshot to stdout and exits immediately (no event loop, always safe to use in scripts or CI):
 
 ```
-● NTK daemon  running  127.0.0.1:8765  up 3m 22s  backend: candle  model: phi3:mini q5_k_m [GPU]
+● NTK daemon  running  127.0.0.1:8765  up 3m 22s  candle [GPU] phi3:mini q5_k_m
   14382 tokens saved across 47 compressions (78% avg ratio)
 
 ┌─ NTK · Token Savings ──────────────────────────────────────────────────────┐
