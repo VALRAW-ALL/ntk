@@ -864,7 +864,7 @@ a:hover { color: var(--color-texto-principal); }
   gap: 2rem;
 }
 @media (min-width: 768px) { .steps-grid { grid-template-columns: repeat(2, 1fr); gap: 3rem; } }
-@media (min-width: 1024px) { .steps-grid { grid-template-columns: repeat(4, 1fr); } }
+@media (min-width: 1024px) { .steps-grid { grid-template-columns: repeat(3, 1fr); } }
 
 .step-card { text-align: center; }
 .step-number {
