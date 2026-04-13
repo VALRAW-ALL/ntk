@@ -181,10 +181,14 @@ ntk discover      # Analisa sessão Claude Code para oportunidades perdidas de R
 - **Estimativa**: 90-99% de redução total
 - **Latência**: 30-800ms dependendo do backend (ver tabela de GPU)
 
-### Layer 4 — Context Injection (opcional, avançado)
+### Layer 4 — Context Injection (opcional, avançado) 🗓️ planejado
+
+> **Status:** não implementado. O campo `context: Option<String>` existe no `CompressRequest` como placeholder. Implementar após L1+L2+L3 estáveis.
+
 - O hook passa para o daemon a **intenção atual** do Claude Code (extraída do contexto da tarefa)
 - O modelo local filtra com base no que Claude está tentando resolver
 - Configurável via `context_aware: true` no config
+- **Impacto esperado:** melhoria marginal de qualidade em fluxos complexos; sem impacto na economia base (L1+L2+L3 já entregam 70–99%)
 
 ---
 

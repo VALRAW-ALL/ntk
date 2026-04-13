@@ -57,11 +57,6 @@
     </div>
     <div class="container hero-content">
 
-      <div class="hero-badge">
-        <div class="hero-badge-dot"></div>
-        <span data-i18n="hero.badge">Open Source · Rust · Local AI</span>
-      </div>
-
       <h1 class="hero-title">
         <span data-i18n="hero.title1">Neural</span><br>
         <span class="gradient-text-blue" data-i18n="hero.title2">Token Killer</span>
@@ -74,7 +69,7 @@
       </p>
 
       <div class="hero-actions">
-        <button class="btn btn-primary" onclick="navigateTo('getstart')" data-i18n="hero.cta_primary">
+        <button class="btn btn-blue" onclick="navigateTo('getstart')" data-i18n="hero.cta_primary">
           ⚡ Get Started
         </button>
         <a class="btn btn-secondary" href="https://github.com/VALRAW-ALL/ntk" target="_blank" rel="noopener" data-i18n="hero.cta_github">
@@ -134,11 +129,6 @@
           <div class="step-number">L3</div>
           <div class="step-title" data-i18n="how.l3_title">Local Inference</div>
           <p class="step-desc" data-i18n="how.l3_desc">Ollama/Phi-3 Mini with type-specific prompts. Only triggers when output &gt;300 tokens.</p>
-        </div>
-        <div class="step-card">
-          <div class="step-number">L4</div>
-          <div class="step-title" data-i18n="how.l4_title">Context Injection</div>
-          <p class="step-desc" data-i18n="how.l4_desc">Passes Claude's current intent to the model for context-aware compression. Optional.</p>
         </div>
       </div>
     </div>
@@ -513,12 +503,19 @@ rm -rf ~/.ntk           <span style="color:var(--color-texto-mutado)"># remove c
         <div class="cmd-row" data-cmd="model test"><div class="cmd-name">model <span class="cmd-arg">test</span></div><div class="cmd-desc" data-i18n="cmd.model_test">Test model latency and output quality with a sample prompt.</div></div>
         <div class="cmd-row" data-cmd="model test --debug"><div class="cmd-name">model <span class="cmd-arg">test --debug</span></div><div class="cmd-desc" data-i18n="cmd.model_test_debug">Verbose test: shows thread config, mlock status, system prompt preview, timing breakdown, and performance analysis with CPU-tier-aware targets (mobile ≥5 tok/s, desktop ≥10, high-end ≥15, GPU ≥40).</div></div>
         <div class="cmd-row" data-cmd="model bench"><div class="cmd-name">model <span class="cmd-arg">bench</span></div><div class="cmd-desc" data-i18n="cmd.model_bench">Benchmark CPU vs GPU inference latency.</div></div>
+        <div class="cmd-row" data-cmd="model list"><div class="cmd-name">model <span class="cmd-arg">list</span></div><div class="cmd-desc" data-i18n="cmd.model_list">List available models in the configured backend.</div></div>
       </div>
 
       <!-- Compression -->
       <div class="cmd-group" data-group="compress">
         <div class="cmd-group-title" data-i18n="cmd.g_compress">Compression</div>
         <div class="cmd-row" data-cmd="test-compress"><div class="cmd-name">test-compress <span class="cmd-arg">&lt;file&gt;</span></div><div class="cmd-desc" data-i18n="cmd.test_compress">Run the full pipeline on a captured output file and print result.</div></div>
+        <div class="cmd-row" data-cmd="test"><div class="cmd-name">test</div><div class="cmd-desc" data-i18n="cmd.test">Run correctness tests on all compression layers. No daemon required.</div></div>
+        <div class="cmd-row" data-cmd="test --l3"><div class="cmd-name">test <span class="cmd-arg">--l3</span></div><div class="cmd-desc" data-i18n="cmd.test_l3">Include Layer 3 inference in the test run.</div></div>
+        <div class="cmd-row" data-cmd="bench"><div class="cmd-name">bench</div><div class="cmd-desc" data-i18n="cmd.bench">Benchmark all compression layers (default: 5 runs per payload).</div></div>
+        <div class="cmd-row" data-cmd="bench --runs"><div class="cmd-name">bench <span class="cmd-arg">--runs &lt;N&gt;</span></div><div class="cmd-desc" data-i18n="cmd.bench_runs">Set number of benchmark runs per payload for stable measurements.</div></div>
+        <div class="cmd-row" data-cmd="config"><div class="cmd-name">config</div><div class="cmd-desc" data-i18n="cmd.config">Show the active merged configuration (global + project overrides).</div></div>
+        <div class="cmd-row" data-cmd="config --file"><div class="cmd-name">config <span class="cmd-arg">--file &lt;path&gt;</span></div><div class="cmd-desc" data-i18n="cmd.config_file">Show configuration from a specific file path.</div></div>
       </div>
 
       <!-- Metrics -->
@@ -527,6 +524,7 @@ rm -rf ~/.ntk           <span style="color:var(--color-texto-mutado)"># remove c
         <div class="cmd-row" data-cmd="metrics"><div class="cmd-name">metrics</div><div class="cmd-desc" data-i18n="cmd.metrics">Session metrics table in stdout (plain text).</div></div>
         <div class="cmd-row" data-cmd="graph"><div class="cmd-name">graph</div><div class="cmd-desc" data-i18n="cmd.graph">ASCII bar chart + sparkline of savings over time.</div></div>
         <div class="cmd-row" data-cmd="gain"><div class="cmd-name">gain</div><div class="cmd-desc" data-i18n="cmd.gain">Token savings summary (RTK-compatible output format).</div></div>
+        <div class="cmd-row" data-cmd="history"><div class="cmd-name">history</div><div class="cmd-desc" data-i18n="cmd.history">Last 50 compressed commands with token counts and layer used.</div></div>
         <div class="cmd-row" data-cmd="discover"><div class="cmd-name">discover</div><div class="cmd-desc" data-i18n="cmd.discover">Analyze Claude Code session for missed compression opportunities.</div></div>
       </div>
     </div>

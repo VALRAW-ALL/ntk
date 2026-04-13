@@ -40,7 +40,7 @@ NTK intercepts those outputs via the `PostToolUse` hook, compresses them semanti
 
 ## How it works
 
-NTK runs as a local daemon (`127.0.0.1:8765`) and processes output through up to four layers:
+NTK runs as a local daemon (`127.0.0.1:8765`) and processes output through three layers:
 
 ```
 Bash tool output
@@ -49,7 +49,6 @@ Bash tool output
     → Layer 1: Fast Filter       (<1ms)   - ANSI removal, line deduplication, blank-line collapse
     → Layer 2: Tokenizer-Aware   (<5ms)   - BPE path shortening, prefix consolidation (cl100k_base)
     → Layer 3: Local Inference   (opt.)   - Ollama/Phi-3 Mini; only activates above token threshold
-    → Layer 4: Context Injection (opt.)   - passes Claude's current intent to the model
   → Compressed output → Claude Code context
 ```
 
@@ -291,6 +290,28 @@ ntk model test --debug
 
 # Benchmark CPU vs GPU
 ntk model bench
+
+# List available models in the configured backend
+ntk model list
+```
+
+### Layer testing and benchmarks
+
+```bash
+# Run correctness tests on all compression layers (no daemon required)
+ntk test
+
+# Include Layer 3 inference in the test run
+ntk test --l3
+
+# Benchmark all compression layers (default: 5 runs per payload)
+ntk bench
+
+# More runs for stable measurements
+ntk bench --runs 20
+
+# Include Layer 3 in benchmark
+ntk bench --l3
 ```
 
 ### Configuration
@@ -541,7 +562,7 @@ cargo fmt --check
 ```
 src/
   main.rs                  - CLI (clap) + daemon entry point
-  server.rs                - HTTP routes: /compress, /metrics, /health, /state
+  server.rs                - HTTP routes: /compress, /metrics, /records, /health, /state
   config.rs                - Config deserialization + merge + validation
   detector.rs              - Output type detection (test/build/log/diff/generic)
   metrics.rs               - In-memory store + SQLite persistence (sqlx)
