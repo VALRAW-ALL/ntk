@@ -689,7 +689,9 @@ fn run_gain() -> Result<()> {
                     let saved = val["total_tokens_saved"].as_u64().unwrap_or(0);
                     let calls = val["total_compressions"].as_u64().unwrap_or(0);
                     let pct = val["average_ratio"].as_f64().unwrap_or(0.0) * 100.0;
-                    println!("NTK: {saved} tokens saved across {calls} compressions ({pct:.0}% avg)");
+                    println!(
+                        "NTK: {saved} tokens saved across {calls} compressions ({pct:.0}% avg)"
+                    );
                 } else {
                     println!("NTK: 0 tokens saved across 0 compressions (0% avg)");
                     println!("[ntk gain] daemon unreachable — start with: ntk start");
