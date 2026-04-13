@@ -126,13 +126,16 @@ impl Installer {
             }
         }
 
-        // Step 4: Add ~/.ntk/bin to user PATH
+        // Step 4: Add ~/.ntk/bin to user PATH (non-fatal — user can update manually)
         let sp = term::Spinner::start("Updating PATH …");
         match add_dir_to_path(&ntk_bin_dir) {
             Ok(msg) => sp.finish_ok(&msg),
             Err(e) => {
-                sp.finish_err(&e.to_string());
-                return Err(e);
+                let msg = format!(
+                    "skipped — {e}  (add manually: export PATH=\"$PATH:{}\")",
+                    ntk_bin_dir.display()
+                );
+                sp.finish_warn(&msg);
             }
         }
 

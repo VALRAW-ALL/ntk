@@ -90,8 +90,17 @@ jobs:
         env:
           NTK_SKIP_OLLAMA_INSTALL: "1"
         run: |
-          cargo test --test cli_tests
-          cargo test --test ollama_mock_tests
+          cargo test --test cli_tests -- --nocapture 2>&1 | tee /tmp/cli_tests.log; CLI_EXIT=${PIPESTATUS[0]}
+          cargo test --test ollama_mock_tests -- --nocapture 2>&1 | tee /tmp/ollama_tests.log; OLLAMA_EXIT=${PIPESTATUS[0]}
+          echo "## CLI tests (exit $CLI_EXIT)" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          cat /tmp/cli_tests.log >> $GITHUB_STEP_SUMMARY || true
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          echo "## Ollama mock tests (exit $OLLAMA_EXIT)" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          cat /tmp/ollama_tests.log >> $GITHUB_STEP_SUMMARY || true
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          [ "$CLI_EXIT" -eq 0 ] && [ "$OLLAMA_EXIT" -eq 0 ]
 
       # ---------------------------------------------------------------------------
       # Property-based tests (run with reduced cases on CI for speed)
