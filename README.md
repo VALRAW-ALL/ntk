@@ -1,6 +1,6 @@
-# NTK — Neural Token Killer
+# NTK - Neural Token Killer
 
-> Semantic compression proxy for Claude Code. Reduces tool output token count by 60–90% before it reaches the model context — without losing the information that matters.
+> Semantic compression proxy for Claude Code. Reduces tool output token count by 60–90% before it reaches the model context - without losing the information that matters.
 
 ---
 
@@ -23,7 +23,7 @@
 
 ## What it does
 
-Every time Claude Code runs a Bash command, the output is fed back into the model context. Long outputs from `cargo test`, `tsc`, Docker logs, or `git diff` can consume hundreds or thousands of tokens — slowing down responses and eating through context budgets.
+Every time Claude Code runs a Bash command, the output is fed back into the model context. Long outputs from `cargo test`, `tsc`, Docker logs, or `git diff` can consume hundreds or thousands of tokens - slowing down responses and eating through context budgets.
 
 NTK intercepts those outputs via the `PostToolUse` hook, compresses them semantically, and returns a compact version that preserves all errors, warnings, and actionable information. Claude sees less noise, responds faster, and stays focused longer.
 
@@ -46,16 +46,16 @@ NTK runs as a local daemon (`127.0.0.1:8765`) and processes output through up to
 Bash tool output
   → PostToolUse hook (ntk-hook.sh / ntk-hook.ps1)
   → HTTP POST /compress  (:8765)
-    → Layer 1: Fast Filter       (<1ms)   — ANSI removal, line deduplication, blank-line collapse
-    → Layer 2: Tokenizer-Aware   (<5ms)   — BPE path shortening, prefix consolidation (cl100k_base)
-    → Layer 3: Local Inference   (opt.)   — Ollama/Phi-3 Mini; only activates above token threshold
-    → Layer 4: Context Injection (opt.)   — passes Claude's current intent to the model
+    → Layer 1: Fast Filter       (<1ms)   - ANSI removal, line deduplication, blank-line collapse
+    → Layer 2: Tokenizer-Aware   (<5ms)   - BPE path shortening, prefix consolidation (cl100k_base)
+    → Layer 3: Local Inference   (opt.)   - Ollama/Phi-3 Mini; only activates above token threshold
+    → Layer 4: Context Injection (opt.)   - passes Claude's current intent to the model
   → Compressed output → Claude Code context
 ```
 
 **Layer 3 activates only when** token count after L1+L2 exceeds `inference_threshold_tokens` (default: 300). Small outputs like `git status` pass through at sub-millisecond latency.
 
-If the daemon is unreachable, the hook falls back gracefully to the original output — NTK never blocks a command.
+If the daemon is unreachable, the hook falls back gracefully to the original output - NTK never blocks a command.
 
 ---
 
@@ -80,11 +80,11 @@ If the daemon is unreachable, the hook falls back gracefully to the original out
 
 ## Installation
 
-### Option 1 — From source (recommended while in pre-release)
+### Option 1 - From source (recommended while in pre-release)
 
 ```bash
 # Clone and build
-git clone https://github.com/you/ntk
+git clone https://github.com/VALRAW-ALL/ntk
 cd ntk
 cargo build --release
 
@@ -96,24 +96,24 @@ cargo install --path .
 ntk init -g
 ```
 
-### Option 2 — Shell installer (Unix)
+### Option 2 - Shell installer (Unix)
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/you/ntk/main/scripts/install.sh | bash
+curl -fsSL https://ntk.valraw.com/install.sh | bash
 ```
 
-### Option 3 — PowerShell installer (Windows)
+### Option 3 - PowerShell installer (Windows)
 
 ```powershell
-irm https://raw.githubusercontent.com/you/ntk/main/scripts/install.ps1 | iex
+irm https://ntk.valraw.com/install.ps1 | iex
 ```
 
 ### What `ntk init -g` does
 
 1. Copies the hook script to `~/.ntk/bin/` (`ntk-hook.sh` on Unix, `ntk-hook.ps1` on Windows)
-2. Patches `~/.claude/settings.json` to register the `PostToolUse` hook (idempotent — safe to run multiple times)
+2. Patches `~/.claude/settings.json` to register the `PostToolUse` hook (idempotent - safe to run multiple times)
 3. Creates `~/.ntk/config.json` with sensible defaults
-4. **Automatically launches `ntk model setup`** — the interactive wizard that detects your CPU/GPU hardware and configures the inference backend
+4. **Automatically launches `ntk model setup`** - the interactive wizard that detects your CPU/GPU hardware and configures the inference backend
 
 `--hook-only`, `--show`, and `--uninstall` skip the model setup step.
 
@@ -162,7 +162,7 @@ ntk status          # Show daemon status, loaded model, GPU backend
 ntk dashboard       # Combined status + session gain + ASCII bar chart (plain text, non-interactive)
 ```
 
-**Live dashboard** — `ntk start` opens a full-screen TUI that updates every 500 ms. If the daemon is already running in the background, `ntk start` detects it and **attaches** to the live TUI without restarting the daemon. Press **Ctrl+C** to exit the TUI — the daemon keeps running:
+**Live dashboard** - `ntk start` opens a full-screen TUI that updates every 500 ms. If the daemon is already running in the background, `ntk start` detects it and **attaches** to the live TUI without restarting the daemon. Press **Ctrl+C** to exit the TUI - the daemon keeps running:
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
@@ -188,7 +188,7 @@ ntk dashboard       # Combined status + session gain + ASCII bar chart (plain te
 
 Press **Ctrl+C** in the **attached** TUI to exit the dashboard without stopping the daemon. Press **Ctrl+C** when you started the daemon (first `ntk start`) to stop it gracefully. When stdout is not a TTY (piped or CI), `ntk start` falls back to a single status line.
 
-**Static dashboard** — `ntk dashboard` prints a combined snapshot to stdout and exits immediately (no event loop, always safe to use in scripts or CI):
+**Static dashboard** - `ntk dashboard` prints a combined snapshot to stdout and exits immediately (no event loop, always safe to use in scripts or CI):
 
 ```
 ● NTK daemon  running  127.0.0.1:8765  up 3m 22s  backend: ollama (phi3:mini)
@@ -309,8 +309,8 @@ ntk config --file /path/to/.ntk.json
 
 NTK merges configuration from two sources, in order:
 
-1. `~/.ntk/config.json` — global defaults
-2. `.ntk.json` in the current project directory — per-project overrides
+1. `~/.ntk/config.json` - global defaults
+2. `.ntk.json` in the current project directory - per-project overrides
 
 **Full reference (`~/.ntk/config.json`):**
 
@@ -398,7 +398,7 @@ NTK auto-detects the best inference backend at startup:
 
 The `ntk model setup` wizard detects your hardware at runtime and presents a GPU/CPU selection step, showing each option with availability status, VRAM, and expected latency. Your choice is saved to `config.model.gpu_layers` (`-1` = GPU, `0` = CPU).
 
-**Performance expectations — Phi-3 Mini 3.8B Q5_K_M (Layer 3 latency p95):**
+**Performance expectations - Phi-3 Mini 3.8B Q5_K_M (Layer 3 latency p95):**
 
 | Backend | Hardware example | p50 | p95 |
 |---|---|---|---|
@@ -415,10 +415,10 @@ Layer 3 is skipped entirely for outputs below the threshold (default 300 tokens)
 **Build options:**
 
 ```bash
-# Default build — includes Candle (in-process inference, no Ollama needed)
+# Default build - includes Candle (in-process inference, no Ollama needed)
 cargo build --release
 
-# CUDA (NVIDIA) — enables GPU offloading for Candle
+# CUDA (NVIDIA) - enables GPU offloading for Candle
 cargo build --release --features cuda
 
 # Metal (Apple Silicon)
@@ -429,7 +429,7 @@ cargo build --release --features metal
 
 ## RTK + NTK Coexistence
 
-NTK is designed to work alongside [RTK (Rust Token Killer)](https://github.com/you/rtk):
+NTK is designed to work alongside [RTK (Rust Token Killer)](https://github.com/VALRAW-ALL/rtk):
 
 - **RTK** runs first, inside the shell command via `rtk <cmd>`. It applies rule-based filtering (regex) synchronously.
 - **NTK** runs after, via the `PostToolUse` hook. It applies semantic compression on RTK's already-filtered output.
@@ -446,7 +446,7 @@ Combined:    ~93% savings
 NTK's Layer 1 detects RTK-pre-filtered output (shorter input, no ANSI codes, already contains `[×N]` groupings) and skips redundant processing. Layer 3's threshold often won't trigger on already-filtered output, keeping latency near zero.
 
 ```bash
-# Both tools active simultaneously — this is the recommended setup
+# Both tools active simultaneously - this is the recommended setup
 rtk cargo test
 # RTK filters in the shell → NTK further compresses via hook
 ```
@@ -476,7 +476,7 @@ cargo test --test compression_pipeline_tests
 cargo test --test snapshot_tests
 cargo test --test quality_regression_tests
 
-# Property-based tests (slow — runs ~256 cases per property)
+# Property-based tests (slow - runs ~256 cases per property)
 cargo test --test compression_invariants
 
 # Reduce proptest cases for a faster run
@@ -540,39 +540,39 @@ cargo fmt --check
 
 ```
 src/
-  main.rs                  — CLI (clap) + daemon entry point
-  server.rs                — HTTP routes: /compress, /metrics, /health, /state
-  config.rs                — Config deserialization + merge + validation
-  detector.rs              — Output type detection (test/build/log/diff/generic)
-  metrics.rs               — In-memory store + SQLite persistence (sqlx)
-  gpu.rs                   — GPU backend detection hierarchy
-  installer.rs             — ntk init: idempotent hook + config install
-  telemetry.rs             — Anonymous daily telemetry (opt-out)
+  main.rs                  - CLI (clap) + daemon entry point
+  server.rs                - HTTP routes: /compress, /metrics, /health, /state
+  config.rs                - Config deserialization + merge + validation
+  detector.rs              - Output type detection (test/build/log/diff/generic)
+  metrics.rs               - In-memory store + SQLite persistence (sqlx)
+  gpu.rs                   - GPU backend detection hierarchy
+  installer.rs             - ntk init: idempotent hook + config install
+  telemetry.rs             - Anonymous daily telemetry (opt-out)
   compressor/
-    layer1_filter.rs       — ANSI strip, dedup, blank-line collapse
-    layer2_tokenizer.rs    — tiktoken-rs BPE, path shortening
-    layer3_backend.rs      — BackendKind abstraction (Ollama / Candle / LlamaCpp)
-    layer3_inference.rs    — Ollama HTTP client + fallback
-    layer3_candle.rs       — In-process inference via HuggingFace Candle (CUDA/Metal/CPU)
-    layer3_llamacpp.rs     — llama.cpp server client with auto-start
+    layer1_filter.rs       - ANSI strip, dedup, blank-line collapse
+    layer2_tokenizer.rs    - tiktoken-rs BPE, path shortening
+    layer3_backend.rs      - BackendKind abstraction (Ollama / Candle / LlamaCpp)
+    layer3_inference.rs    - Ollama HTTP client + fallback
+    layer3_candle.rs       - In-process inference via HuggingFace Candle (CUDA/Metal/CPU)
+    layer3_llamacpp.rs     - llama.cpp server client with auto-start
   output/
-    terminal.rs            — ANSI colors, TTY detection, Spinner + BenchSpinner
-    table.rs               — Metrics tables for stdout
-    graph.rs               — ASCII bar charts + sparklines (stdout, non-interactive)
-    dashboard.rs           — ratatui TUI: live + attach-mode dashboard (polls /state endpoint)
+    terminal.rs            - ANSI colors, TTY detection, Spinner + BenchSpinner
+    table.rs               - Metrics tables for stdout
+    graph.rs               - ASCII bar charts + sparklines (stdout, non-interactive)
+    dashboard.rs           - ratatui TUI: live + attach-mode dashboard (polls /state endpoint)
 
 scripts/
-  ntk-hook.sh              — PostToolUse hook (Unix/macOS)
-  ntk-hook.ps1             — PostToolUse hook (Windows PowerShell)
-  install.sh               — One-line installer (Unix)
-  install.ps1              — One-line installer (Windows)
+  ntk-hook.sh              - PostToolUse hook (Unix/macOS)
+  ntk-hook.ps1             - PostToolUse hook (Windows PowerShell)
+  install.sh               - One-line installer (Unix)
+  install.ps1              - One-line installer (Windows)
 
 tests/
-  unit/                    — Layer 1, Layer 2, detector unit tests
-  integration/             — Pipeline, endpoint, CLI, Ollama mock, quality, snapshot tests
-  proptest/                — Compression invariants (proptest)
-  benchmarks/              — criterion.rs benchmarks
-  fixtures/                — Real captured outputs (cargo, tsc, vitest, docker, next.js)
+  unit/                    - Layer 1, Layer 2, detector unit tests
+  integration/             - Pipeline, endpoint, CLI, Ollama mock, quality, snapshot tests
+  proptest/                - Compression invariants (proptest)
+  benchmarks/              - criterion.rs benchmarks
+  fixtures/                - Real captured outputs (cargo, tsc, vitest, docker, next.js)
 ```
 
 ---
@@ -585,12 +585,12 @@ NTK collects **anonymous, aggregated** usage metrics. No code, file contents, co
 
 | Field | Description |
 |---|---|
-| `device_hash` | SHA-256(random_salt + machine_id) — not reversible to any personal identifier |
+| `device_hash` | SHA-256(random_salt + machine_id) - not reversible to any personal identifier |
 | `ntk_version` | Installed NTK version |
 | `os` | Operating system name (`linux`, `macos`, `windows`) |
 | `arch` | CPU architecture (`x86_64`, `aarch64`) |
 | `compressions_24h` | Number of compressions in the last 24 hours |
-| `top_commands` | Most-used command **names only** (e.g. `["cargo", "git"]`) — no arguments, no paths |
+| `top_commands` | Most-used command **names only** (e.g. `["cargo", "git"]`) - no arguments, no paths |
 | `avg_savings_pct` | Average token savings percentage |
 | `layer_pct` | Layer distribution: how often L1, L2, L3 produced the final output |
 | `gpu_backend` | Backend used (e.g. `cuda`, `cpu`) |
@@ -606,14 +606,14 @@ NTK collects **anonymous, aggregated** usage metrics. No code, file contents, co
 
 ### How the device hash works
 
-A random UUID (salt) is generated once and stored locally in `~/.ntk/.telemetry_salt` with mode `600` (readable only by the file owner on Unix). The salt is combined with a non-personal machine identifier and hashed with SHA-256. The salt is **never sent** — only the hash is. The hash cannot be reversed to identify the machine or the user.
+A random UUID (salt) is generated once and stored locally in `~/.ntk/.telemetry_salt` with mode `600` (readable only by the file owner on Unix). The salt is combined with a non-personal machine identifier and hashed with SHA-256. The salt is **never sent** - only the hash is. The hash cannot be reversed to identify the machine or the user.
 
 ### Opt-out
 
 Telemetry can be disabled in two ways:
 
 ```bash
-# Environment variable — add to ~/.bashrc or ~/.zshrc for permanent opt-out
+# Environment variable - add to ~/.bashrc or ~/.zshrc for permanent opt-out
 export NTK_TELEMETRY_DISABLED=1
 ```
 
