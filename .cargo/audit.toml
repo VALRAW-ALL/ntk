@@ -1,0 +1,12 @@
+# cargo-audit configuration for NTK
+# https://github.com/rustsec/rustsec/tree/main/cargo-audit
+
+[advisories]
+ignore = [
+    # RUSTSEC-2023-0071: Marvin Attack timing side-channel in `rsa` crate.
+    # This vulnerability is in `rsa 0.9.x` which is pulled in by `sqlx-mysql`
+    # as an unused transitive dependency. NTK only uses the `sqlite` feature
+    # of sqlx — the MySQL backend is never compiled or linked. No fix is
+    # available upstream (the `rsa` crate has no patched version).
+    "RUSTSEC-2023-0071",
+]
