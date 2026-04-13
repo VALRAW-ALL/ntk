@@ -266,7 +266,18 @@ async fn dashboard_loop(
         let backend_name = backend_name.as_str();
         let model_info = model_info.as_str();
 
-        terminal.draw(|f| render(f, &summary, &recent, &warns, uptime, addr, backend_name, model_info))?;
+        terminal.draw(|f| {
+            render(
+                f,
+                &summary,
+                &recent,
+                &warns,
+                uptime,
+                addr,
+                backend_name,
+                model_info,
+            )
+        })?;
     }
 
     Ok(())

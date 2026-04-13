@@ -338,7 +338,11 @@ async fn async_run_daemon(gpu: bool) -> Result<()> {
 
     // Build a human-readable model info line shown in the dashboard header.
     // Format: "<model_name> <quantization>  [GPU] or [CPU]"
-    let compute_mode = if config.model.gpu_layers != 0 { "GPU" } else { "CPU" };
+    let compute_mode = if config.model.gpu_layers != 0 {
+        "GPU"
+    } else {
+        "CPU"
+    };
     let model_info = format!(
         "{} {}  [{}]",
         config.model.model_name, config.model.quantization, compute_mode
