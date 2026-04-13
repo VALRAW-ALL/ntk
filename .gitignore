@@ -51,3 +51,4 @@ tarpaulin-report.html
 
 # Logs
 *.log
+act_output.txt
