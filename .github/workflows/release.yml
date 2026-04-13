@@ -5,6 +5,7 @@ on:
     branches: [main, master]
     paths:
       - 'Cargo.toml'
+  workflow_dispatch:
 
 env:
   CARGO_TERM_COLOR: always
