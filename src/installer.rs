@@ -139,22 +139,8 @@ impl Installer {
             }
         }
 
-        // Step 5: Detect / install Ollama (non-fatal if it fails)
-        let sp = term::Spinner::start("Configuring Ollama …");
-        let ollama_outcome = match setup_ollama_path() {
-            Ok(msg) => {
-                sp.finish_ok(&msg);
-                (msg, StepOutcome::Ok)
-            }
-            Err(e) => {
-                let msg = e.to_string();
-                sp.finish_warn(&msg);
-                (msg, StepOutcome::Warn)
-            }
-        };
-        summary.push(("Ollama ", ollama_outcome.0, ollama_outcome.1));
-
-        // Step 6: Patch editor settings.json
+        // Step 5: Patch editor settings.json
+        // (Model backend / Ollama installation is handled separately by `ntk model setup`.)
         let settings_path = editor_settings_path(self.editor)?;
         let sp = term::Spinner::start("Patching editor settings …");
         match patch_settings(&settings_path, self.auto_patch) {
@@ -169,7 +155,7 @@ impl Installer {
             }
         }
 
-        // Step 7: Create default config (unless --hook-only)
+        // Step 6: Create default config (unless --hook-only)
         let config_path = global_config_path()?;
         if !self.hook_only {
             let sp = term::Spinner::start("Creating config …");
@@ -222,13 +208,16 @@ impl Installer {
         }
 
         println!();
-        if has_warn {
-            println!(
-                "  {}ℹ  Layers 1+2 (fast compression) are active. Layer 3 (AI inference) requires Ollama.{}",
-                term::dim(),
-                term::reset()
-            );
-        }
+        println!(
+            "  {}ℹ  Layers 1+2 (fast compression) are active by default.{}",
+            term::dim(),
+            term::reset()
+        );
+        println!(
+            "  {}   Run `ntk model setup` to configure Layer 3 (AI inference).{}",
+            term::dim(),
+            term::reset()
+        );
         println!(
             "  {}💡 Open a new terminal, then run `ntk start` to start the daemon.{}",
             term::dim(),
@@ -612,7 +601,7 @@ fn shell_rc_files(shell: &str) -> Vec<PathBuf> {
 
 /// Detect, install (if missing), and configure Ollama in PATH.
 /// Tries silent installation via the platform's package manager or official installer.
-fn setup_ollama_path() -> Result<String> {
+pub fn setup_ollama_path() -> Result<String> {
     // Skip installation in test/CI environments.
     if std::env::var("NTK_SKIP_OLLAMA_INSTALL").is_ok() {
         return Err(anyhow!(

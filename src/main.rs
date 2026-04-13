@@ -226,16 +226,9 @@ fn run_init(
         return installer.uninstall();
     }
 
-    // Normal init path — run installer, then launch model setup wizard.
-    installer.run()?;
-
-    // hook_only skips config.json, so model setup is not meaningful there.
-    // auto_patch implies non-interactive mode — skip the interactive wizard.
-    if !hook_only && !auto_patch {
-        run_model_setup()?;
-    }
-
-    Ok(())
+    // `ntk init` only configures NTK itself. Model backend selection and any
+    // Ollama / AI-runtime installation are handled by `ntk model setup`.
+    installer.run()
 }
 
 fn run_daemon(gpu: bool) -> Result<()> {
@@ -1638,14 +1631,22 @@ fn setup_gpu_selection() -> Result<(i32, bool)> {
 fn setup_write_config(provider: &str, existing: &ntk::config::NtkConfig) -> Result<()> {
     use ntk::output::terminal as term;
 
-    let sp = term::Spinner::start("Saving configuration…");
-
     let global_path = ntk::config::global_config_path()?;
     let mut config = existing.clone();
 
     if provider == "ollama" {
         config.model.provider = ntk::config::ModelProvider::Ollama;
+
+        // Detect or install the Ollama runtime (non-fatal on failure —
+        // user can install it manually from https://ollama.ai).
+        let sp = term::Spinner::start("Configuring Ollama …");
+        match ntk::installer::setup_ollama_path() {
+            Ok(msg) => sp.finish_ok(&msg),
+            Err(e) => sp.finish_warn(&e.to_string()),
+        }
     }
+
+    let sp = term::Spinner::start("Saving configuration…");
 
     // Write atomically.
     let json = serde_json::to_string_pretty(&config)?;
