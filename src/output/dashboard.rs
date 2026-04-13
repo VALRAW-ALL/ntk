@@ -153,6 +153,7 @@ fn art_color(idx: u8) -> Color {
 ///
 /// If stdout is not a TTY (e.g. piped / CI), falls back to a plain one-liner
 /// and waits for the shutdown signal without touching the terminal.
+#[allow(clippy::too_many_arguments)]
 pub async fn run_live_dashboard(
     metrics: Arc<Mutex<MetricsStore>>,
     warn_log: WarnBuffer,
@@ -287,6 +288,7 @@ async fn dashboard_loop(
 // Top-level layout: header | metrics | logs
 // ---------------------------------------------------------------------------
 
+#[allow(clippy::too_many_arguments)]
 fn render(
     f: &mut Frame,
     summary: &SessionSummary,
