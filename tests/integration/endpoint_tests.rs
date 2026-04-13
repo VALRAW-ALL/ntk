@@ -27,6 +27,7 @@ fn test_server() -> TestServer {
         warn_log: empty_warn_log(),
         addr: "127.0.0.1:8765".to_string(),
         backend_name: "test".to_string(),
+        model_info: String::new(),
     };
     let router = build_router(state);
     TestServer::new(router).expect("test server")
@@ -118,6 +119,7 @@ async fn test_compress_rejects_oversized_input() {
         warn_log: empty_warn_log(),
         addr: "127.0.0.1:8765".to_string(),
         backend_name: "test".to_string(),
+        model_info: String::new(),
     };
     let server = TestServer::new(build_router(state)).expect("test server");
 
