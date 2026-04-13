@@ -1,0 +1,323 @@
+2024-09-12T08:00:01.003Z INFO  [ntk::server] NTK daemon starting on 127.0.0.1:8765
+2024-09-12T08:00:01.004Z INFO  [ntk::server] NTK daemon starting on 127.0.0.1:8765
+2024-09-12T08:00:01.007Z INFO  [ntk::config] Loading config from /home/dev/.ntk/config.json
+2024-09-12T08:00:01.007Z INFO  [ntk::config] Loading config from /home/dev/.ntk/config.json
+2024-09-12T08:00:01.009Z DEBUG [ntk::config] inference_threshold_tokens = 300
+2024-09-12T08:00:01.009Z DEBUG [ntk::config] inference_threshold_tokens = 300
+2024-09-12T08:00:01.009Z DEBUG [ntk::config] model.provider = ollama
+2024-09-12T08:00:01.011Z DEBUG [ntk::config] model.ollama_url = http://localhost:11434
+2024-09-12T08:00:01.011Z DEBUG [ntk::config] model.ollama_url = http://localhost:11434
+2024-09-12T08:00:01.013Z INFO  [ntk::gpu] Detecting GPU capabilities...
+2024-09-12T08:00:01.013Z INFO  [ntk::gpu] Detecting GPU capabilities...
+2024-09-12T08:00:01.014Z DEBUG [ntk::gpu] CUDA not available (no nvidia-smi found)
+2024-09-12T08:00:01.014Z DEBUG [ntk::gpu] CUDA not available (no nvidia-smi found)
+2024-09-12T08:00:01.014Z DEBUG [ntk::gpu] Metal not available (not macOS)
+2024-09-12T08:00:01.015Z INFO  [ntk::gpu] Backend selected: CPU (AVX2)
+2024-09-12T08:00:01.015Z INFO  [ntk::gpu] Backend selected: CPU (AVX2)
+2024-09-12T08:00:01.017Z INFO  [ntk::compressor::layer2_tokenizer] Initializing tiktoken cl100k_base encoder...
+2024-09-12T08:00:01.017Z INFO  [ntk::compressor::layer2_tokenizer] Initializing tiktoken cl100k_base encoder...
+2024-09-12T08:00:01.143Z INFO  [ntk::compressor::layer2_tokenizer] tiktoken encoder initialized (126ms)
+2024-09-12T08:00:01.145Z INFO  [ntk::metrics] SQLite database opened at /home/dev/.ntk/metrics.db
+2024-09-12T08:00:01.145Z INFO  [ntk::metrics] SQLite database opened at /home/dev/.ntk/metrics.db
+2024-09-12T08:00:01.146Z DEBUG [ntk::metrics] Running migrations...
+2024-09-12T08:00:01.148Z DEBUG [ntk::metrics] Migrations complete (2ms)
+2024-09-12T08:00:01.150Z INFO  [ntk::server] HTTP server bound to 127.0.0.1:8765
+2024-09-12T08:00:01.150Z INFO  [ntk::server] HTTP server bound to 127.0.0.1:8765
+2024-09-12T08:00:01.151Z INFO  [ntk::server] Routes: /compress /metrics /health /records /version
+2024-09-12T08:00:03.441Z DEBUG [ntk::server] POST /compress content-length=4821
+2024-09-12T08:00:03.441Z DEBUG [ntk::server] POST /compress content-length=4821
+2024-09-12T08:00:03.442Z DEBUG [ntk::detector] Detecting output type...
+2024-09-12T08:00:03.442Z DEBUG [ntk::detector] Detecting output type...
+2024-09-12T08:00:03.442Z DEBUG [ntk::detector] Pattern match: cargo_test (score=0.94)
+2024-09-12T08:00:03.442Z DEBUG [ntk::detector] Pattern match: cargo_test (score=0.94)
+2024-09-12T08:00:03.443Z DEBUG [ntk::compressor::layer1_filter] Input: 4821 chars
+2024-09-12T08:00:03.443Z DEBUG [ntk::compressor::layer1_filter] Input: 4821 chars
+2024-09-12T08:00:03.444Z DEBUG [ntk::compressor::layer1_filter] ANSI codes stripped: 312 sequences removed
+2024-09-12T08:00:03.444Z DEBUG [ntk::compressor::layer1_filter] ANSI codes stripped: 312 sequences removed
+2024-09-12T08:00:03.444Z DEBUG [ntk::compressor::layer1_filter] Progress bars removed: 0
+2024-09-12T08:00:03.445Z DEBUG [ntk::compressor::layer1_filter] Duplicate lines collapsed: 47 -> 18 unique groups
+2024-09-12T08:00:03.445Z DEBUG [ntk::compressor::layer1_filter] Duplicate lines collapsed: 47 -> 18 unique groups
+2024-09-12T08:00:03.445Z DEBUG [ntk::compressor::layer1_filter] Blank lines collapsed: 12 -> 3
+2024-09-12T08:00:03.446Z DEBUG [ntk::compressor::layer1_filter] Layer1 output: 1834 chars (61.9% reduction)
+2024-09-12T08:00:03.446Z DEBUG [ntk::compressor::layer1_filter] Layer1 output: 1834 chars (61.9% reduction)
+2024-09-12T08:00:03.447Z DEBUG [ntk::compressor::layer2_tokenizer] Token count after L1: 412
+2024-09-12T08:00:03.447Z DEBUG [ntk::compressor::layer2_tokenizer] Token count after L1: 412
+2024-09-12T08:00:03.447Z DEBUG [ntk::compressor::layer2_tokenizer] Threshold: 300 — L3 will be triggered
+2024-09-12T08:00:03.448Z DEBUG [ntk::compressor::layer2_tokenizer] Path shortening: 8 paths found
+2024-09-12T08:00:03.448Z DEBUG [ntk::compressor::layer2_tokenizer] Path shortening: 8 paths found
+2024-09-12T08:00:03.449Z DEBUG [ntk::compressor::layer2_tokenizer] /home/dev/projects/ntk/src/compressor -> src/compressor
+2024-09-12T08:00:03.449Z DEBUG [ntk::compressor::layer2_tokenizer] /home/dev/projects/ntk/src/compressor -> src/compressor
+2024-09-12T08:00:03.449Z DEBUG [ntk::compressor::layer2_tokenizer] /home/dev/.cargo/registry/src -> $CARGO
+2024-09-12T08:00:03.450Z DEBUG [ntk::compressor::layer2_tokenizer] Layer2 output: 1621 chars (11.6% reduction)
+2024-09-12T08:00:03.450Z DEBUG [ntk::compressor::layer2_tokenizer] Layer2 output: 1621 chars (11.6% reduction)
+2024-09-12T08:00:03.451Z DEBUG [ntk::compressor::layer3_inference] Calling Ollama at http://localhost:11434/api/generate
+2024-09-12T08:00:03.451Z DEBUG [ntk::compressor::layer3_inference] Calling Ollama at http://localhost:11434/api/generate
+2024-09-12T08:00:03.451Z DEBUG [ntk::compressor::layer3_inference] Model: phi3:mini (q5_k_m)
+2024-09-12T08:00:03.451Z DEBUG [ntk::compressor::layer3_inference] Model: phi3:mini (q5_k_m)
+2024-09-12T08:00:03.452Z DEBUG [ntk::compressor::layer3_inference] Prompt type: cargo_test
+2024-09-12T08:00:03.452Z DEBUG [ntk::compressor::layer3_inference] Prompt type: cargo_test
+2024-09-12T08:00:03.452Z DEBUG [ntk::compressor::layer3_inference] Timeout: 2000ms
+2024-09-12T08:00:03.744Z DEBUG [ntk::compressor::layer3_inference] Ollama response received (292ms)
+2024-09-12T08:00:03.744Z DEBUG [ntk::compressor::layer3_inference] Ollama response received (292ms)
+2024-09-12T08:00:03.745Z DEBUG [ntk::compressor::layer3_inference] Layer3 output: 387 chars (76.1% reduction from L2)
+2024-09-12T08:00:03.745Z DEBUG [ntk::compressor::layer3_inference] Layer3 output: 387 chars (76.1% reduction from L2)
+2024-09-12T08:00:03.746Z INFO  [ntk::server] POST /compress 303ms original=4821 compressed=387 ratio=91.97% layer=L3
+2024-09-12T08:00:03.746Z INFO  [ntk::server] POST /compress 303ms original=4821 compressed=387 ratio=91.97% layer=L3
+2024-09-12T08:00:05.112Z DEBUG [ntk::server] POST /compress content-length=892
+2024-09-12T08:00:05.112Z DEBUG [ntk::server] POST /compress content-length=892
+2024-09-12T08:00:05.113Z DEBUG [ntk::detector] Pattern match: generic (score=0.41)
+2024-09-12T08:00:05.113Z DEBUG [ntk::detector] Pattern match: generic (score=0.41)
+2024-09-12T08:00:05.113Z DEBUG [ntk::compressor::layer1_filter] Input: 892 chars
+2024-09-12T08:00:05.114Z DEBUG [ntk::compressor::layer1_filter] ANSI codes stripped: 0 sequences removed
+2024-09-12T08:00:05.114Z DEBUG [ntk::compressor::layer1_filter] ANSI codes stripped: 0 sequences removed
+2024-09-12T08:00:05.114Z DEBUG [ntk::compressor::layer1_filter] Layer1 output: 891 chars (0.1% reduction)
+2024-09-12T08:00:05.115Z DEBUG [ntk::compressor::layer2_tokenizer] Token count after L1: 187
+2024-09-12T08:00:05.115Z DEBUG [ntk::compressor::layer2_tokenizer] Token count after L1: 187
+2024-09-12T08:00:05.115Z DEBUG [ntk::compressor::layer2_tokenizer] Threshold: 300 — L3 NOT triggered (below threshold)
+2024-09-12T08:00:05.115Z DEBUG [ntk::compressor::layer2_tokenizer] Threshold: 300 — L3 NOT triggered (below threshold)
+2024-09-12T08:00:05.116Z INFO  [ntk::server] POST /compress 4ms original=892 compressed=891 ratio=0.11% layer=L2
+2024-09-12T08:00:05.116Z INFO  [ntk::server] POST /compress 4ms original=892 compressed=891 ratio=0.11% layer=L2
+2024-09-12T08:00:07.889Z DEBUG [ntk::server] POST /compress content-length=18743
+2024-09-12T08:00:07.889Z DEBUG [ntk::server] POST /compress content-length=18743
+2024-09-12T08:00:07.890Z DEBUG [ntk::detector] Pattern match: docker_logs (score=0.88)
+2024-09-12T08:00:07.890Z DEBUG [ntk::detector] Pattern match: docker_logs (score=0.88)
+2024-09-12T08:00:07.892Z DEBUG [ntk::compressor::layer1_filter] Input: 18743 chars
+2024-09-12T08:00:07.893Z DEBUG [ntk::compressor::layer1_filter] ANSI codes stripped: 0 sequences removed
+2024-09-12T08:00:07.893Z DEBUG [ntk::compressor::layer1_filter] Duplicate lines collapsed: 1241 -> 89 unique groups
+2024-09-12T08:00:07.893Z DEBUG [ntk::compressor::layer1_filter] Duplicate lines collapsed: 1241 -> 89 unique groups
+2024-09-12T08:00:07.894Z DEBUG [ntk::compressor::layer1_filter] Layer1 output: 3211 chars (82.9% reduction)
+2024-09-12T08:00:07.894Z DEBUG [ntk::compressor::layer1_filter] Layer1 output: 3211 chars (82.9% reduction)
+2024-09-12T08:00:07.895Z DEBUG [ntk::compressor::layer2_tokenizer] Token count after L1: 743
+2024-09-12T08:00:07.895Z DEBUG [ntk::compressor::layer2_tokenizer] Token count after L1: 743
+2024-09-12T08:00:07.895Z DEBUG [ntk::compressor::layer2_tokenizer] Threshold: 300 — L3 will be triggered
+2024-09-12T08:00:07.896Z DEBUG [ntk::compressor::layer3_inference] Calling Ollama at http://localhost:11434/api/generate
+2024-09-12T08:00:07.896Z DEBUG [ntk::compressor::layer3_inference] Calling Ollama at http://localhost:11434/api/generate
+2024-09-12T08:00:08.234Z DEBUG [ntk::compressor::layer3_inference] Ollama response received (338ms)
+2024-09-12T08:00:08.234Z DEBUG [ntk::compressor::layer3_inference] Ollama response received (338ms)
+2024-09-12T08:00:08.235Z DEBUG [ntk::compressor::layer3_inference] Layer3 output: 512 chars (84.0% reduction from L2)
+2024-09-12T08:00:08.235Z DEBUG [ntk::compressor::layer3_inference] Layer3 output: 512 chars (84.0% reduction from L2)
+2024-09-12T08:00:08.236Z INFO  [ntk::server] POST /compress 347ms original=18743 compressed=512 ratio=97.27% layer=L3
+2024-09-12T08:00:08.236Z INFO  [ntk::server] POST /compress 347ms original=18743 compressed=512 ratio=97.27% layer=L3
+
+--- Docker container logs (ntk-api service) ---
+
+ntk-api-1   | 2024-09-12T08:01:00.000Z INFO  Starting NTK API container
+ntk-api-1   | 2024-09-12T08:01:00.001Z INFO  Starting NTK API container
+ntk-api-1   | 2024-09-12T08:01:00.002Z INFO  Loading environment variables
+ntk-api-1   | 2024-09-12T08:01:00.002Z INFO  Loading environment variables
+ntk-api-1   | 2024-09-12T08:01:00.003Z INFO  NTK_DAEMON_PORT=8765
+ntk-api-1   | 2024-09-12T08:01:00.003Z INFO  NTK_DAEMON_PORT=8765
+ntk-api-1   | 2024-09-12T08:01:00.003Z INFO  NTK_LOG_LEVEL=debug
+ntk-api-1   | 2024-09-12T08:01:00.004Z INFO  NTK_MODEL_PROVIDER=ollama
+ntk-api-1   | 2024-09-12T08:01:00.004Z INFO  NTK_MODEL_PROVIDER=ollama
+ntk-api-1   | 2024-09-12T08:01:00.005Z INFO  NTK_INFERENCE_THRESHOLD=300
+ntk-api-1   | 2024-09-12T08:01:00.005Z INFO  NTK_INFERENCE_THRESHOLD=300
+ntk-api-1   | 2024-09-12T08:01:00.006Z INFO  Connecting to SQLite at /data/metrics.db
+ntk-api-1   | 2024-09-12T08:01:00.006Z INFO  Connecting to SQLite at /data/metrics.db
+ntk-api-1   | 2024-09-12T08:01:00.008Z INFO  SQLite connection established
+ntk-api-1   | 2024-09-12T08:01:00.008Z INFO  SQLite connection established
+ntk-api-1   | 2024-09-12T08:01:00.009Z INFO  Running schema migrations
+ntk-api-1   | 2024-09-12T08:01:00.011Z INFO  Migration 001_initial.sql applied
+ntk-api-1   | 2024-09-12T08:01:00.011Z INFO  Migration 001_initial.sql applied
+ntk-api-1   | 2024-09-12T08:01:00.012Z INFO  Migration 002_add_layer_column.sql applied
+ntk-api-1   | 2024-09-12T08:01:00.012Z INFO  Migration 002_add_layer_column.sql applied
+ntk-api-1   | 2024-09-12T08:01:00.013Z INFO  Migration 003_add_session_index.sql applied
+ntk-api-1   | 2024-09-12T08:01:00.013Z INFO  Migration 003_add_session_index.sql applied
+ntk-api-1   | 2024-09-12T08:01:00.014Z INFO  All migrations applied successfully
+ntk-api-1   | 2024-09-12T08:01:00.015Z INFO  Binding to 0.0.0.0:8765
+ntk-api-1   | 2024-09-12T08:01:00.015Z INFO  Binding to 0.0.0.0:8765
+ntk-api-1   | 2024-09-12T08:01:00.016Z INFO  Server ready — accepting connections
+ntk-api-1   | 2024-09-12T08:01:00.016Z INFO  Server ready — accepting connections
+ntk-api-1   | 2024-09-12T08:01:01.221Z DEBUG Received POST /compress from 172.18.0.3
+ntk-api-1   | 2024-09-12T08:01:01.221Z DEBUG Received POST /compress from 172.18.0.3
+ntk-api-1   | 2024-09-12T08:01:01.222Z DEBUG Request body size: 3412 bytes
+ntk-api-1   | 2024-09-12T08:01:01.222Z DEBUG Request body size: 3412 bytes
+ntk-api-1   | 2024-09-12T08:01:01.222Z DEBUG Session-ID: sess_7f2a9b3c
+ntk-api-1   | 2024-09-12T08:01:01.222Z DEBUG Session-ID: sess_7f2a9b3c
+ntk-api-1   | 2024-09-12T08:01:01.441Z DEBUG Response: 200 OK 219ms
+ntk-api-1   | 2024-09-12T08:01:01.441Z DEBUG Response: 200 OK 219ms
+ntk-api-1   | 2024-09-12T08:01:01.441Z INFO  Compressed 3412 -> 284 bytes (91.68%) L3
+ntk-api-1   | 2024-09-12T08:01:01.441Z INFO  Compressed 3412 -> 284 bytes (91.68%) L3
+ntk-api-1   | 2024-09-12T08:01:02.334Z DEBUG Received POST /compress from 172.18.0.3
+ntk-api-1   | 2024-09-12T08:01:02.334Z DEBUG Received POST /compress from 172.18.0.3
+ntk-api-1   | 2024-09-12T08:01:02.335Z DEBUG Request body size: 641 bytes
+ntk-api-1   | 2024-09-12T08:01:02.335Z DEBUG Request body size: 641 bytes
+ntk-api-1   | 2024-09-12T08:01:02.337Z DEBUG Response: 200 OK 3ms
+ntk-api-1   | 2024-09-12T08:01:02.337Z DEBUG Response: 200 OK 3ms
+ntk-api-1   | 2024-09-12T08:01:02.337Z INFO  Compressed 641 -> 639 bytes (0.31%) L1
+ntk-api-1   | 2024-09-12T08:01:02.337Z INFO  Compressed 641 -> 639 bytes (0.31%) L1
+ntk-api-1   | 2024-09-12T08:01:03.881Z DEBUG Received GET /health from 172.18.0.1
+ntk-api-1   | 2024-09-12T08:01:03.881Z DEBUG Received GET /health from 172.18.0.1
+ntk-api-1   | 2024-09-12T08:01:03.882Z DEBUG Response: 200 OK 1ms
+ntk-api-1   | 2024-09-12T08:01:03.882Z DEBUG Response: 200 OK 1ms
+ntk-api-1   | 2024-09-12T08:01:04.001Z DEBUG Received POST /compress from 172.18.0.3
+ntk-api-1   | 2024-09-12T08:01:04.001Z DEBUG Received POST /compress from 172.18.0.3
+ntk-api-1   | 2024-09-12T08:01:04.002Z DEBUG Request body size: 22184 bytes
+ntk-api-1   | 2024-09-12T08:01:04.002Z DEBUG Request body size: 22184 bytes
+ntk-api-1   | 2024-09-12T08:01:04.003Z DEBUG Session-ID: sess_9d1e4f7a
+ntk-api-1   | 2024-09-12T08:01:04.003Z DEBUG Session-ID: sess_9d1e4f7a
+ntk-api-1   | 2024-09-12T08:01:04.371Z DEBUG Response: 200 OK 369ms
+ntk-api-1   | 2024-09-12T08:01:04.371Z DEBUG Response: 200 OK 369ms
+ntk-api-1   | 2024-09-12T08:01:04.371Z INFO  Compressed 22184 -> 631 bytes (97.16%) L3
+ntk-api-1   | 2024-09-12T08:01:04.371Z INFO  Compressed 22184 -> 631 bytes (97.16%) L3
+ntk-api-1   | 2024-09-12T08:01:05.002Z DEBUG Received GET /metrics from 172.18.0.1
+ntk-api-1   | 2024-09-12T08:01:05.002Z DEBUG Received GET /metrics from 172.18.0.1
+ntk-api-1   | 2024-09-12T08:01:05.004Z DEBUG Response: 200 OK 2ms
+ntk-api-1   | 2024-09-12T08:01:05.004Z DEBUG Response: 200 OK 2ms
+ntk-api-1   | 2024-09-12T08:01:05.112Z DEBUG Received POST /compress from 172.18.0.3
+ntk-api-1   | 2024-09-12T08:01:05.113Z DEBUG Request body size: 9872 bytes
+ntk-api-1   | 2024-09-12T08:01:05.113Z DEBUG Request body size: 9872 bytes
+ntk-api-1   | 2024-09-12T08:01:05.113Z DEBUG Session-ID: sess_2b8c5e1d
+ntk-api-1   | 2024-09-12T08:01:05.113Z DEBUG Session-ID: sess_2b8c5e1d
+ntk-api-1   | 2024-09-12T08:01:05.441Z DEBUG Response: 200 OK 328ms
+ntk-api-1   | 2024-09-12T08:01:05.441Z DEBUG Response: 200 OK 328ms
+ntk-api-1   | 2024-09-12T08:01:05.441Z INFO  Compressed 9872 -> 441 bytes (95.53%) L3
+ntk-api-1   | 2024-09-12T08:01:05.441Z INFO  Compressed 9872 -> 441 bytes (95.53%) L3
+ntk-db-1    | 2024-09-12T08:01:00.000Z LOG  database system identifier: 7384921047362859011
+ntk-db-1    | 2024-09-12T08:01:00.000Z LOG  database system identifier: 7384921047362859011
+ntk-db-1    | 2024-09-12T08:01:00.001Z LOG  entering standby mode
+ntk-db-1    | 2024-09-12T08:01:00.001Z LOG  entering standby mode
+ntk-db-1    | 2024-09-12T08:01:00.002Z LOG  redo in progress
+ntk-db-1    | 2024-09-12T08:01:00.002Z LOG  redo in progress
+ntk-db-1    | 2024-09-12T08:01:00.004Z LOG  consistent recovery state reached at 0/3000000
+ntk-db-1    | 2024-09-12T08:01:00.004Z LOG  consistent recovery state reached at 0/3000000
+ntk-db-1    | 2024-09-12T08:01:00.005Z LOG  database system is ready to accept read-only connections
+ntk-db-1    | 2024-09-12T08:01:00.005Z LOG  database system is ready to accept read-only connections
+ntk-db-1    | 2024-09-12T08:01:01.000Z LOG  checkpoint starting: immediate force wait
+ntk-db-1    | 2024-09-12T08:01:01.000Z LOG  checkpoint starting: immediate force wait
+ntk-db-1    | 2024-09-12T08:01:01.041Z LOG  checkpoint complete: wrote 14 buffers (0.1%); 0 WAL file(s) added, 0 removed, 1 recycled
+ntk-db-1    | 2024-09-12T08:01:01.041Z LOG  checkpoint complete: wrote 14 buffers (0.1%); 0 WAL file(s) added, 0 removed, 1 recycled
+ntk-db-1    | 2024-09-12T08:01:01.042Z LOG  checkpoint complete: wrote 14 buffers (0.1%); 0 WAL file(s) added, 0 removed, 1 recycled
+ntk-db-1    | 2024-09-12T08:01:02.000Z LOG  automatic checkpoint requested
+ntk-db-1    | 2024-09-12T08:01:02.000Z LOG  automatic checkpoint requested
+ntk-db-1    | 2024-09-12T08:01:02.000Z LOG  automatic checkpoint requested
+ntk-ollama-1 | 2024-09-12T08:01:00.000Z INFO  [ollama] starting server on 0.0.0.0:11434
+ntk-ollama-1 | 2024-09-12T08:01:00.000Z INFO  [ollama] starting server on 0.0.0.0:11434
+ntk-ollama-1 | 2024-09-12T08:01:00.001Z INFO  [ollama] loading model phi3:mini
+ntk-ollama-1 | 2024-09-12T08:01:00.001Z INFO  [ollama] loading model phi3:mini
+ntk-ollama-1 | 2024-09-12T08:01:00.001Z INFO  [ollama] loading model phi3:mini
+ntk-ollama-1 | 2024-09-12T08:01:00.234Z INFO  [ollama] model loaded: phi3:mini (3.8B Q5_K_M)
+ntk-ollama-1 | 2024-09-12T08:01:00.234Z INFO  [ollama] model loaded: phi3:mini (3.8B Q5_K_M)
+ntk-ollama-1 | 2024-09-12T08:01:00.235Z INFO  [ollama] backend: CPU (AVX2) — no GPU detected
+ntk-ollama-1 | 2024-09-12T08:01:00.235Z INFO  [ollama] backend: CPU (AVX2) — no GPU detected
+ntk-ollama-1 | 2024-09-12T08:01:00.235Z INFO  [ollama] backend: CPU (AVX2) — no GPU detected
+ntk-ollama-1 | 2024-09-12T08:01:00.236Z INFO  [ollama] server ready
+ntk-ollama-1 | 2024-09-12T08:01:00.236Z INFO  [ollama] server ready
+ntk-ollama-1 | 2024-09-12T08:01:01.221Z DEBUG [ollama] POST /api/generate model=phi3:mini
+ntk-ollama-1 | 2024-09-12T08:01:01.221Z DEBUG [ollama] POST /api/generate model=phi3:mini
+ntk-ollama-1 | 2024-09-12T08:01:01.222Z DEBUG [ollama] prompt tokens: 412
+ntk-ollama-1 | 2024-09-12T08:01:01.222Z DEBUG [ollama] prompt tokens: 412
+ntk-ollama-1 | 2024-09-12T08:01:01.222Z DEBUG [ollama] prompt tokens: 412
+ntk-ollama-1 | 2024-09-12T08:01:01.441Z DEBUG [ollama] generated tokens: 87 (219ms, 3.97 t/s)
+ntk-ollama-1 | 2024-09-12T08:01:01.441Z DEBUG [ollama] generated tokens: 87 (219ms, 3.97 t/s)
+ntk-ollama-1 | 2024-09-12T08:01:04.003Z DEBUG [ollama] POST /api/generate model=phi3:mini
+ntk-ollama-1 | 2024-09-12T08:01:04.003Z DEBUG [ollama] POST /api/generate model=phi3:mini
+ntk-ollama-1 | 2024-09-12T08:01:04.004Z DEBUG [ollama] prompt tokens: 1841
+ntk-ollama-1 | 2024-09-12T08:01:04.004Z DEBUG [ollama] prompt tokens: 1841
+ntk-ollama-1 | 2024-09-12T08:01:04.004Z DEBUG [ollama] prompt tokens: 1841
+ntk-ollama-1 | 2024-09-12T08:01:04.371Z DEBUG [ollama] generated tokens: 124 (367ms, 3.38 t/s)
+ntk-ollama-1 | 2024-09-12T08:01:04.371Z DEBUG [ollama] generated tokens: 124 (367ms, 3.38 t/s)
+ntk-ollama-1 | 2024-09-12T08:01:05.113Z DEBUG [ollama] POST /api/generate model=phi3:mini
+ntk-ollama-1 | 2024-09-12T08:01:05.113Z DEBUG [ollama] prompt tokens: 897
+ntk-ollama-1 | 2024-09-12T08:01:05.113Z DEBUG [ollama] prompt tokens: 897
+ntk-ollama-1 | 2024-09-12T08:01:05.113Z DEBUG [ollama] prompt tokens: 897
+ntk-ollama-1 | 2024-09-12T08:01:05.441Z DEBUG [ollama] generated tokens: 98 (328ms, 2.99 t/s)
+ntk-ollama-1 | 2024-09-12T08:01:05.441Z DEBUG [ollama] generated tokens: 98 (328ms, 2.99 t/s)
+
+--- pnpm install output ---
+
+Packages: +847
++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+Packages are hard linked from the content-addressable store to the virtual store.
+  Content-addressable store is at: /home/dev/.local/share/pnpm/store/v3
+  Virtual store is at:             node_modules/.pnpm
+
+ WARN  deprecated npmlog@5.0.1: This package is no longer supported.
+ WARN  deprecated npmlog@5.0.1: This package is no longer supported.
+ WARN  deprecated npmlog@5.0.1: This package is no longer supported.
+ WARN  deprecated inflight@1.0.6: This module is not supported, and leaks memory.
+ WARN  deprecated inflight@1.0.6: This module is not supported, and leaks memory.
+ WARN  deprecated glob@7.2.3: Glob versions prior to v9 are no longer supported
+ WARN  deprecated glob@7.2.3: Glob versions prior to v9 are no longer supported
+ WARN  deprecated glob@7.2.3: Glob versions prior to v9 are no longer supported
+ WARN  deprecated @humanwhocodes/config-array@0.11.14: Use @eslint/config-array instead
+ WARN  deprecated @humanwhocodes/object-schema@2.0.3: Use @eslint/object-schema instead
+ WARN  deprecated rimraf@3.0.2: Rimraf versions prior to v4 are no longer supported
+ WARN  deprecated rimraf@3.0.2: Rimraf versions prior to v4 are no longer supported
+ WARN  deprecated rimraf@3.0.2: Rimraf versions prior to v4 are no longer supported
+ WARN  deprecated are-we-there-yet@2.0.0: This package is no longer maintained.
+ WARN  deprecated are-we-there-yet@2.0.0: This package is no longer maintained.
+ WARN  deprecated gauge@3.0.2: This package is no longer maintained.
+ WARN  deprecated gauge@3.0.2: This package is no longer maintained.
+ WARN  deprecated gauge@3.0.2: This package is no longer maintained.
+
+dependencies:
++ @tanstack/react-query 5.45.0
++ @tanstack/react-query 5.45.0
++ axum 0.7.5
++ clap 4.5.8
++ next 14.2.4
++ react 18.3.1
++ react 18.3.1
++ react-dom 18.3.1
++ tailwindcss 4.0.0-alpha.18
++ tailwindcss 4.0.0-alpha.18
++ typescript 5.5.3
++ zustand 4.5.4
++ zustand 4.5.4
+
+devDependencies:
++ @types/node 20.14.9
++ @types/react 18.3.3
++ @types/react 18.3.3
++ @types/react-dom 18.3.0
++ eslint 8.57.0
++ eslint 8.57.0
++ eslint-config-next 14.2.4
++ prettier 3.3.2
++ prettier 3.3.2
++ vitest 1.6.0
++ vitest 1.6.0
+
+Done in 34.2s
+Done in 34.2s
+
+--- vitest output ---
+
+ RUN  v1.6.0 /home/dev/projects/ntk-dashboard
+
+ ✓ src/utils/tokenCounter.test.ts (8 tests) 12ms
+ ✓ src/utils/tokenCounter.test.ts (8 tests) 12ms
+ ✓ src/api/ntkClient.test.ts (12 tests) 84ms
+ ✓ src/api/ntkClient.test.ts (12 tests) 84ms
+ ✓ src/components/MetricsDashboard.test.tsx (6 tests) 147ms
+ ✓ src/components/SparklineChart.test.tsx (4 tests) 93ms
+ ✓ src/components/SparklineChart.test.tsx (4 tests) 93ms
+ ✓ src/hooks/useCompression.test.ts (9 tests) 211ms
+ ✓ src/hooks/useCompression.test.ts (9 tests) 211ms
+ ✓ src/store/metricsSlice.test.ts (7 tests) 38ms
+ ✓ src/pages/Dashboard.test.tsx (11 tests) 334ms
+ ✓ src/pages/Dashboard.test.tsx (11 tests) 334ms
+ ✗ src/pages/Dashboard.test.tsx > renders compression ratio correctly
+ ✗ src/pages/Dashboard.test.tsx > renders compression ratio correctly
+
+   AssertionError: expected '0.00%' to equal '91.97%'
+     at Object.<anonymous> (/home/dev/projects/ntk-dashboard/src/pages/Dashboard.test.tsx:88:32)
+
+ ✗ src/api/ntkClient.test.ts > fetchLatestRelease > returns tag_name from releases API
+ ✗ src/api/ntkClient.test.ts > fetchLatestRelease > returns tag_name from releases API
+
+   AssertionError: expected undefined to equal 'v0.2.0'
+     at Object.<anonymous> (/home/dev/projects/ntk-dashboard/src/api/ntkClient.test.ts:44:28)
+
+ ✗ src/hooks/useCompression.test.ts > sends correct session-id header
+ ✗ src/hooks/useCompression.test.ts > sends correct session-id header
+
+   AssertionError: expected null to equal 'sess_abc123'
+     at Object.<anonymous> (/home/dev/projects/ntk-dashboard/src/hooks/useCompression.test.ts:71:34)
+
+ Test Files  11 passed | 0 failed
+ Tests       57 passed | 3 failed
+ Tests       57 passed | 3 failed
+ Start at    08:02:14
+ Duration    1.21s (transform 344ms, setup 0ms, collect 812ms, tests 1041ms, environment 892ms, prepare 441ms)

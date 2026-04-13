@@ -1,0 +1,348 @@
+[0m[1m[32m   Compiling[0m ntk v0.2.0 (/home/dev/projects/ntk)
+[0m[1m[32m   Compiling[0m ntk v0.2.0 (/home/dev/projects/ntk)
+[0m[1m[32m   Compiling[0m ntk v0.2.0 (/home/dev/projects/ntk)
+[0m[1m[32m   Compiling[0m axum v0.7.5
+[0m[1m[32m   Compiling[0m axum v0.7.5
+[0m[1m[32m   Compiling[0m tokio v1.38.0
+[0m[1m[32m   Compiling[0m tokio v1.38.0
+[0m[1m[32m   Compiling[0m tokio v1.38.0
+[0m[1m[32m   Compiling[0m serde v1.0.203
+[0m[1m[32m   Compiling[0m serde v1.0.203
+[0m[1m[32m   Compiling[0m serde_json v1.0.117
+[0m[1m[32m   Compiling[0m serde_json v1.0.117
+[0m[1m[32m   Compiling[0m tiktoken-rs v0.5.9
+[0m[1m[32m   Compiling[0m strip-ansi-escapes v0.2.0
+[0m[1m[32m   Compiling[0m strip-ansi-escapes v0.2.0
+[0m[1m[32m   Compiling[0m sqlx v0.8.2
+[0m[1m[32m   Compiling[0m sqlx v0.8.2
+[0m[1m[32m   Compiling[0m sqlx v0.8.2
+[0m[1m[32m   Compiling[0m clap v4.5.8
+[0m[1m[32m   Compiling[0m clap v4.5.8
+[0m[1m[32m   Compiling[0m anyhow v1.0.86
+[0m[1m[32m   Compiling[0m reqwest v0.11.27
+[0m[1m[32m   Compiling[0m reqwest v0.11.27
+[0m[1m[32m   Compiling[0m reqwest v0.11.27
+[0m[1m[32m   Compiling[0m tracing v0.1.40
+[0m[1m[32m   Compiling[0m tracing-subscriber v0.3.18
+[0m[1m[32m   Compiling[0m ratatui v0.28.0
+[0m[1m[32m   Compiling[0m candle-core v0.8.0
+[0m[1m[32m   Compiling[0m candle-core v0.8.0
+[0m[1m[32m   Compiling[0m candle-nn v0.8.0
+[0m[1m[32m   Compiling[0m candle-transformers v0.8.0
+[0m[1m[32m   Compiling[0m candle-transformers v0.8.0
+[0m[1m[32m   Compiling[0m uuid v1.9.1
+[0m[1m[32m   Compiling[0m chrono v0.4.38
+[0m[1m[32m   Compiling[0m sha2 v0.10.8
+[0m[1m[32m   Compiling[0m dirs v5.0.1
+[0m[1m[32m   Compiling[0m url v2.5.2
+[0m[1m[32m   Compiling[0m zip v2.1.6
+[0m[0m[1m[32m    Finished[0m test [unoptimized + debuginfo] target(s) in 87.41s
+[0m[1m[32m     Running[0m unittests src/lib.rs (target/debug/deps/ntk-1a2b3c4d5e6f)
+
+running 94 tests
+[0m[1m[32mtest[0m compressor::layer1::tests::test_remove_ansi_codes [0m[1m[32m... ok[0m
+[0m[1m[32mtest[0m compressor::layer1::tests::test_remove_ansi_codes [0m[1m[32m... ok[0m
+[0m[1m[32mtest[0m compressor::layer1::tests::test_remove_ansi_codes [0m[1m[32m... ok[0m
+[0m[1m[32mtest[0m compressor::layer1::tests::test_collapse_blank_lines [0m[1m[32m... ok[0m
+[0m[1m[32mtest[0m compressor::layer1::tests::test_collapse_blank_lines [0m[1m[32m... ok[0m
+[0m[1m[32mtest[0m compressor::layer1::tests::test_group_repeated_lines [0m[1m[32m... ok[0m
+[0m[1m[32mtest[0m compressor::layer1::tests::test_group_repeated_lines [0m[1m[32m... ok[0m
+[0m[1m[32mtest[0m compressor::layer1::tests::test_detect_rtk_output [0m[1m[32m... ok[0m
+[0m[1m[32mtest[0m compressor::layer1::tests::test_keep_only_failures [0m[1m[32m... ok[0m
+[0m[1m[32mtest[0m compressor::layer1::tests::test_remove_progress_bars [0m[1m[32m... ok[0m
+[0m[1m[32mtest[0m compressor::layer1::tests::test_remove_progress_bars [0m[1m[32m... ok[0m
+[0m[1m[32mtest[0m compressor::layer1::tests::test_remove_progress_bars [0m[1m[32m... ok[0m
+[0m[1m[32mtest[0m compressor::layer2::tests::test_path_shortening_reduces_tokens [0m[1m[32m... ok[0m
+[0m[1m[32mtest[0m compressor::layer2::tests::test_path_shortening_reduces_tokens [0m[1m[32m... ok[0m
+[0m[1m[32mtest[0m compressor::layer2::tests::test_prefix_consolidation [0m[1m[32m... ok[0m
+[0m[1m[32mtest[0m compressor::layer2::tests::test_prefix_consolidation [0m[1m[32m... ok[0m
+[0m[1m[32mtest[0m compressor::layer2::tests::test_token_count_accuracy [0m[1m[32m... ok[0m
+[0m[1m[32mtest[0m compressor::layer2::tests::test_no_data_loss_in_reformatting [0m[1m[32m... ok[0m
+[0m[1m[32mtest[0m compressor::layer2::tests::test_threshold_not_triggered_below_300 [0m[1m[32m... ok[0m
+[0m[1m[32mtest[0m compressor::layer3::tests::test_ollama_client_timeout [0m[1m[32m... ok[0m
+[0m[1m[32mtest[0m compressor::layer3::tests::test_ollama_client_timeout [0m[1m[32m... ok[0m
+[0m[1m[32mtest[0m compressor::layer3::tests::test_ollama_fallback_on_error [0m[1m[32m... ok[0m
+[0m[1m[32mtest[0m compressor::layer3::tests::test_type_specific_prompts [0m[1m[32m... ok[0m
+[0m[1m[32mtest[0m compressor::layer3::tests::test_inference_threshold_gate [0m[1m[32m... ok[0m
+[0m[1m[32mtest[0m compressor::layer3::tests::test_inference_threshold_gate [0m[1m[32m... ok[0m
+[0m[1m[32mtest[0m config::tests::test_load_default_when_file_missing [0m[1m[32m... ok[0m
+[0m[1m[32mtest[0m config::tests::test_load_full_config_from_file [0m[1m[32m... ok[0m
+[0m[1m[32mtest[0m config::tests::test_merge_does_not_affect_unspecified_fields [0m[1m[32m... ok[0m
+[0m[1m[32mtest[0m config::tests::test_expand_tilde_in_storage_path [0m[1m[32m... ok[0m
+[0m[1m[32mtest[0m config::tests::test_expand_tilde_in_storage_path [0m[1m[32m... ok[0m
+[0m[1m[32mtest[0m detector::tests::test_detect_cargo_test [0m[1m[32m... ok[0m
+[0m[1m[32mtest[0m detector::tests::test_detect_cargo_test [0m[1m[32m... ok[0m
+[0m[1m[32mtest[0m detector::tests::test_detect_tsc_build [0m[1m[32m... ok[0m
+[0m[1m[32mtest[0m detector::tests::test_detect_vitest [0m[1m[32m... ok[0m
+[0m[1m[32mtest[0m detector::tests::test_detect_docker_logs [0m[1m[32m... ok[0m
+[0m[1m[32mtest[0m detector::tests::test_detect_docker_logs [0m[1m[32m... ok[0m
+[0m[1m[32mtest[0m detector::tests::test_detect_generic [0m[1m[32m... ok[0m
+[0m[1m[32mtest[0m metrics::tests::test_record_session [0m[1m[32m... ok[0m
+[0m[1m[32mtest[0m metrics::tests::test_record_session [0m[1m[32m... ok[0m
+[0m[1m[32mtest[0m metrics::tests::test_compression_ratio_calculation [0m[1m[32m... ok[0m
+[0m[1m[32mtest[0m metrics::tests::test_layer_distribution [0m[1m[32m... ok[0m
+[0m[1m[32mtest[0m metrics::tests::test_layer_distribution [0m[1m[32m... ok[0m
+[0m[1m[32mtest[0m installer::tests::test_idempotent_patch [0m[1m[32m... ok[0m
+[0m[1m[32mtest[0m installer::tests::test_idempotent_patch [0m[1m[32m... ok[0m
+[0m[1m[32mtest[0m installer::tests::test_idempotent_patch [0m[1m[32m... ok[0m
+[0m[1m[32mtest[0m installer::tests::test_uninstall_removes_hook [0m[1m[32m... ok[0m
+[0m[1m[32mtest[0m server::tests::test_compress_endpoint_returns_200 [0m[1m[32m... ok[0m
+[0m[1m[32mtest[0m server::tests::test_compress_endpoint_returns_200 [0m[1m[32m... ok[0m
+[0m[1m[32mtest[0m server::tests::test_health_endpoint [0m[1m[32m... ok[0m
+[0m[1m[32mtest[0m server::tests::test_health_endpoint [0m[1m[32m... ok[0m
+[0m[1m[32mtest[0m server::tests::test_metrics_endpoint [0m[1m[32m... ok[0m
+[0m[1m[32mtest[0m gpu::tests::test_detect_cpu_fallback [0m[1m[32m... ok[0m
+[0m[1m[32mtest[0m gpu::tests::test_detect_cpu_fallback [0m[1m[32m... ok[0m
+[0m[1m[32mtest[0m gpu::tests::test_gpu_layers_config [0m[1m[32m... ok[0m
+[0m[1m[32mtest[0m telemetry::tests::test_disabled_by_env [0m[1m[32m... ok[0m
+[0m[1m[32mtest[0m telemetry::tests::test_disabled_by_env [0m[1m[32m... ok[0m
+[0m[1m[32mtest[0m telemetry::tests::test_hash_not_reversible [0m[1m[32m... ok[0m
+[0m[1m[32mtest[0m telemetry::tests::test_payload_no_pii [0m[1m[32m... ok[0m
+[0m[1m[32mtest[0m telemetry::tests::test_payload_no_pii [0m[1m[32m... ok[0m
+
+[1mtest result:[0m [0m[1m[32mok[0m. 54 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 3.14s
+
+[0m[1m[32m     Running[0m tests/unit/layer1_tests.rs (target/debug/deps/layer1_tests-f1a2b3c4d5e6)
+
+running 18 tests
+[0m[1m[32mtest[0m test_ansi_removal_basic [0m[1m[32m... ok[0m
+[0m[1m[32mtest[0m test_ansi_removal_basic [0m[1m[32m... ok[0m
+[0m[1m[32mtest[0m test_ansi_removal_nested [0m[1m[32m... ok[0m
+[0m[1m[32mtest[0m test_ansi_removal_nested [0m[1m[32m... ok[0m
+[0m[1m[32mtest[0m test_ansi_removal_256_color [0m[1m[32m... ok[0m
+[0m[1m[32mtest[0m test_progress_bar_detection [0m[1m[32m... ok[0m
+[0m[1m[32mtest[0m test_progress_bar_detection [0m[1m[32m... ok[0m
+[0m[1m[32mtest[0m test_progress_bar_multiple_formats [0m[1m[32m... ok[0m
+[0m[1m[32mtest[0m test_dedup_identical_lines [0m[1m[32m... ok[0m
+[0m[1m[32mtest[0m test_dedup_identical_lines [0m[1m[32m... ok[0m
+[0m[1m[32mtest[0m test_dedup_preserves_order [0m[1m[32m... ok[0m
+[0m[1m[32mtest[0m test_blank_line_collapse [0m[1m[32m... ok[0m
+[0m[1m[32mtest[0m test_blank_line_collapse [0m[1m[32m... ok[0m
+[0m[1m[32mtest[0m test_blank_line_collapse_max_one [0m[1m[32m... ok[0m
+[0m[1m[32mtest[0m test_cargo_extract_failures_only [0m[1m[32m... ok[0m
+[0m[1m[32mtest[0m test_cargo_extract_failures_only [0m[1m[32m... ok[0m
+[0m[1m[32mtest[0m test_cargo_no_failures_passthrough [0m[1m[32m... ok[0m
+[0m[1m[32mtest[0m test_rtk_output_detection [0m[1m[32m... ok[0m
+[0m[1m[32mtest[0m test_rtk_output_detection [0m[1m[32m... ok[0m
+[0m[1m[32mtest[0m test_layer1_deterministic [0m[1m[32m... ok[0m
+[0m[1m[32mtest[0m test_layer1_deterministic [0m[1m[32m... ok[0m
+
+[1mtest result:[0m [0m[1m[32mok[0m. 18 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.04s
+
+[0m[1m[32m     Running[0m tests/unit/layer2_tests.rs (target/debug/deps/layer2_tests-a9b8c7d6e5f4)
+
+running 14 tests
+[0m[1m[32mtest[0m test_token_count_empty_string [0m[1m[32m... ok[0m
+[0m[1m[32mtest[0m test_token_count_empty_string [0m[1m[32m... ok[0m
+[0m[1m[32mtest[0m test_token_count_short_text [0m[1m[32m... ok[0m
+[0m[1m[32mtest[0m test_path_shortening_absolute [0m[1m[32m... ok[0m
+[0m[1m[32mtest[0m test_path_shortening_absolute [0m[1m[32m... ok[0m
+[0m[1m[32mtest[0m test_path_shortening_relative [0m[1m[32m... ok[0m
+[0m[1m[32mtest[0m test_path_shortening_windows [0m[1m[32m... ok[0m
+[0m[1m[32mtest[0m test_path_shortening_windows [0m[1m[32m... ok[0m
+[0m[1m[32mtest[0m test_bpe_prefix_consolidation_cargo [0m[1m[32m... ok[0m
+[0m[1m[32mtest[0m test_bpe_prefix_consolidation_cargo [0m[1m[32m... ok[0m
+[0m[1m[32mtest[0m test_bpe_prefix_consolidation_node [0m[1m[32m... ok[0m
+[0m[1m[32mtest[0m test_threshold_300_not_triggered [0m[1m[32m... ok[0m
+[0m[1m[32mtest[0m test_threshold_300_not_triggered [0m[1m[32m... ok[0m
+[0m[1m[32mtest[0m test_threshold_301_triggered [0m[1m[32m... ok[0m
+[0m[1m[32mtest[0m test_no_data_loss_critical_info [0m[1m[32m... ok[0m
+[0m[1m[32mtest[0m test_no_data_loss_critical_info [0m[1m[32m... ok[0m
+
+[1mtest result:[0m [0m[1m[32mok[0m. 14 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.12s
+
+[0m[1m[32m     Running[0m tests/integration/compression_pipeline_tests.rs (target/debug/deps/compression_pipeline_tests-1b2c3d4e5f6a)
+
+running 22 tests
+[0m[1m[32mtest[0m test_full_pipeline_cargo_test_output [0m[1m[32m... ok[0m
+[0m[1m[32mtest[0m test_full_pipeline_cargo_test_output [0m[1m[32m... ok[0m
+[0m[1m[32mtest[0m test_full_pipeline_tsc_errors [0m[1m[32m... ok[0m
+[0m[1m[32mtest[0m test_full_pipeline_tsc_errors [0m[1m[32m... ok[0m
+[0m[1m[32mtest[0m test_full_pipeline_docker_logs [0m[1m[32m... ok[0m
+[0m[1m[32mtest[0m test_full_pipeline_vitest_failures [0m[1m[32m... ok[0m
+[0m[1m[32mtest[0m test_full_pipeline_vitest_failures [0m[1m[32m... ok[0m
+[0m[1m[32mtest[0m test_pipeline_skips_short_output [0m[1m[32m... ok[0m
+[0m[1m[32mtest[0m test_pipeline_skips_short_output [0m[1m[32m... ok[0m
+[0m[1m[32mtest[0m test_pipeline_preserves_errors [0m[1m[32m... ok[0m
+[0m[1m[32mtest[0m test_pipeline_preserves_errors [0m[1m[32m... ok[0m
+[0m[1m[32mtest[0m test_pipeline_compression_ratio_cargo [0m[1m[32m... ok[0m
+[0m[1m[32mtest[0m test_pipeline_compression_ratio_tsc [0m[1m[32m... ok[0m
+[0m[1m[32mtest[0m test_pipeline_compression_ratio_tsc [0m[1m[32m... ok[0m
+[0m[1m[32mtest[0m test_pipeline_l1_l2_latency_under_50ms [0m[1m[32m... ok[0m
+[0m[1m[32mtest[0m test_pipeline_l1_l2_latency_under_50ms [0m[1m[32m... ok[0m
+[0m[1m[32mtest[0m test_pipeline_graceful_fallback_no_daemon [0m[1m[32m... ok[0m
+[0m[1m[32mtest[0m test_pipeline_graceful_fallback_no_daemon [0m[1m[32m... ok[0m
+[0m[1m[32mtest[0m test_compression_idempotent [0m[1m[32m... ok[0m
+[0m[1m[32mtest[0m test_compression_idempotent [0m[1m[32m... ok[0m
+[0m[1m[32mtest[0m test_l3_not_triggered_below_threshold [0m[1m[32m... ok[0m
+[0m[1m[32mtest[0m test_l3_triggered_above_threshold [0m[1m[32m... ok[0m
+[0m[1m[32mtest[0m test_l3_triggered_above_threshold [0m[1m[32m... ok[0m
+
+[1mtest result:[0m [0m[1m[32mok[0m. 22 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.87s
+
+[0m[1m[32m     Running[0m tests/integration/endpoint_tests.rs (target/debug/deps/endpoint_tests-7e8f9a0b1c2d)
+[0m[1m[32m     Running[0m tests/integration/endpoint_tests.rs (target/debug/deps/endpoint_tests-7e8f9a0b1c2d)
+
+running 11 tests
+[0m[1m[32mtest[0m test_compress_endpoint_empty_body [0m[1m[32m... ok[0m
+[0m[1m[32mtest[0m test_compress_endpoint_with_ansi [0m[1m[32m... ok[0m
+[0m[1m[32mtest[0m test_compress_endpoint_with_ansi [0m[1m[32m... ok[0m
+[0m[1m[32mtest[0m test_compress_endpoint_large_payload [0m[1m[32m... ok[0m
+[0m[1m[32mtest[0m test_compress_endpoint_large_payload [0m[1m[32m... ok[0m
+[0m[1m[32mtest[0m test_health_endpoint_running [0m[1m[32m... ok[0m
+[0m[1m[32mtest[0m test_metrics_endpoint_format [0m[1m[32m... ok[0m
+[0m[1m[32mtest[0m test_metrics_endpoint_format [0m[1m[32m... ok[0m
+[0m[1m[32mtest[0m test_compress_rejects_oversized_body [0m[1m[32m... ok[0m
+[0m[1m[32mtest[0m test_compress_rejects_oversized_body [0m[1m[32m... ok[0m
+[0m[1m[32mtest[0m test_compress_content_type_validation [0m[1m[32m... ok[0m
+[0m[1m[32mtest[0m test_records_endpoint_pagination [0m[1m[32m... ok[0m
+[0m[1m[32mtest[0m test_records_endpoint_pagination [0m[1m[32m... ok[0m
+
+[1mtest result:[0m [0m[1m[32mok[0m. 11 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.33s
+
+[0m[1m[32m     Running[0m tests/integration/quality_regression_tests.rs (target/debug/deps/quality_regression_tests-3c4d5e6f7a8b)
+[0m[1m[32m     Running[0m tests/integration/quality_regression_tests.rs (target/debug/deps/quality_regression_tests-3c4d5e6f7a8b)
+[0m[1m[32m     Running[0m tests/integration/quality_regression_tests.rs (target/debug/deps/quality_regression_tests-3c4d5e6f7a8b)
+
+running 8 tests
+[0m[1m[32mtest[0m test_cargo_fixture_compression_ratio_above_70pct [0m[1m[32m... ok[0m
+[0m[1m[32mtest[0m test_tsc_fixture_compression_ratio_above_70pct [0m[1m[32m... ok[0m
+[0m[1m[32mtest[0m test_tsc_fixture_compression_ratio_above_70pct [0m[1m[32m... ok[0m
+[0m[1m[32mtest[0m test_vitest_fixture_compression_ratio_above_70pct [0m[1m[32m... ok[0m
+[0m[1m[32mtest[0m test_docker_fixture_compression_ratio_above_70pct [0m[1m[32m... ok[0m
+[0m[1m[32mtest[0m test_docker_fixture_compression_ratio_above_70pct [0m[1m[32m... ok[0m
+[0m[1m[32mtest[0m test_error_lines_always_preserved [0m[1m[32m... ok[0m
+[0m[1m[32mtest[0m test_error_lines_always_preserved [0m[1m[32m... ok[0m
+[0m[1m[32mtest[0m test_compression_under_50ms_l1_l2 [0m[1m[32m... ok[0m
+[0m[1m[32mtest[0m test_compression_under_50ms_l1_l2 [0m[1m[32m... ok[0m
+
+[1mtest result:[0m [0m[1m[32mok[0m. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.21s
+
+[0m[1m[32m     Running[0m tests/proptest/compression_invariants.rs (target/debug/deps/compression_invariants-9f0a1b2c3d4e)
+
+running 6 tests
+[0m[1m[32mtest[0m proptest_compression_ratio_always_improves [0m[1m[32m... ok[0m
+[0m[1m[32mtest[0m proptest_compression_ratio_always_improves [0m[1m[32m... ok[0m
+[0m[1m[32mtest[0m proptest_error_lines_preserved [0m[1m[32m... ok[0m
+[0m[1m[32mtest[0m proptest_error_lines_preserved [0m[1m[32m... ok[0m
+[0m[1m[32mtest[0m proptest_deterministic_output [0m[1m[32m... ok[0m
+[0m[1m[32mtest[0m proptest_deterministic_output [0m[1m[32m... ok[0m
+[0m[1m[32mtest[0m proptest_no_panic_on_random_input [0m[1m[32m... ok[0m
+[0m[1m[32mtest[0m proptest_no_panic_on_random_input [0m[1m[32m... ok[0m
+[0m[1m[32mtest[0m proptest_l3_threshold_gate [0m[1m[32m... ok[0m
+[0m[1m[32mtest[0m proptest_l3_threshold_gate [0m[1m[32m... ok[0m
+[0m[1m[32mtest[0m proptest_short_passthrough [0m[1m[32m... ok[0m
+[0m[1m[32mtest[0m proptest_short_passthrough [0m[1m[32m... ok[0m
+
+[1mtest result:[0m [0m[1m[32mok[0m. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 4.71s
+
+[0m[1m[32m     Running[0m tests/integration/cli_tests.rs (target/debug/deps/cli_tests-b2c3d4e5f6a7)
+[0m[1m[32m     Running[0m tests/integration/cli_tests.rs (target/debug/deps/cli_tests-b2c3d4e5f6a7)
+
+running 19 tests
+[0m[1m[32mtest[0m test_cli_status_daemon_not_running [0m[1m[32m... ok[0m
+[0m[1m[32mtest[0m test_cli_status_daemon_not_running [0m[1m[32m... ok[0m
+[0m[1m[32mtest[0m test_cli_version_flag [0m[1m[32m... ok[0m
+[0m[1m[32mtest[0m test_cli_help_flag [0m[1m[32m... ok[0m
+[0m[1m[32mtest[0m test_cli_help_flag [0m[1m[32m... ok[0m
+[0m[1m[32mtest[0m test_cli_test_compress_file_not_found [0m[1m[32m... ok[0m
+[0m[1m[32mtest[0m test_cli_test_compress_file_not_found [0m[1m[32m... ok[0m
+[0m[1m[32mtest[0m test_cli_metrics_no_data [0m[1m[32m... ok[0m
+[0m[1m[32mtest[0m test_cli_metrics_no_data [0m[1m[32m... ok[0m
+[0m[1m[32mtest[0m test_cli_graph_no_data [0m[1m[32m... ok[0m
+[0m[1m[32mtest[0m test_cli_init_show [0m[1m[32m... ok[0m
+[0m[1m[32mtest[0m test_cli_init_show [0m[1m[32m... ok[0m
+[0m[1m[32mtest[0m test_cli_gain_output_format [0m[1m[32m... ok[0m
+[0m[1m[32mtest[0m test_cli_gain_output_format [0m[1m[32m... ok[0m
+[0m[1m[32mtest[0m test_cli_start_stops_with_signal [0m[1m[32m... ok[0m
+[0m[1m[32mtest[0m test_cli_model_list [0m[1m[32m... ok[0m
+[0m[1m[32mtest[0m test_cli_model_list [0m[1m[32m... ok[0m
+[0m[1m[32mtest[0m test_cli_config_show [0m[1m[32m... ok[0m
+[0m[1m[32mtest[0m test_cli_config_show [0m[1m[32m... ok[0m
+[0m[1m[32mtest[0m test_cli_discover_no_session [0m[1m[32m... ok[0m
+[0m[1m[32mtest[0m test_cli_bench_cpu [0m[1m[32m... ok[0m
+[0m[1m[32mtest[0m test_cli_bench_cpu [0m[1m[32m... ok[0m
+
+[1mtest result:[0m [0m[1m[32mok[0m. 19 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.44s
+
+[0m[1m[32m     Running[0m tests/integration/ollama_mock_tests.rs (target/debug/deps/ollama_mock_tests-c3d4e5f6a7b8)
+[0m[1m[32m     Running[0m tests/integration/ollama_mock_tests.rs (target/debug/deps/ollama_mock_tests-c3d4e5f6a7b8)
+
+running 9 tests
+[0m[1m[32mtest[0m test_ollama_compress_success [0m[1m[32m... ok[0m
+[0m[1m[32mtest[0m test_ollama_compress_success [0m[1m[32m... ok[0m
+[0m[1m[32mtest[0m test_ollama_timeout_fallback [0m[1m[32m... ok[0m
+[0m[1m[32mtest[0m test_ollama_timeout_fallback [0m[1m[32m... ok[0m
+[0m[1m[32mtest[0m test_ollama_503_fallback [0m[1m[32m... ok[0m
+[0m[1m[32mtest[0m test_ollama_model_not_found [0m[1m[32m... ok[0m
+[0m[1m[32mtest[0m test_ollama_model_not_found [0m[1m[32m... ok[0m
+[0m[1m[32mtest[0m test_ollama_compression_ratio_preserved [0m[1m[32m... ok[0m
+[0m[1m[32mtest[0m test_ollama_compression_ratio_preserved [0m[1m[32m... ok[0m
+[0m[1m[32mtest[0m test_ollama_prompt_injection_prevented [0m[1m[32m... ok[0m
+[0m[1m[32mtest[0m test_ollama_prompt_injection_prevented [0m[1m[32m... ok[0m
+[0m[1m[32mtest[0m test_ollama_streaming_response [0m[1m[32m... ok[0m
+[0m[1m[32mtest[0m test_ollama_streaming_response [0m[1m[32m... ok[0m
+[0m[1m[32mtest[0m test_ollama_empty_response_fallback [0m[1m[32m... ok[0m
+
+[1mtest result:[0m [0m[1m[32mok[0m. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.58s
+
+[0m[1m[32m     Running[0m tests/integration/snapshot_tests.rs (target/debug/deps/snapshot_tests-d4e5f6a7b8c9)
+[0m[1m[32m     Running[0m tests/integration/snapshot_tests.rs (target/debug/deps/snapshot_tests-d4e5f6a7b8c9)
+
+running 6 tests
+[0m[1m[32mtest[0m test_snapshot_cargo_compressed_output [0m[1m[32m... ok[0m
+[0m[1m[32mtest[0m test_snapshot_cargo_compressed_output [0m[1m[32m... ok[0m
+[0m[1m[32mtest[0m test_snapshot_tsc_compressed_output [0m[1m[32m... ok[0m
+[0m[1m[32mtest[0m test_snapshot_vitest_compressed_output [0m[1m[32m... ok[0m
+[0m[1m[32mtest[0m test_snapshot_vitest_compressed_output [0m[1m[32m... ok[0m
+[0m[1m[32mtest[0m test_snapshot_docker_compressed_output [0m[1m[32m... ok[0m
+[0m[1m[32mtest[0m test_snapshot_docker_compressed_output [0m[1m[32m... ok[0m
+[0m[1m[32mtest[0m test_snapshot_next_build_compressed_output [0m[1m[32m... ok[0m
+[0m[1m[32mtest[0m test_snapshot_next_build_compressed_output [0m[1m[32m... ok[0m
+
+[1mtest result:[0m [0m[1m[32mok[0m. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.09s
+
+[0m[32mDOCTEST[0m ntk
+running 0 tests
+[1mtest result:[0m [0m[1m[32mok[0m. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+[0m[1m[32m   Compiling[0m ntk v0.2.0 (/home/dev/projects/ntk)
+[0m[1m[32m   Compiling[0m ntk v0.2.0 (/home/dev/projects/ntk)
+[0m[1m[32m   Compiling[0m ntk v0.2.0 (/home/dev/projects/ntk)
+[0m[1m[32m   Compiling[0m ntk v0.2.0 (/home/dev/projects/ntk)
+[0m[1m[32m   Compiling[0m axum v0.7.5
+[0m[1m[32m   Compiling[0m axum v0.7.5
+[0m[1m[32m   Compiling[0m tokio v1.38.0
+[0m[1m[32m   Compiling[0m tokio v1.38.0
+[0m[1m[32m   Compiling[0m tokio v1.38.0
+[0m[1m[32m   Compiling[0m serde v1.0.203
+[0m[1m[32m   Compiling[0m serde v1.0.203
+[0m[1m[32m   Compiling[0m serde_json v1.0.117
+[0m[1m[32m   Compiling[0m serde_json v1.0.117
+[0m[1m[32m   Compiling[0m tiktoken-rs v0.5.9
+[0m[1m[32m   Compiling[0m strip-ansi-escapes v0.2.0
+[0m[1m[32m   Compiling[0m strip-ansi-escapes v0.2.0
+[0m[1m[32m   Compiling[0m sqlx v0.8.2
+[0m[1m[32m   Compiling[0m sqlx v0.8.2
+[0m[1m[32m   Compiling[0m sqlx v0.8.2
+[0m[1m[32m   Compiling[0m clap v4.5.8
+[0m[1m[32m   Compiling[0m clap v4.5.8
+[0m[1m[32m   Compiling[0m anyhow v1.0.86
+[0m[1m[32m   Compiling[0m reqwest v0.11.27
+[0m[1m[32m   Compiling[0m reqwest v0.11.27
+[0m[1m[32m   Compiling[0m reqwest v0.11.27
+[0m[1m[32m   Compiling[0m tracing v0.1.40
+[0m[1m[32m   Compiling[0m tracing-subscriber v0.3.18
+[0m[1m[32m   Compiling[0m ratatui v0.28.0
+[0m[1m[32m   Compiling[0m candle-core v0.8.0
+[0m[1m[32m   Compiling[0m candle-core v0.8.0
+[0m[1m[32m   Compiling[0m candle-nn v0.8.0
+[0m[1m[32m   Compiling[0m candle-transformers v0.8.0
+[0m[1m[32m   Compiling[0m candle-transformers v0.8.0
+[0m[1m[32m   Compiling[0m uuid v1.9.1
+[0m[1m[32m   Compiling[0m chrono v0.4.38
+[0m[1m[32m   Compiling[0m sha2 v0.10.8
+[0m[1m[32m   Compiling[0m dirs v5.0.1
+[0m[1m[32m   Compiling[0m url v2.5.2
+[0m[1m[32m   Compiling[0m zip v2.1.6
+[0m[0m[1m[32m    Finished[0m test [unoptimized + debuginfo] target(s) in 91.03s

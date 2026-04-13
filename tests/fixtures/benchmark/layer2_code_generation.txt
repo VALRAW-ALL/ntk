@@ -1,0 +1,451 @@
+src/compressor/layer1_filter.rs:1:1: error[E0432]: unresolved import `crate::config::CompressionConfig`
+src/compressor/layer1_filter.rs:2:1: error[E0432]: unresolved import `crate::detector::OutputType`
+src/compressor/layer2_tokenizer.rs:1:1: error[E0432]: unresolved import `crate::config::CompressionConfig`
+src/compressor/layer3_inference.rs:1:1: error[E0432]: unresolved import `crate::config::ModelConfig`
+src/compressor/layer3_backend.rs:1:1: error[E0432]: unresolved import `crate::compressor::layer3_inference::Layer3Inference`
+
+error[E0412]: cannot find type `CompressionResult` in this scope
+  --> src/compressor/layer1_filter.rs:47:28
+   |
+47 |     pub fn compress(&self, input: &str) -> CompressionResult {
+   |                                            ^^^^^^^^^^^^^^^^^ not found in this scope
+   |
+help: consider importing this struct
+   |
+1  | use crate::server::CompressionResult;
+   |
+
+error[E0412]: cannot find type `CompressionResult` in this scope
+  --> src/compressor/layer2_tokenizer.rs:62:28
+   |
+62 |     pub fn compress(&self, input: &str) -> CompressionResult {
+   |                                            ^^^^^^^^^^^^^^^^^ not found in this scope
+
+error[E0412]: cannot find type `OutputType` in this scope
+  --> src/compressor/layer3_inference.rs:31:43
+   |
+31 |     pub async fn compress(&self, input: &str, output_type: OutputType) -> anyhow::Result<String> {
+   |                                               ^^^^^^^^^^ not found in this scope
+
+error[E0277]: the trait bound `Layer1Filter: Send` is not satisfied
+  --> src/server.rs:88:14
+   |
+88 |         .route("/compress", post(compress_handler))
+   |              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ `Layer1Filter` cannot be shared between threads safely
+   |
+   = help: the trait `Send` is not implemented for `Layer1Filter`
+   = note: required for `Arc<Layer1Filter>` to implement `Send`
+
+error[E0277]: the trait bound `Layer2Tokenizer: Sync` is not satisfied
+  --> src/server.rs:89:14
+   |
+89 |         .route("/metrics", get(metrics_handler))
+   |              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ `Layer2Tokenizer` cannot be shared between threads safely
+   |
+   = help: the trait `Sync` is not implemented for `Layer2Tokenizer`
+
+error[E0308]: mismatched types
+  --> src/compressor/layer3_inference.rs:104:9
+   |
+103|     async fn call_ollama(&self, prompt: &str) -> anyhow::Result<String> {
+104|         Ok(response.text().await?)
+   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^ expected `String`, found `Response`
+   |
+   = note: `Response` and `String` have different sizes
+
+error[E0502]: cannot borrow `self.config` as mutable because it is also borrowed as immutable
+  --> src/config.rs:78:9
+   |
+76 |     let threshold = self.config.compression.inference_threshold_tokens;
+   |                     ----------- immutable borrow occurs here
+77 |     if threshold > 0 {
+78 |         self.config.model.timeout_ms = 2000;
+   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ mutable borrow occurs here
+79 |     }
+   |     - immutable borrow later used here
+
+error[E0505]: cannot move out of `config` because it is borrowed
+  --> src/main.rs:44:21
+   |
+42 |     let cfg_ref = &config;
+   |                    ------ borrow of `config` occurs here
+43 |     tokio::spawn(async move {
+44 |         start_daemon(config).await
+   |                      ^^^^^^ move out of `config` occurs here
+45 |     });
+   |     - borrow later used here
+
+warning: unused variable: `session_id`
+  --> src/server.rs:112:9
+   |
+112|         let session_id = headers.get("x-session-id");
+   |             ^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_session_id`
+   |
+   = note: `#[warn(unused_variables)]` on by default
+
+warning: unused variable: `session_id`
+  --> src/server.rs:112:9
+
+warning: unused variable: `session_id`
+  --> src/server.rs:112:9
+
+warning: dead code: `LayerDistribution`
+  --> src/metrics.rs:23:5
+   |
+23 |     pub struct LayerDistribution {
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ dead code
+
+warning: dead code: `LayerDistribution`
+  --> src/metrics.rs:23:5
+
+warning: field `layer3_avg_ms` is never read
+  --> src/metrics.rs:31:9
+   |
+31 |         layer3_avg_ms: f64,
+   |         ^^^^^^^^^^^^^ field `layer3_avg_ms` is never read
+
+warning: field `layer3_avg_ms` is never read
+  --> src/metrics.rs:31:9
+
+warning: method `to_compact_string` is never used
+  --> src/output/table.rs:87:12
+   |
+87 |     fn to_compact_string(&self) -> String {
+   |        ^^^^^^^^^^^^^^^^^ method is never used
+
+warning: unused import: `std::sync::Arc`
+  --> src/server.rs:4:5
+   |
+4  | use std::sync::Arc;
+   |     ^^^^^^^^^^^^^^ unused import
+
+warning: unused import: `std::sync::Arc`
+  --> src/server.rs:4:5
+
+warning: unused import: `tracing::instrument`
+  --> src/compressor/layer3_inference.rs:6:5
+   |
+6  | use tracing::instrument;
+   |     ^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `tracing::instrument`
+  --> src/compressor/layer3_inference.rs:6:5
+
+warning: variable `compressed` does not need to be mutable
+  --> src/compressor/layer1_filter.rs:93:13
+   |
+93 |         let mut compressed = input.to_string();
+   |             ^^^ help: remove this `mut`: `compressed`
+
+warning: variable `compressed` does not need to be mutable
+  --> src/compressor/layer1_filter.rs:93:13
+
+src/server.rs:14:5: warning: unused import: `axum::http::StatusCode`
+  --> src/server.rs:14:5
+   |
+14 | use axum::http::StatusCode;
+   |     ^^^^^^^^^^^^^^^^^^^^^^
+
+src/installer.rs:88:1: warning: function `patch_settings` is never used outside of tests
+  --> src/installer.rs:88:1
+   |
+88 | pub fn patch_settings(path: &Path, hook_command: &str) -> anyhow::Result<()> {
+   |                                                            ^^^^^^^^^^^^^^^^ this function has a restrictive visibility
+
+src/installer.rs:88:1: warning: function `patch_settings` is never used outside of tests
+
+src/gpu.rs:12:1: warning: unused import: `std::process::Command`
+src/gpu.rs:12:1: warning: unused import: `std::process::Command`
+src/gpu.rs:12:1: warning: unused import: `std::process::Command`
+
+src/telemetry.rs:67:18: warning: unused variable: `salt_path`
+  --> src/telemetry.rs:67:18
+   |
+67 |         let salt_path = dirs::home_dir()
+   |                   ^^^^^^^^^ help: if this is intentional, prefix with underscore: `_salt_path`
+
+src/telemetry.rs:67:18: warning: unused variable: `salt_path`
+src/telemetry.rs:67:18: warning: unused variable: `salt_path`
+
+error[E0716]: temporary value dropped while borrowed
+   --> src/compressor/layer2_tokenizer.rs:154:22
+    |
+154 |         let bpe = tiktoken_rs::cl100k_base().unwrap();
+    |                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ creates a temporary value
+155 |         let tokens = bpe.encode_with_special_tokens(text);
+    |                      --- temporary value is borrowed here
+...
+161 |     }
+    |     ^ temporary value is dropped here while still borrowed
+    |
+    = note: consider using a `let` binding to give it a longer lifetime
+
+error[E0716]: temporary value dropped while borrowed
+   --> src/compressor/layer2_tokenizer.rs:154:22
+error[E0716]: temporary value dropped while borrowed
+   --> src/compressor/layer2_tokenizer.rs:154:22
+
+error[E0499]: cannot borrow `metrics` as mutable more than once at a time
+   --> src/metrics.rs:201:9
+    |
+198 |         metrics.record_compression(original, compressed, layer, duration);
+    |         ------- first mutable borrow occurs here
+...
+201 |         metrics.flush_to_db().await?;
+    |         ^^^^^^^ second mutable borrow occurs here
+
+error[E0502]: cannot borrow `db` as mutable because it is also borrowed as immutable
+   --> src/metrics.rs:244:9
+    |
+241 |         let query = db.prepare("SELECT * FROM sessions ORDER BY ts DESC LIMIT ?");
+    |                     -- immutable borrow occurs here
+...
+244 |         db.execute(&query, params![limit])?;
+    |         ^^^^^^^^^^ mutable borrow occurs here
+
+error[E0507]: cannot move out of `*config` which is behind a shared reference
+   --> src/server.rs:62:27
+    |
+62  |     let compression_config = *state.config.compression;
+    |                               ^^^^^^^^^^^^^^^^^^^^^^^^^ move occurs because `*state.config.compression` has type `CompressionConfig`, which does not implement the `Copy` trait
+
+error[E0507]: cannot move out of `*config` which is behind a shared reference
+   --> src/server.rs:62:27
+
+src/compressor/layer3_backend.rs:44:5: error[E0004]: non-exhaustive patterns: `BackendKind::LlamaCpp` not covered
+  --> src/compressor/layer3_backend.rs:44:15
+   |
+44 |         match self.kind {
+   |               ^^^^^^^^^ pattern `BackendKind::LlamaCpp` not covered
+   |
+   = help: ensure that all possible cases are being handled, possibly by adding wildcards or more match arms
+
+src/compressor/layer3_backend.rs:44:5: error[E0004]: non-exhaustive patterns: `BackendKind::LlamaCpp` not covered
+src/compressor/layer3_backend.rs:44:5: error[E0004]: non-exhaustive patterns: `BackendKind::LlamaCpp` not covered
+
+error[E0382]: borrow of moved value: `input`
+   --> src/compressor/layer1_filter.rs:112:28
+    |
+108 |     pub fn apply(&self, input: String) -> String {
+    |                         ----- move occurs because `input` has type `String`, which does not implement the `Copy` trait
+109 |         let stripped = self.strip_ansi(input);
+    |                                        ----- value moved here
+...
+112 |         let deduped = self.dedup_lines(input);
+    |                                        ^^^^^ value borrowed here after move
+
+error[E0382]: borrow of moved value: `input`
+   --> src/compressor/layer1_filter.rs:112:28
+
+error[E0382]: borrow of moved value: `input`
+   --> src/compressor/layer1_filter.rs:112:28
+
+error[E0382]: use of moved value: `response`
+   --> src/compressor/layer3_inference.rs:87:32
+    |
+84  |     let response = client.post(&self.ollama_url).json(&payload).send().await?;
+    |         -------- move occurs because `response` has type `reqwest::Response`
+...
+87  |     let status = response.status();
+    |                  -------- value moved here
+88  |     let body = response.json::<OllamaResponse>().await?;
+    |                ^^^^^^^^ value used here after move
+
+warning: clippy::unwrap_used: used `unwrap()` on a `Result` value
+   --> src/compressor/layer2_tokenizer.rs:154:43
+    |
+154 |         let bpe = tiktoken_rs::cl100k_base().unwrap();
+    |                                              ^^^^^^^^
+    |
+    = note: if this value is an `Err`, it will panic
+    = help: use `?` or another method to handle the `Err`
+
+warning: clippy::unwrap_used: used `unwrap()` on a `Result` value
+   --> src/compressor/layer2_tokenizer.rs:154:43
+warning: clippy::unwrap_used: used `unwrap()` on a `Result` value
+   --> src/compressor/layer2_tokenizer.rs:154:43
+
+warning: clippy::expect_used: used `expect()` on an `Option` value
+   --> src/config.rs:34:52
+    |
+34  |     let home = dirs::home_dir().expect("cannot find home dir");
+    |                                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: use `ok_or()` or another method to handle the `None`
+
+warning: clippy::expect_used: used `expect()` on an `Option` value
+   --> src/config.rs:34:52
+warning: clippy::expect_used: used `expect()` on an `Option` value
+   --> src/config.rs:34:52
+
+warning: clippy::arithmetic_side_effects: arithmetic operation that can potentially have unexpected side effects
+   --> src/metrics.rs:178:42
+    |
+178 |         let ratio = (original - compressed) / original * 100;
+    |                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: use checked arithmetic or explicitly handle the side effects
+
+warning: clippy::arithmetic_side_effects: arithmetic operation that can potentially have unexpected side effects
+   --> src/metrics.rs:178:42
+
+error: aborting due to 14 previous errors; 27 warnings emitted
+
+For more information about this error, try `rustc --explain E0432`.
+For more information about this error, try `rustc --explain E0412`.
+For more information about this error, try `rustc --explain E0277`.
+For more information about this error, try `rustc --explain E0308`.
+For more information about this error, try `rustc --explain E0502`.
+For more information about this error, try `rustc --explain E0505`.
+For more information about this error, try `rustc --explain E0716`.
+For more information about this error, try `rustc --explain E0499`.
+For more information about this error, try `rustc --explain E0507`.
+For more information about this error, try `rustc --explain E0004`.
+For more information about this error, try `rustc --explain E0382`.
+
+--- TypeScript errors (tsc --noEmit) ---
+
+src/hooks/useCompression.ts:14:7 - error TS2322: Type 'string | undefined' is not assignable to type 'string'.
+  14       sessionId: headers.get('x-session-id'),
+           ~~~~~~~~~
+  src/hooks/useCompression.ts:8:5
+    8     sessionId: string;
+          ~~~~~~~~~ The expected type comes from property 'sessionId' which is declared here on type 'CompressionRequest'
+
+src/hooks/useCompression.ts:22:3 - error TS2345: Argument of type '{ method: string; headers: Headers; body: string; }' is not assignable to parameter of type 'RequestInit'.
+  22   const res = await fetch(NTK_ENDPOINT, {
+       ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+  23     method: 'POST',
+  24     headers,
+  25     body: JSON.stringify(payload),
+  26   });
+  Property 'duplex' is missing in type '{ method: string; headers: Headers; body: string; }' but required in type '{ duplex: "half"; }'.
+
+src/components/MetricsDashboard.tsx:44:5 - error TS2741: Property 'onRefresh' is missing in type '{ data: MetricsData; }' but required in type 'MetricsDashboardProps'.
+  44     <MetricsDashboard data={metrics} />
+         ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+  src/components/MetricsDashboard.tsx:12:3
+    12   onRefresh: () => void;
+         ~~~~~~~~~
+
+src/components/MetricsDashboard.tsx:44:5 - error TS2741: Property 'onRefresh' is missing in type '{ data: MetricsData; }' but required in type 'MetricsDashboardProps'.
+src/components/MetricsDashboard.tsx:44:5 - error TS2741: Property 'onRefresh' is missing in type '{ data: MetricsData; }' but required in type 'MetricsDashboardProps'.
+
+src/components/SparklineChart.tsx:31:9 - error TS2339: Property 'toFixed' does not exist on type 'never'.
+  31         {value.toFixed(2)}%
+             ~~~~~~~~~~~~~~~~~~~
+src/components/SparklineChart.tsx:31:9 - error TS2339: Property 'toFixed' does not exist on type 'never'.
+src/components/SparklineChart.tsx:31:9 - error TS2339: Property 'toFixed' does not exist on type 'never'.
+
+src/api/ntkClient.ts:67:23 - error TS2532: Object is possibly 'undefined'.
+  67     const latest = releases[0].tag_name;
+                        ~~~~~~~~~~
+src/api/ntkClient.ts:67:23 - error TS2532: Object is possibly 'undefined'.
+src/api/ntkClient.ts:67:23 - error TS2532: Object is possibly 'undefined'.
+
+src/api/ntkClient.ts:89:18 - error TS2304: Cannot find name 'CompressionLayer'.
+  89   layer: CompressionLayer;
+              ~~~~~~~~~~~~~~~~
+src/api/ntkClient.ts:89:18 - error TS2304: Cannot find name 'CompressionLayer'.
+src/api/ntkClient.ts:89:18 - error TS2304: Cannot find name 'CompressionLayer'.
+
+src/utils/tokenCounter.ts:12:34 - error TS7006: Parameter 'text' implicitly has an 'any' type.
+  12   export function countTokens(text) {
+                                   ~~~~
+src/utils/tokenCounter.ts:12:34 - error TS7006: Parameter 'text' implicitly has an 'any' type.
+src/utils/tokenCounter.ts:12:34 - error TS7006: Parameter 'text' implicitly has an 'any' type.
+
+src/utils/tokenCounter.ts:18:5 - error TS2367: This comparison appears to be unintentional because the types 'string' and 'number' have no overlap.
+  18   if (text.length === 0n) {
+       ~~~~~~~~~~~~~~~~~~~~~~~~~
+src/utils/tokenCounter.ts:18:5 - error TS2367: This comparison appears to be unintentional because the types 'string' and 'number' have no overlap.
+
+src/pages/Dashboard.tsx:103:11 - error TS2322: Type 'CompressionRecord[]' is not assignable to type 'SessionRecord[]'.
+  103   records={compressionHistory}
+              ~~~~~~~~~~~~~~~~~~~~~
+  Type 'CompressionRecord' is not assignable to type 'SessionRecord'.
+    Types of property 'layer' are incompatible.
+      Type 'string' is not assignable to type '"L1" | "L2" | "L3"'.
+
+src/pages/Dashboard.tsx:103:11 - error TS2322: Type 'CompressionRecord[]' is not assignable to type 'SessionRecord[]'.
+src/pages/Dashboard.tsx:103:11 - error TS2322: Type 'CompressionRecord[]' is not assignable to type 'SessionRecord[]'.
+
+src/pages/Dashboard.tsx:148:19 - error TS18048: 'session' is possibly 'undefined'.
+  148     const ratio = session.compressionRatio * 100;
+                        ~~~~~~~
+src/pages/Dashboard.tsx:148:19 - error TS18048: 'session' is possibly 'undefined'.
+
+src/pages/Dashboard.tsx:177:32 - error TS2551: Property 'totalTokensSaved' does not exist on type 'MetricsSummary'. Did you mean 'tokensSaved'?
+  177     const saved = summary.totalTokensSaved;
+                                ~~~~~~~~~~~~~~~~
+  src/types/metrics.ts:34:3
+    34   tokensSaved: number;
+         ~~~~~~~~~~~ 'tokensSaved' is declared here.
+
+src/pages/Dashboard.tsx:177:32 - error TS2551: Property 'totalTokensSaved' does not exist on type 'MetricsSummary'. Did you mean 'tokensSaved'?
+
+src/store/metricsSlice.ts:22:5 - error TS2322: Type 'AsyncThunk<MetricsData, void, AsyncThunkConfig>' is not assignable to type 'Reducer<MetricsState, AnyAction>'.
+  22     fetchMetrics,
+         ~~~~~~~~~~~~
+
+src/store/metricsSlice.ts:22:5 - error TS2322: Type 'AsyncThunk<MetricsData, void, AsyncThunkConfig>' is not assignable to type 'Reducer<MetricsState, AnyAction>'.
+src/store/metricsSlice.ts:22:5 - error TS2322: Type 'AsyncThunk<MetricsData, void, AsyncThunkConfig>' is not assignable to type 'Reducer<MetricsState, AnyAction>'.
+
+Found 17 errors.
+
+--- Next.js build output ---
+
+info  - Loaded env from /home/dev/projects/ntk-dashboard/.env.local
+info  - Loaded env from /home/dev/projects/ntk-dashboard/.env.local
+info  - Loaded env from /home/dev/projects/ntk-dashboard/.env.local
+warn  - Fast Refresh had to perform a full reload due to a runtime error.
+warn  - Fast Refresh had to perform a full reload due to a runtime error.
+warn  - Fast Refresh had to perform a full reload due to a runtime error.
+event - compiled client and server successfully in 4.2s (348 modules)
+event - compiled client and server successfully in 4.2s (348 modules)
+event - compiled client and server successfully in 4.2s (348 modules)
+wait  - compiling /api/compress (client and server)...
+wait  - compiling /api/compress (client and server)...
+event - compiled successfully in 847ms (112 modules)
+event - compiled successfully in 847ms (112 modules)
+wait  - compiling /dashboard (client and server)...
+event - compiled successfully in 1.23s (241 modules)
+wait  - compiling /metrics (client and server)...
+event - compiled successfully in 934ms (187 modules)
+wait  - compiling /metrics (client and server)...
+event - compiled successfully in 934ms (187 modules)
+info  - Generating static pages (0/8)
+info  - Generating static pages (2/8)
+info  - Generating static pages (4/8)
+info  - Generating static pages (6/8)
+info  - Generating static pages (8/8)
+info  - Generating static pages (0/8)
+info  - Generating static pages (2/8)
+info  - Generating static pages (4/8)
+info  - Generating static pages (6/8)
+info  - Generating static pages (8/8)
+info  - Finalizing page optimization
+info  - Finalizing page optimization
+
+Route (pages)                              Size     First Load JS
++-- / (Static)                            4.82 kB          92.3 kB
++-- /dashboard (SSR)                      12.4 kB           183 kB
++-- /dashboard (SSR)                      12.4 kB           183 kB
++-- /metrics (SSR)                        8.71 kB           147 kB
++-- /metrics (SSR)                        8.71 kB           147 kB
++-- /api/compress                           412 B          78.1 kB
++-- /api/health                             121 B          78.1 kB
++-- /api/records                          1.24 kB          78.1 kB
++-- /api/records                          1.24 kB          78.1 kB
++-- /404 (Static)                         2.12 kB          79.4 kB
++-- /500 (Static)                         1.98 kB          79.4 kB
++ First Load JS shared by all             78.1 kB
+  +-- chunks/framework-abc123.js          45.2 kB
+  +-- chunks/framework-abc123.js          45.2 kB
+  +-- chunks/main-def456.js              28.9 kB
+  +-- chunks/pages/_app-ghi789.js         3.56 kB
+  +-- chunks/webpack-jkl012.js             492 B
+  +-- chunks/webpack-jkl012.js             492 B
+
+info  - Build completed in 34.7s
+info  - Build completed in 34.7s
