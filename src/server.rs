@@ -35,6 +35,8 @@ pub struct AppState {
     pub addr: String,
     /// GPU backend name — served via /state.
     pub backend_name: String,
+    /// Model info string — "phi3:mini q5_k_m [GPU]" — served via /state.
+    pub model_info: String,
 }
 
 // ---------------------------------------------------------------------------
@@ -272,6 +274,7 @@ struct StateResponse {
     uptime_secs: u64,
     addr: String,
     backend_name: String,
+    model_info: String,
 }
 
 async fn handle_state(
@@ -296,5 +299,6 @@ async fn handle_state(
         uptime_secs: state.started_at.elapsed().as_secs(),
         addr: state.addr.clone(),
         backend_name: state.backend_name.clone(),
+        model_info: state.model_info.clone(),
     }))
 }

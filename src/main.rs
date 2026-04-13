@@ -336,6 +336,14 @@ async fn async_run_daemon(gpu: bool) -> Result<()> {
     let metrics = Arc::new(Mutex::new(ntk::metrics::MetricsStore::new()));
     let backend_name = backend.name().to_owned();
 
+    // Build a human-readable model info line shown in the dashboard header.
+    // Format: "<model_name> <quantization>  [GPU] or [CPU]"
+    let compute_mode = if config.model.gpu_layers != 0 { "GPU" } else { "CPU" };
+    let model_info = format!(
+        "{} {}  [{}]",
+        config.model.model_name, config.model.quantization, compute_mode
+    );
+
     let state = ntk::server::AppState {
         config: Arc::new(config),
         metrics: Arc::clone(&metrics),
@@ -345,6 +353,7 @@ async fn async_run_daemon(gpu: bool) -> Result<()> {
         warn_log: Arc::clone(&warn_buf),
         addr: addr.clone(),
         backend_name: backend_name.clone(),
+        model_info: model_info.clone(),
     };
 
     let router = ntk::server::build_router(state);
@@ -368,6 +377,7 @@ async fn async_run_daemon(gpu: bool) -> Result<()> {
         started_at,
         addr.clone(),
         backend_name,
+        model_info,
         shutdown_rx,
         dashboard_trigger_tx,
     ));

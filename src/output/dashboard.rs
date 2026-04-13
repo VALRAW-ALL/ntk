@@ -159,6 +159,7 @@ pub async fn run_live_dashboard(
     started_at: Instant,
     addr: String,
     backend_name: String,
+    model_info: String,
     shutdown: watch::Receiver<bool>,
     // Sender so the dashboard can trigger server shutdown when Ctrl+C is
     // pressed as a key event (raw mode suppresses the normal SIGINT path).
@@ -189,6 +190,7 @@ pub async fn run_live_dashboard(
         started_at,
         addr,
         backend_name,
+        model_info,
         shutdown,
         shutdown_trigger,
     )
@@ -214,6 +216,7 @@ async fn dashboard_loop(
     started_at: Instant,
     addr: String,
     backend_name: String,
+    model_info: String,
     mut shutdown: watch::Receiver<bool>,
     shutdown_trigger: watch::Sender<bool>,
 ) -> Result<()> {
@@ -261,8 +264,9 @@ async fn dashboard_loop(
         let uptime = started_at.elapsed();
         let addr = addr.as_str();
         let backend_name = backend_name.as_str();
+        let model_info = model_info.as_str();
 
-        terminal.draw(|f| render(f, &summary, &recent, &warns, uptime, addr, backend_name))?;
+        terminal.draw(|f| render(f, &summary, &recent, &warns, uptime, addr, backend_name, model_info))?;
     }
 
     Ok(())
@@ -280,6 +284,7 @@ fn render(
     uptime: Duration,
     addr: &str,
     backend_name: &str,
+    model_info: &str,
 ) {
     let area = f.area();
 
@@ -293,7 +298,7 @@ fn render(
         ])
         .split(area);
 
-    render_header(f, chunks[0], uptime, addr, backend_name);
+    render_header(f, chunks[0], uptime, addr, backend_name, model_info);
     render_metrics(f, chunks[1], summary);
     render_logs(f, chunks[2], recent);
     render_warn_log(f, chunks[3], warns);
@@ -309,6 +314,7 @@ fn render_header(
     uptime: Duration,
     addr: &str,
     backend_name: &str,
+    model_info: &str,
 ) {
     let version = env!("CARGO_PKG_VERSION");
     let uptime_str = fmt_uptime(uptime);
@@ -320,7 +326,7 @@ fn render_header(
         "  Neural Token Killer".to_string(),
         format!("  v{version}  •  {addr}"),
         format!("  Uptime: {uptime_str}"),
-        format!("  Backend: {backend_name}"),
+        format!("  Backend: {backend_name}   Model: {model_info}"),
         String::new(),
     ];
 
@@ -602,6 +608,8 @@ pub struct DaemonState {
     pub uptime_secs: u64,
     pub addr: String,
     pub backend_name: String,
+    #[serde(default)]
+    pub model_info: String,
 }
 
 /// Connect to a running daemon and render the live TUI by polling `/state`.
@@ -673,6 +681,7 @@ async fn attach_loop(terminal: &mut Terminal<CrosstermBackend<Stdout>>, url: Str
                     uptime,
                     &state.addr,
                     &state.backend_name,
+                    &state.model_info,
                 )
             })?;
         } else {
