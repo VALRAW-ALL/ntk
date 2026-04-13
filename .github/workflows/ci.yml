@@ -87,6 +87,7 @@ jobs:
       # NTK_SKIP_OLLAMA_INSTALL prevents ntk init from attempting to download
       # Ollama during the install/uninstall tests (which would take minutes in CI).
       - name: CLI + Ollama mock tests
+        shell: bash
         env:
           NTK_SKIP_OLLAMA_INSTALL: "1"
         run: |

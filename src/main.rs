@@ -230,7 +230,8 @@ fn run_init(
     installer.run()?;
 
     // hook_only skips config.json, so model setup is not meaningful there.
-    if !hook_only {
+    // auto_patch implies non-interactive mode — skip the interactive wizard.
+    if !hook_only && !auto_patch {
         run_model_setup()?;
     }
 
