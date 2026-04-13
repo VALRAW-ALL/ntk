@@ -86,7 +86,8 @@ fn test_ntk_install_creates_hook() {
     // NTK_HOME overrides dirs::home_dir() in the installer — works cross-platform.
     let mut cmd = ntk();
     cmd.args(["init", "--global", "--auto-patch"])
-        .env("NTK_HOME", home_path);
+        .env("NTK_HOME", home_path)
+        .env("NTK_SKIP_OLLAMA_INSTALL", "1");
 
     let output = cmd.output().expect("failed to run ntk init");
     let stdout = String::from_utf8_lossy(&output.stdout);
@@ -139,6 +140,7 @@ fn test_ntk_uninstall_removes_hook() {
     ntk()
         .args(["init", "--global", "--auto-patch"])
         .env("NTK_HOME", home_path)
+        .env("NTK_SKIP_OLLAMA_INSTALL", "1")
         .output()
         .expect("install failed");
 
@@ -154,6 +156,7 @@ fn test_ntk_uninstall_removes_hook() {
     let output = ntk()
         .args(["init", "--global", "--uninstall"])
         .env("NTK_HOME", home_path)
+        .env("NTK_SKIP_OLLAMA_INSTALL", "1")
         .output()
         .expect("uninstall failed");
 

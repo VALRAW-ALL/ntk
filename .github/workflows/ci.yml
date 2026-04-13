@@ -84,7 +84,11 @@ jobs:
         run: cargo test --test snapshot_tests
 
       # CLI binary tests require the binary to be built first.
+      # NTK_SKIP_OLLAMA_INSTALL prevents ntk init from attempting to download
+      # Ollama during the install/uninstall tests (which would take minutes in CI).
       - name: CLI + Ollama mock tests
+        env:
+          NTK_SKIP_OLLAMA_INSTALL: "1"
         run: |
           cargo test --test cli_tests
           cargo test --test ollama_mock_tests

@@ -610,6 +610,13 @@ fn shell_rc_files(shell: &str) -> Vec<PathBuf> {
 /// Detect, install (if missing), and configure Ollama in PATH.
 /// Tries silent installation via the platform's package manager or official installer.
 fn setup_ollama_path() -> Result<String> {
+    // Skip installation in test/CI environments.
+    if std::env::var("NTK_SKIP_OLLAMA_INSTALL").is_ok() {
+        return Err(anyhow!(
+            "not found — Layer 3 inference disabled.\n    Install Ollama later: https://ollama.com/download\n    Then run: ntk model pull"
+        ));
+    }
+
     // Already in PATH — nothing to do.
     if ollama_in_path() {
         return Ok("already in PATH".to_owned());
