@@ -37,14 +37,6 @@ jobs:
           fi
 
   # ── 2. Build cross-platform (CPU + GPU por plataforma) ────────────────────
-  #
-  # Dimensão `kind`:
-  #   cpu → binário magro, sem Candle. GPU só via Ollama/llama-server externos.
-  #   gpu → Candle in-process.
-  #         • Linux/Windows x86_64 → CUDA (NVIDIA)
-  #         • macOS aarch64         → Metal (Apple Silicon)
-  #
-  # Nome final do artefato: ntk-<os>-<arch>-<kind>[.exe]
   build:
     name: Build ${{ matrix.artifact }}
     needs: check-version
@@ -62,9 +54,10 @@ jobs:
             kind: cpu
             features: sqlite-bundled
 
-          # --- Linux x86_64 GPU (CUDA) — runs inside the official NVIDIA
-          #     CUDA dev container so every header, library, nvcc and linker
-          #     stub is already present. No manual installation needed.
+          # --- Linux x86_64 GPU (CUDA) ─────────────────────────────────────
+          # Runs inside the official NVIDIA devel image: nvcc, all CUDA
+          # headers (CUB, Thrust, cudart, cublas, curand), g++ and the
+          # libcuda linker stub are all pre-installed. No manual install needed.
           - runner: ubuntu-latest
             container: nvidia/cuda:12.5.1-devel-ubuntu22.04
             target: x86_64-unknown-linux-gnu
@@ -73,7 +66,7 @@ jobs:
             features: sqlite-bundled,cuda
             cuda_linux: true
 
-          # --- Linux aarch64 (sem GPU — nenhum backend Candle compatível) ---
+          # --- Linux aarch64 ------------------------------------------------
           - runner: ubuntu-latest
             target: aarch64-unknown-linux-gnu
             artifact: ntk-linux-aarch64-cpu
@@ -81,7 +74,7 @@ jobs:
             features: sqlite-bundled
             linker: gcc-aarch64-linux-gnu
 
-          # --- macOS Intel (sem GPU — Candle Metal alvo é Apple Silicon) ----
+          # --- macOS Intel --------------------------------------------------
           - runner: macos-latest
             target: x86_64-apple-darwin
             artifact: ntk-darwin-x86_64-cpu
@@ -108,8 +101,9 @@ jobs:
             kind: cpu
             features: sqlite-bundled
 
-          # --- Windows x86_64 GPU (CUDA) — windows-latest has CUDA 12.5
-          #     pre-installed; we just export the env vars.
+          # --- Windows x86_64 GPU (CUDA) ─────────────────────────────────
+          # windows-latest does NOT ship CUDA; Jimver installs it.
+          # visual_studio_integration is required so nvcc finds cl.exe.
           - runner: windows-latest
             target: x86_64-pc-windows-msvc
             artifact: ntk-windows-x86_64-gpu.exe
@@ -120,61 +114,65 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # The CUDA Linux container (nvidia/cuda devel image) ships without curl
-      # or ca-certificates; install the bare minimum for rustup.
-      - name: Bootstrap container deps (Linux CUDA container only)
+      # ── Linux CUDA container bootstrap ────────────────────────────────────
+      # The nvidia/cuda devel image ships without build-essential (g++) and
+      # curl. Both are required: g++ for nvcc to compile CUDA kernels (.cu),
+      # curl for rustup. CUDA_PATH + linker stub path are also exported here.
+      - name: Bootstrap (Linux CUDA container)
         if: matrix.cuda_linux == true
         shell: bash
         run: |
           apt-get update -qq
           apt-get install -y --no-install-recommends \
-            curl ca-certificates gcc pkg-config libssl-dev
-          # Export CUDA env vars for subsequent steps. The devel image sets
-          # CUDA_HOME but not CUDA_PATH (which cudarc/candle expect).
-          CUDA_DIR=$(dirname "$(which nvcc)")/../
-          CUDA_DIR=$(realpath "$CUDA_DIR")
-          echo "CUDA_PATH=$CUDA_DIR" >> $GITHUB_ENV
-          # Link-time stub for libcuda (driver API) — the CI runner has no
-          # physical GPU driver; NVIDIA ships a stub specifically for this.
-          echo "LIBRARY_PATH=$CUDA_DIR/lib64/stubs:${LIBRARY_PATH:-}" >> $GITHUB_ENV
-          echo "RUSTFLAGS=-L $CUDA_DIR/lib64/stubs" >> $GITHUB_ENV
+            curl ca-certificates build-essential pkg-config libssl-dev
+          CUDA=$(dirname "$(which nvcc)")/..
+          CUDA=$(realpath "$CUDA")
+          echo "CUDA_PATH=$CUDA"                      >> $GITHUB_ENV
+          # libcuda.so stub — CI runners have no physical GPU driver.
+          # LIBRARY_PATH is read by cc (C linker); RUSTFLAGS -L is read by
+          # rustc's own linker invocation (not inherited from LIBRARY_PATH).
+          echo "LIBRARY_PATH=$CUDA/lib64/stubs"       >> $GITHUB_ENV
+          echo "RUSTFLAGS=-L $CUDA/lib64/stubs"       >> $GITHUB_ENV
 
+      # ── Rust toolchain (all jobs) ─────────────────────────────────────────
       - name: Install Rust stable
         uses: dtolnay/rust-toolchain@stable
         with:
           targets: ${{ matrix.target }}
 
-      # taiki-e's action downloads a prebuilt tarball (~5 MB from CDN) and
-      # sets linker env vars automatically — much faster than apt-get install.
+      # ── aarch64 cross-toolchain ───────────────────────────────────────────
       - name: Install aarch64 cross-toolchain
         if: matrix.linker != ''
         uses: taiki-e/setup-cross-toolchain-action@v1
         with:
           target: ${{ matrix.target }}
 
-      # windows-latest ships CUDA 12.5 pre-installed at a fixed path.
-      # We only need to export the env vars so cargo / cudarc find it.
+      # ── Windows CUDA install ──────────────────────────────────────────────
+      # Jimver network-installs CUDA 12.5 (nvcc + dev libs + VS integration).
+      # `visual_studio_integration_12.5` is required so nvcc can locate
+      # cl.exe via the Windows SDK registry entries.
+      - name: Install CUDA 12.5 (Windows)
+        if: matrix.cuda_windows == true
+        uses: Jimver/cuda-toolkit@v0.2.24
+        id: cuda-toolkit
+        with:
+          cuda: '12.5.0'
+          method: 'network'
+          sub-packages: '["nvcc", "cudart", "cublas", "cublas_dev", "curand", "curand_dev", "visual_studio_integration"]'
+
+      # Export paths so Rust's linker (link.exe) and cudarc find CUDA.
       - name: Configure CUDA env (Windows)
         if: matrix.cuda_windows == true
         shell: pwsh
         run: |
-          $cudaRoot = 'C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v12.5'
-          if (-not (Test-Path "$cudaRoot\bin\nvcc.exe")) {
-            # Fallback: find any installed CUDA 12.x version
-            $cudaRoot = Get-ChildItem 'C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA' |
-              Where-Object { $_.Name -like 'v12.*' } |
-              Sort-Object Name -Descending |
-              Select-Object -First 1 -ExpandProperty FullName
-            if (-not $cudaRoot) { throw 'No CUDA 12.x found on runner' }
-            Write-Host "Using CUDA at: $cudaRoot"
-          }
-          "CUDA_PATH=$cudaRoot"         | Out-File $env:GITHUB_ENV -Append
-          "CUDA_PATH_V12_5=$cudaRoot"   | Out-File $env:GITHUB_ENV -Append
-          "$cudaRoot\bin"               | Out-File $env:GITHUB_PATH -Append
-          "$cudaRoot\libnvvp"           | Out-File $env:GITHUB_PATH -Append
-          # Expose import libs (cuda.lib, cublas.lib, …) to the MSVC linker.
-          "LIB=$cudaRoot\lib\x64;$env:LIB" | Out-File $env:GITHUB_ENV -Append
+          $cuda = '${{ steps.cuda-toolkit.outputs.CUDA_PATH }}'
+          if (-not $cuda) { $cuda = $env:CUDA_PATH }
+          Write-Host "CUDA_PATH = $cuda"
+          "$cuda\bin"      | Out-File $env:GITHUB_PATH -Append
+          "$cuda\libnvvp"  | Out-File $env:GITHUB_PATH -Append
+          "LIB=$cuda\lib\x64;$env:LIB" | Out-File $env:GITHUB_ENV -Append
 
+      # ── Cargo cache ───────────────────────────────────────────────────────
       - name: Cache cargo
         uses: actions/cache@v4
         with:
@@ -182,10 +180,11 @@ jobs:
             ~/.cargo/registry
             ~/.cargo/git
             target
-          key: ${{ matrix.runner }}-${{ matrix.target }}-${{ matrix.kind }}-release-${{ hashFiles('**/Cargo.lock') }}
+          key: ${{ matrix.runner }}-${{ matrix.target }}-${{ matrix.kind }}-${{ hashFiles('**/Cargo.lock') }}
           restore-keys: |
-            ${{ matrix.runner }}-${{ matrix.target }}-${{ matrix.kind }}-release-
+            ${{ matrix.runner }}-${{ matrix.target }}-${{ matrix.kind }}-
 
+      # ── Build ─────────────────────────────────────────────────────────────
       - name: Build
         shell: bash
         run: |
