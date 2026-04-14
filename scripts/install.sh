@@ -220,21 +220,28 @@ echo "  NTK installed to $DEST"
 echo ""
 
 if [ "${POST_INSTALL_NOTE:-}" = "AMD" ]; then
-    echo "  Next steps for AMD GPU inference:"
-    echo "    1. Install llama.cpp built with Vulkan:"
-    echo "         https://github.com/ggerganov/llama.cpp/releases"
-    echo "       Place 'llama-server' on your PATH (or ~/.ntk/bin/)."
-    echo "    2. Run:  ntk model setup   → choose 'llama.cpp' backend."
+    echo "  ⚠  AMD GPU note: inference uses llama-server + Vulkan (external)."
+    echo "     Install llama.cpp (Vulkan build) from:"
+    echo "       https://github.com/ggerganov/llama.cpp/releases"
+    echo "     Place 'llama-server' on your PATH (or ~/.ntk/bin/) before"
+    echo "     running 'ntk model setup' — choose 'llama.cpp' backend."
     echo ""
 fi
 
-echo "  Next: ntk init -g"
+# ---------------------------------------------------------------------------
+# Step 1 — ntk init -g  (register PostToolUse hook in Claude Code)
+# ---------------------------------------------------------------------------
+echo "  ── Step 1/2: Initializing NTK hook (ntk init -g) ──"
+echo ""
+ntk init -g
 echo ""
 
-# When executed via `curl ... | sh`, the shell exits as soon as the script
-# ends and the terminal window may close before the user reads the output.
-# Pause only when stdin is an interactive TTY (not a pipe).
-if [ -t 0 ]; then
-    printf "  Press Enter to close…"
-    read -r _
-fi
+# ---------------------------------------------------------------------------
+# Step 2 — ntk model setup  (configure backend + GPU)
+# ---------------------------------------------------------------------------
+echo "  ── Step 2/2: Configuring inference backend (ntk model setup) ──"
+echo ""
+ntk model setup
+echo ""
+echo "  ✓ Installation complete. Run  ntk start  to launch the daemon."
+echo ""

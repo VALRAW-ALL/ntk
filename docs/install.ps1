@@ -160,21 +160,28 @@ Write-Host "  NTK installed to $dest"
 Write-Host ''
 
 if ($postNote -eq 'AMD') {
-    Write-Host '  Next steps for AMD GPU inference:'
-    Write-Host '    1. Install llama.cpp built with Vulkan:'
-    Write-Host '         https://github.com/ggerganov/llama.cpp/releases'
-    Write-Host '       Place llama-server.exe on your PATH (or %USERPROFILE%\.ntk\bin\).'
-    Write-Host "    2. Run: ntk model setup   → choose 'llama.cpp' backend."
+    Write-Host '  Warning: AMD GPU note: inference uses llama-server + Vulkan (external).' -ForegroundColor Yellow
+    Write-Host '    Install llama.cpp (Vulkan build) from:'
+    Write-Host '      https://github.com/ggerganov/llama.cpp/releases'
+    Write-Host "    Place llama-server.exe on your PATH (or %USERPROFILE%\.ntk\bin\) before"
+    Write-Host "    running 'ntk model setup' — choose 'llama.cpp' backend."
     Write-Host ''
 }
 
-Write-Host '  Next: ntk init -g'
+# ---------------------------------------------------------------------------
+# Step 1 — ntk init -g  (register PostToolUse hook in Claude Code)
+# ---------------------------------------------------------------------------
+Write-Host '  -- Step 1/2: Initializing NTK hook (ntk init -g) --' -ForegroundColor Cyan
+Write-Host ''
+& ntk init -g
 Write-Host ''
 
-# When the script is invoked via `iex` (Invoke-Expression) or launched by the
-# OS as a new PowerShell window, the window closes as soon as the script ends.
-# Pause only when running interactively (not piped / automated).
-if ([Environment]::UserInteractive -and $Host.UI.RawUI -and -not [Console]::IsInputRedirected) {
-    Write-Host '  Press Enter to close...' -NoNewline
-    $null = Read-Host
-}
+# ---------------------------------------------------------------------------
+# Step 2 — ntk model setup  (configure backend + GPU)
+# ---------------------------------------------------------------------------
+Write-Host '  -- Step 2/2: Configuring inference backend (ntk model setup) --' -ForegroundColor Cyan
+Write-Host ''
+& ntk model setup
+Write-Host ''
+Write-Host '  Installation complete. Run  ntk start  to launch the daemon.' -ForegroundColor Green
+Write-Host ''
