@@ -128,13 +128,16 @@ jobs:
           CUDA=$(dirname "$(which nvcc)")/..
           CUDA=$(realpath "$CUDA")
           echo "CUDA_PATH=$CUDA"                      >> $GITHUB_ENV
-          # Make nvcc and nvidia-smi (used by bindgen_cuda) discoverable.
+          # Make nvcc and nvidia-smi discoverable by the build scripts.
           echo "$CUDA/bin"                            >> $GITHUB_PATH
           # libcuda.so stub — CI runners have no physical GPU driver.
-          # LIBRARY_PATH is read by cc (C linker); RUSTFLAGS -L is read by
-          # rustc's own linker invocation (not inherited from LIBRARY_PATH).
           echo "LIBRARY_PATH=$CUDA/lib64/stubs"       >> $GITHUB_ENV
           echo "RUSTFLAGS=-L $CUDA/lib64/stubs"       >> $GITHUB_ENV
+          # candle-core's build.rs calls nvidia-smi to detect the GPU compute
+          # capability. Without a physical GPU, nvidia-smi returns nothing and
+          # the build fails. Set CUDA_COMPUTE_CAP to sm_80 (Ampere A100) so
+          # candle skips the nvidia-smi call and compiles for a known target.
+          echo "CUDA_COMPUTE_CAP=80"                  >> $GITHUB_ENV
 
       # ── Rust toolchain (all jobs) ─────────────────────────────────────────
       - name: Install Rust stable
@@ -173,6 +176,8 @@ jobs:
           "$cuda\bin"      | Out-File $env:GITHUB_PATH -Append
           "$cuda\libnvvp"  | Out-File $env:GITHUB_PATH -Append
           "LIB=$cuda\lib\x64;$env:LIB" | Out-File $env:GITHUB_ENV -Append
+          # Same as Linux: prevent candle-core from calling nvidia-smi.
+          "CUDA_COMPUTE_CAP=80"        | Out-File $env:GITHUB_ENV -Append
 
       # ── Cargo cache ───────────────────────────────────────────────────────
       - name: Cache cargo
