@@ -229,3 +229,12 @@ if [ "${POST_INSTALL_NOTE:-}" = "AMD" ]; then
 fi
 
 echo "  Next: ntk init -g"
+echo ""
+
+# When executed via `curl ... | sh`, the shell exits as soon as the script
+# ends and the terminal window may close before the user reads the output.
+# Pause only when stdin is an interactive TTY (not a pipe).
+if [ -t 0 ]; then
+    printf "  Press Enter to close…"
+    read -r _
+fi

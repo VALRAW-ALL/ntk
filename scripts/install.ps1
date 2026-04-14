@@ -169,3 +169,12 @@ if ($postNote -eq 'AMD') {
 }
 
 Write-Host '  Next: ntk init -g'
+Write-Host ''
+
+# When the script is invoked via `iex` (Invoke-Expression) or launched by the
+# OS as a new PowerShell window, the window closes as soon as the script ends.
+# Pause only when running interactively (not piped / automated).
+if ([Environment]::UserInteractive -and $Host.UI.RawUI -and -not [Console]::IsInputRedirected) {
+    Write-Host '  Press Enter to close...' -NoNewline
+    $null = Read-Host
+}
