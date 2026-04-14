@@ -132,17 +132,57 @@ jobs:
         with:
           target: ${{ matrix.target }}
 
-      - name: Install CUDA Toolkit
-        if: matrix.cuda == true
-        uses: Jimver/cuda-toolkit@v0.2.19
-        with:
-          cuda: '12.5.0'
-          method: 'network'
-          # Minimum set required to link candle-cuda / cudarc. `cuda_runtime`
-          # is NOT a valid sub-package name (runtime = `cudart`, already
-          # listed); including it made apt-get exit 100 on Linux and the
-          # Windows installer reject the manifest, skipping the whole build.
-          sub-packages: '["nvcc", "cudart", "cublas", "cublas_dev", "curand", "curand_dev"]'
+      # CUDA install — replaced the Jimver/cuda-toolkit action after repeated
+      # failures:
+      #   • Linux: Jimver's short package names (`cublas`, `curand`) resolved
+      #     to apt package names that 404'd on the NVIDIA ubuntu2204 channel
+      #     under `ubuntu-22.04` runner, returning sudo exit 100.
+      #   • Windows: Jimver installed successfully but did not propagate
+      #     CUDA_PATH / PATH to subsequent shell:bash steps, so `cargo build
+      #     --features cuda` failed to find nvcc (exit 101).
+      # Doing the install inline is predictable, self-contained, and exports
+      # env vars through the official $GITHUB_ENV / $GITHUB_PATH channels.
+
+      - name: Install CUDA 12.5 (Linux)
+        if: matrix.cuda == true && runner.os == 'Linux'
+        shell: bash
+        run: |
+          curl -fsSL https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2204/x86_64/cuda-keyring_1.1-1_all.deb -o /tmp/cuda-keyring.deb
+          sudo dpkg -i /tmp/cuda-keyring.deb
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends \
+            cuda-nvcc-12-5 cuda-cudart-dev-12-5 \
+            libcublas-12-5 libcublas-dev-12-5 \
+            libcurand-12-5 libcurand-dev-12-5
+          echo "CUDA_PATH=/usr/local/cuda-12.5" >> $GITHUB_ENV
+          echo "/usr/local/cuda-12.5/bin" >> $GITHUB_PATH
+
+      - name: Install CUDA 12.5 (Windows)
+        if: matrix.cuda == true && runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $url = 'https://developer.download.nvidia.com/compute/cuda/12.5.1/network_installers/cuda_12.5.1_windows_network.exe'
+          $exe = "$env:RUNNER_TEMP\cuda_installer.exe"
+          Invoke-WebRequest -Uri $url -OutFile $exe
+          # Silent install with only the components candle-cuda / cudarc need.
+          $args = @(
+            '-s',
+            'nvcc_12.5',
+            'cudart_12.5',
+            'cublas_12.5', 'cublas_dev_12.5',
+            'curand_12.5', 'curand_dev_12.5',
+            'visual_studio_integration_12.5'
+          )
+          $p = Start-Process -FilePath $exe -ArgumentList $args -Wait -PassThru
+          if ($p.ExitCode -ne 0) { throw "CUDA installer exited $($p.ExitCode)" }
+          $cudaRoot = 'C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v12.5'
+          if (-not (Test-Path "$cudaRoot\bin\nvcc.exe")) {
+            throw "nvcc.exe missing after install at $cudaRoot"
+          }
+          "CUDA_PATH=$cudaRoot"           | Out-File -FilePath $env:GITHUB_ENV -Append
+          "CUDA_PATH_V12_5=$cudaRoot"     | Out-File -FilePath $env:GITHUB_ENV -Append
+          "$cudaRoot\bin"                 | Out-File -FilePath $env:GITHUB_PATH -Append
+          "$cudaRoot\libnvvp"             | Out-File -FilePath $env:GITHUB_PATH -Append
 
       - name: Cache cargo
         uses: actions/cache@v4
