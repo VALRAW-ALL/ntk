@@ -353,7 +353,9 @@ fn nvidia_gpus_from_smi() -> Vec<GpuDevice> {
             "--format=csv,noheader,nounits",
         ])
         .output();
-    let Ok(output) = output else { return Vec::new() };
+    let Ok(output) = output else {
+        return Vec::new();
+    };
     if !output.status.success() {
         return Vec::new();
     }

@@ -4,6 +4,9 @@ fn main() {
     for g in &gpus {
         println!("  - {:?}", g);
     }
-    println!("detect_best_backend() = {:?}", ntk::gpu::detect_best_backend());
+    println!(
+        "detect_best_backend() = {:?}",
+        ntk::gpu::detect_best_backend()
+    );
     println!("gpu_model_name() = {:?}", ntk::gpu::gpu_model_name());
 }

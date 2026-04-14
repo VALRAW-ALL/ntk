@@ -272,9 +272,7 @@ async fn async_run_daemon(gpu: bool) -> Result<()> {
     if gpu {
         let gpus = ntk::gpu::enumerate_gpus();
         if gpus.is_empty() {
-            tracing::warn!(
-                "--gpu requested but no discrete GPU was detected; falling back to CPU"
-            );
+            tracing::warn!("--gpu requested but no discrete GPU was detected; falling back to CPU");
         } else {
             let chosen_id = config.model.cuda_device as usize;
             let chosen = gpus.get(chosen_id).or_else(|| gpus.first()).unwrap();
@@ -1499,12 +1497,7 @@ fn setup_gpu_selection() -> Result<(i32, bool, u32, Option<ntk::gpu::GpuVendor>)
             cpu_label
         );
     } else if gpus.len() == 1 {
-        println!(
-            "  {}Detected:{} {}",
-            term::dim(),
-            term::reset(),
-            gpus[0]
-        );
+        println!("  {}Detected:{} {}", term::dim(), term::reset(), gpus[0]);
     } else {
         println!(
             "  {}Detected:{} {} discrete GPUs",
