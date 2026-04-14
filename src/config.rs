@@ -88,6 +88,13 @@ pub struct ModelConfig {
     pub gpu_layers: i32,
     pub gpu_auto_detect: bool,
     pub cuda_device: u32,
+    /// GPU vendor the user explicitly picked in `ntk model setup`.
+    /// `None` = no choice made → fall back to auto-detection.
+    /// Set explicitly, it overrides the detect_best_backend priority so picking
+    /// an AMD card on a machine that also has NVIDIA actually routes inference
+    /// to the AMD card instead of silently switching back to CUDA.
+    #[serde(default)]
+    pub gpu_vendor: Option<crate::gpu::GpuVendor>,
     pub llama_cpp_path: Option<PathBuf>,
     /// Path to the GGUF model file (Candle and llama.cpp backends).
     pub model_path: Option<PathBuf>,
@@ -112,6 +119,7 @@ impl Default for ModelConfig {
             gpu_layers: -1,
             gpu_auto_detect: true,
             cuda_device: 0,
+            gpu_vendor: None,
             llama_cpp_path: None,
             model_path: None,
             tokenizer_path: None,

@@ -1,0 +1,49 @@
+Compiling serde v1.0.219
+   Compiling serde_json v1.0.140
+   Compiling tokio v1.43.0
+   Compiling ntk v0.2.4 (C:/project/ntk)
+error[E0432]: unresolved import `std::collections::BTreeMap`
+   --> src/cache.rs:12:5
+    |
+12  | use std::collections::BTreeMap as TreeCache;
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^ no `BTreeMap` in the root
+help: a similar name exists in the module: `BTreeSet`
+    |
+12  | use std::collections::BTreeSet as TreeCache;
+    |                       ~~~~~~~~
+
+error[E0433]: failed to resolve: use of undeclared crate or module `regex`
+   --> src/parser.rs:45:19
+    |
+45  |     let re = regex::Regex::new(r"^\s*#\s*([A-Z][A-Z0-9_]+)\s*=").unwrap();
+    |              ^^^^^ use of undeclared crate or module `regex`
+    = help: consider adding `regex` to Cargo.toml
+error[E0277]: the trait bound `PathBuf: From<&OsStr>` is not satisfied
+   --> src/fs_walk.rs:88:34
+    |
+88  |     let normalized = PathBuf::from(entry.file_name());
+    |                      ^^^^^^^^^^^^^ the trait `From<&OsStr>` is not implemented
+
+error[E0382]: borrow of moved value: `cfg`
+   --> src/daemon.rs:201:17
+    |
+199 | let srv = HttpServer::new(cfg);
+    |                           --- value moved here
+201 | if !cfg.tls_enabled {
+    |                 ^^^ value borrowed here after move
+
+warning: unused variable: `hostname`
+   --> src/net.rs:14:9
+    |
+14  | let hostname = hostname_crate::get().unwrap_or_default();
+    |     ^^^^^^^^ help: if intentional, prefix: `_hostname`
+
+warning: function is never used: `serialize_bench_result`
+   --> src/bench.rs:321:4
+
+error: aborting due to 4 previous errors; 2 warnings emitted
+
+For more information about these errors, try `rustc --explain E0432`.
+error: could not compile `ntk` (lib) due to 4 previous errors
+warning: build failed, waiting for other jobs to finish...
+error: could not compile `ntk` (bin "ntk") due to 4 previous errors

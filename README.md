@@ -71,8 +71,8 @@ If the daemon is unreachable, the hook falls back gracefully to the original out
 | Requirement | Notes |
 |---|---|
 | [Ollama](https://ollama.com) | Recommended. Manages model download and GPU offloading. |
-| NVIDIA GPU (CUDA) | RTX series recommended; tested on RTX 3060+ |
-| AMD GPU (ROCm) | Detected via `rocm-smi`; ROCm 5.4+ |
+| NVIDIA GPU (CUDA) | RTX series recommended; tested on RTX 3060+. Detected via `nvidia-smi`. |
+| AMD GPU | Detected via `rocm-smi`, Windows driver registry, or Linux sysfs — covers Polaris/Vega/RDNA even without ROCm. Inference uses `llama-server` with Vulkan. |
 | Apple Silicon (Metal) | M1 and later |
 
 ---
@@ -91,8 +91,10 @@ cargo build --release
 cargo install --path .
 
 # Register the PostToolUse hook in Claude Code
-# (automatically launches ntk model setup after patching)
 ntk init -g
+
+# Configure the Layer 3 backend (separate step — see below)
+ntk model setup
 ```
 
 ### Option 2 - Shell installer (Unix)
@@ -101,20 +103,32 @@ ntk init -g
 curl -fsSL https://ntk.valraw.com/install.sh | bash
 ```
 
+The installer enumerates every discrete GPU on the machine (NVIDIA and
+AMD, any number and any vendor mix) and asks which release variant to
+download: **NVIDIA** (`-gpu` CUDA build), **AMD** (`-cpu` build + guidance
+to set up a Vulkan llama-server), or **CPU only** (`-cpu` build). When
+piped non-interactively, the choice is made automatically from detection
+and can be overridden with `NTK_INSTALL_PLATFORM=nvidia|amd|cpu`.
+
 ### Option 3 - PowerShell installer (Windows)
 
 ```powershell
 irm https://ntk.valraw.com/install.ps1 | iex
 ```
 
+Same logic as the Unix installer. Override with
+`$env:NTK_INSTALL_PLATFORM = 'nvidia' | 'amd' | 'cpu'` for unattended runs.
+
 ### What `ntk init -g` does
 
 1. Copies the hook script to `~/.ntk/bin/` (`ntk-hook.sh` on Unix, `ntk-hook.ps1` on Windows)
 2. Patches `~/.claude/settings.json` to register the `PostToolUse` hook (idempotent - safe to run multiple times)
 3. Creates `~/.ntk/config.json` with sensible defaults
-4. **Automatically launches `ntk model setup`** - the interactive wizard that detects your CPU/GPU hardware and configures the inference backend
 
-`--hook-only`, `--show`, and `--uninstall` skip the model setup step.
+That's it. `ntk init` configures NTK itself — nothing more. Model backend
+choice, Ollama / llama-server installation, and GPU selection all live
+under `ntk model setup` (see [Model management](#model-management-layer-3))
+and can be re-run at any time.
 
 ```json
 // ~/.claude/settings.json  (added by ntk init -g)
@@ -267,9 +281,10 @@ Commands that perform inference show a real-time progress animation:
 ### Model management (Layer 3)
 
 ```bash
-# Interactive backend + hardware setup wizard
-# Runs automatically after ntk init / ntk init -g.
-# Can also be run manually to reconfigure at any time.
+# Interactive backend + hardware setup wizard.
+# Run this after `ntk init` (or anytime you want to change backend / GPU).
+# Detects Ollama, every NVIDIA / AMD GPU on the system, and installs
+# Ollama on demand when you pick that backend.
 ntk model setup
 
 # Download the default model via Ollama
@@ -361,7 +376,9 @@ NTK merges configuration from two sources, in order:
     "timeout_ms": 2000,
     "fallback_to_layer1_on_timeout": true,
     "gpu_layers": -1,
-    "gpu_auto_detect": true
+    "gpu_auto_detect": true,
+    "gpu_vendor": null,
+    "cuda_device": 0
   },
   "metrics": {
     "enabled": true,
@@ -385,6 +402,8 @@ NTK merges configuration from two sources, in order:
 | `compression.inference_threshold_tokens` | `300` | Layer 3 only activates above this token count |
 | `model.fallback_to_layer1_on_timeout` | `true` | Use L1+L2 output if Ollama is slow or unavailable |
 | `model.gpu_layers` | `-1` | `-1` = all layers on GPU; `0` = CPU only |
+| `model.gpu_vendor` | `null` | `"nvidia"` / `"amd"` / `"apple"` — the card the user picked in `ntk model setup`. `null` = auto-detect. Runtime honours this verbatim instead of silently preferring NVIDIA on multi-vendor systems. |
+| `model.cuda_device` | `0` | Zero-based device index **within** the chosen vendor (e.g. the first AMD card is `0` in the AMD namespace, independent of how many NVIDIAs are present). |
 | `exclusions.commands` | `["cat","echo"]` | Commands whose output is never compressed |
 | `exclusions.max_input_chars` | `500000` | Hard limit on input size before processing |
 
@@ -405,19 +424,64 @@ NTK merges configuration from two sources, in order:
 
 ## GPU Acceleration
 
-NTK auto-detects the best inference backend at startup:
+NTK enumerates every discrete GPU on the host — multiple cards, multiple
+vendors, mixed setups are all supported — and picks the best CPU fallback
+when no GPU is available.
+
+**NVIDIA detection** — `nvidia-smi` (every CUDA device, with accurate VRAM).
+
+**AMD detection** — tries, in order:
+
+1. `rocm-smi` (ROCm-supported cards only)
+2. **Windows**: the display-class driver registry (`VEN_1002`), reading
+   `HardwareInformation.qwMemorySize` for accurate 64-bit VRAM. This is
+   what lets Polaris / Vega cards (e.g. **RX 570 / 580 / Vega 56**) show
+   up on Windows even though they are not supported by ROCm.
+3. **Linux**: `/sys/class/drm/card*/device/vendor == 0x1002`, with VRAM
+   from `mem_info_vram_total` and the product name resolved via
+   `lspci -nn -d 1002:<device>`.
+
+**Apple Silicon** — Metal is enabled at compile time on
+`aarch64-apple-darwin`.
+
+**CPU fallbacks** — Intel AMX → AVX-512 → AVX2 → scalar.
+
+### Multi-GPU selection
+
+`ntk model setup` lists every detected GPU as its own numbered option
+(plus a CPU-only option). When more than one GPU is present, the user
+picks explicitly — the chosen **vendor** is saved to
+`config.model.gpu_vendor` and the per-vendor **device index** to
+`config.model.cuda_device`.
 
 ```
-1. NVIDIA CUDA  (detected via nvidia-smi)
-2. AMD ROCm     (detected via rocm-smi)
-3. Apple Metal  (aarch64-apple-darwin compile target)
-4. Intel AMX    (Xeon 4th Gen / Core Ultra)
-5. AVX-512      (is_x86_feature_detected!)
-6. AVX2         (most modern x86)
-7. CPU Scalar   (fallback)
+  GPU / Compute Selection
+  ────────────────────────────────────
+  Detected: 2 discrete GPUs
+
+  [1]  CPU  AVX2                      ✓ always available
+  [2]  NVIDIA GeForce RTX 3060        ✓ 12288 MB VRAM
+  [3]  AMD Radeon RX 580 2048SP       ✓ 8192 MB VRAM
+
+  Choose [1-3] or Enter for [2]:
 ```
 
-The `ntk model setup` wizard detects your hardware at runtime and presents a GPU/CPU selection step, showing each option with availability status, VRAM, and expected latency. Your choice is saved to `config.model.gpu_layers` (`-1` = GPU, `0` = CPU).
+**No hidden vendor preference.** On a machine with both an NVIDIA and an
+AMD card, picking AMD in the wizard actually routes inference to the AMD
+card. The daemon passes `HIP_VISIBLE_DEVICES` / `ROCR_VISIBLE_DEVICES` /
+`GGML_VK_VISIBLE_DEVICES` to the llama-server subprocess when AMD is
+selected, and `CUDA_VISIBLE_DEVICES` when NVIDIA is selected. If the
+configured vendor is unavailable at runtime (GPU removed / driver
+failure), NTK falls back to CPU and warns — it never silently switches to
+a different vendor.
+
+> **About the `(device 0)` label.** Each vendor numbers its own devices
+> starting at 0, independently. So `NVIDIA GT 730 (device 0)` and
+> `AMD RX 580 (device 0)` are different hardware — the disambiguation
+> comes from `gpu_vendor`, not from the numeric index.
+
+`ntk status` reports the **configured** backend (respecting `gpu_vendor`),
+not the "best detected" one.
 
 **Performance expectations - Phi-3 Mini 3.8B Q5_K_M (Layer 3 latency p95):**
 
@@ -436,15 +500,88 @@ Layer 3 is skipped entirely for outputs below the threshold (default 300 tokens)
 **Build options:**
 
 ```bash
-# Default build - includes Candle (in-process inference, no Ollama needed)
+# Default build — Candle CPU + Ollama / llama-server external.
+# Works on any machine, including AMD GPUs (inference routes through
+# llama-server built with Vulkan, configured via `ntk model setup`).
 cargo build --release
 
-# CUDA (NVIDIA) - enables GPU offloading for Candle
+# CUDA (NVIDIA) — enables in-process GPU offloading via Candle
 cargo build --release --features cuda
 
 # Metal (Apple Silicon)
 cargo build --release --features metal
 ```
+
+**Or let the wrapper pick the right flag automatically:**
+
+```bash
+# Linux / macOS
+./scripts/build.sh
+
+# Windows (PowerShell)
+.\scripts\build.ps1
+```
+
+The wrapper detects the host GPU + toolchain and adds the correct feature
+(or none), so `./scripts/build.sh` does the right thing on an NVIDIA
+workstation, an M-series Mac, an AMD box, and a bare CPU server alike.
+
+### Release binary variants
+
+The `release.yml` workflow publishes one binary per platform × scenario,
+with a `-cpu` or `-gpu` suffix:
+
+| Artifact | Contents |
+|---|---|
+| `ntk-linux-x86_64-cpu`        | CPU-only, Candle disabled. |
+| `ntk-linux-x86_64-gpu`        | Candle + CUDA. Requires NVIDIA driver at runtime. |
+| `ntk-linux-aarch64-cpu`       | CPU-only. |
+| `ntk-darwin-x86_64-cpu`       | CPU-only (Intel Macs). |
+| `ntk-darwin-aarch64-cpu`      | CPU-only (Apple Silicon). |
+| `ntk-darwin-aarch64-gpu`      | Candle + Metal (Apple Silicon). |
+| `ntk-windows-x86_64-cpu.exe`  | CPU-only. |
+| `ntk-windows-x86_64-gpu.exe`  | Candle + CUDA. Requires NVIDIA driver. |
+
+The shell / PowerShell installers pick the right artifact automatically
+based on the user's platform choice (NVIDIA / AMD / CPU). There is no
+dedicated AMD `-gpu` binary because Candle has no AMD backend — AMD users
+get the `-cpu` binary and point NTK at an external `llama-server`
+compiled with Vulkan (step-by-step in the installer's post-install hint
+and in the [AMD GPUs](#amd-gpus) section below).
+
+### Prerequisites for GPU features
+
+Cargo **does not** install GPU SDKs for you — feature flags only toggle
+which bindings get compiled, and the SDK has to be present at build time.
+
+| Feature flag | Required on the build machine |
+|---|---|
+| *(none, default)* | Just Rust stable. Nothing GPU-specific. |
+| `cuda` | **CUDA Toolkit ≥ 12.0** with `nvcc` on `PATH`. The runtime host also needs the NVIDIA driver.  Install: `winget install Nvidia.CUDA` (Windows) or NVIDIA's official `.run`/apt packages (Linux). |
+| `metal` | **macOS on Apple Silicon (aarch64)**. Metal ships with Xcode Command Line Tools — `xcode-select --install` is enough. Intel Macs may compile but are not supported; Linux and Windows will not link. |
+
+If `cargo build --release --features cuda` fails with
+`Failed to execute nvcc: program not found`, the CUDA Toolkit isn't installed
+(or `nvcc` isn't on `PATH`). Install it, reopen the shell, then
+`cargo clean && cargo build --release --features cuda`.
+
+### AMD GPUs
+
+There is no `--features amd` / `--features rocm` / `--features vulkan` —
+Candle has no AMD backend in the currently pinned version. For AMD GPU
+acceleration on NTK:
+
+1. Build NTK with the default flags (`cargo build --release`).
+2. Download a `llama-server` binary compiled with **Vulkan** from
+   [llama.cpp releases](https://github.com/ggerganov/llama.cpp/releases)
+   and place it on your `PATH` (or `~/.ntk/bin/`).
+3. Run `ntk model setup` → choose the **llama.cpp** backend.
+4. Inference will run on the AMD GPU through `llama-server`; the NTK
+   daemon talks to it over HTTP.
+
+The `ntk start --gpu` and `ntk model setup` commands detect AMD cards
+(Polaris / Vega / RDNA) via the Windows driver registry or Linux sysfs,
+so your GPU will show up in the selection list even without ROCm.
 
 ---
 

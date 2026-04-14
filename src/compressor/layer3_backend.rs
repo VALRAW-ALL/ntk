@@ -89,7 +89,8 @@ impl BackendKind {
                 let port = config.model.llama_server_port;
                 let gpu_layers = config.model.gpu_layers;
                 let backend =
-                    LlamaCppBackend::new(model_path, port, gpu_layers, config.model.timeout_ms);
+                    LlamaCppBackend::new(model_path, port, gpu_layers, config.model.timeout_ms)
+                        .with_gpu_selection(config.model.gpu_vendor, config.model.cuda_device);
 
                 Ok(Self::LlamaCpp(Arc::new(backend)))
             }

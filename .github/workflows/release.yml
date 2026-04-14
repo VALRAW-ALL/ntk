@@ -36,7 +36,15 @@ jobs:
             echo "should_release=true" >> $GITHUB_OUTPUT
           fi
 
-  # ── 2. Build cross-platform ───────────────────────────────────────────────
+  # ── 2. Build cross-platform (CPU + GPU por plataforma) ────────────────────
+  #
+  # Dimensão `kind`:
+  #   cpu → binário magro, sem Candle. GPU só via Ollama/llama-server externos.
+  #   gpu → Candle in-process.
+  #         • Linux/Windows x86_64 → CUDA (NVIDIA)
+  #         • macOS aarch64         → Metal (Apple Silicon)
+  #
+  # Nome final do artefato: ntk-<os>-<arch>-<kind>[.exe]
   build:
     name: Build ${{ matrix.artifact }}
     needs: check-version
@@ -46,31 +54,61 @@ jobs:
       fail-fast: false
       matrix:
         include:
+          # --- Linux x86_64 -------------------------------------------------
           - runner: ubuntu-latest
             target: x86_64-unknown-linux-gnu
-            artifact: ntk-linux-x86_64
-            ext: ""
+            artifact: ntk-linux-x86_64-cpu
+            kind: cpu
+            features: sqlite-bundled
 
           - runner: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+            artifact: ntk-linux-x86_64-gpu
+            kind: gpu
+            features: sqlite-bundled,cuda
+            cuda: true
+
+          # --- Linux aarch64 (sem GPU — nenhum backend Candle compatível) ---
+          - runner: ubuntu-latest
             target: aarch64-unknown-linux-gnu
-            artifact: ntk-linux-aarch64
-            ext: ""
+            artifact: ntk-linux-aarch64-cpu
+            kind: cpu
+            features: sqlite-bundled
             linker: gcc-aarch64-linux-gnu
 
+          # --- macOS Intel (sem GPU — Candle Metal alvo é Apple Silicon) ----
           - runner: macos-latest
             target: x86_64-apple-darwin
-            artifact: ntk-darwin-x86_64
-            ext: ""
+            artifact: ntk-darwin-x86_64-cpu
+            kind: cpu
+            features: sqlite-bundled
+
+          # --- macOS Apple Silicon ------------------------------------------
+          - runner: macos-latest
+            target: aarch64-apple-darwin
+            artifact: ntk-darwin-aarch64-cpu
+            kind: cpu
+            features: sqlite-bundled
 
           - runner: macos-latest
             target: aarch64-apple-darwin
-            artifact: ntk-darwin-aarch64
-            ext: ""
+            artifact: ntk-darwin-aarch64-gpu
+            kind: gpu
+            features: sqlite-bundled,metal
+
+          # --- Windows x86_64 -----------------------------------------------
+          - runner: windows-latest
+            target: x86_64-pc-windows-msvc
+            artifact: ntk-windows-x86_64-cpu.exe
+            kind: cpu
+            features: sqlite-bundled
 
           - runner: windows-latest
             target: x86_64-pc-windows-msvc
-            artifact: ntk-windows-x86_64.exe
-            ext: ".exe"
+            artifact: ntk-windows-x86_64-gpu.exe
+            kind: gpu
+            features: sqlite-bundled,cuda
+            cuda: true
 
     steps:
       - uses: actions/checkout@v4
@@ -84,6 +122,16 @@ jobs:
         if: matrix.linker != ''
         run: sudo apt-get install -y ${{ matrix.linker }}
 
+      - name: Install CUDA Toolkit
+        if: matrix.cuda == true
+        uses: Jimver/cuda-toolkit@v0.2.19
+        with:
+          cuda: '12.5.0'
+          method: 'network'
+          # Somente as sub-packages necessárias para linkar o candle-cuda.
+          sub-packages: '["nvcc", "cudart", "cublas", "cublas_dev", "cuda_runtime", "curand", "curand_dev"]'
+          non-cuda-sub-packages: '["libcublas", "libcurand"]'
+
       - name: Cache cargo
         uses: actions/cache@v4
         with:
@@ -91,9 +139,9 @@ jobs:
             ~/.cargo/registry
             ~/.cargo/git
             target
-          key: ${{ matrix.runner }}-${{ matrix.target }}-release-${{ hashFiles('**/Cargo.lock') }}
+          key: ${{ matrix.runner }}-${{ matrix.target }}-${{ matrix.kind }}-release-${{ hashFiles('**/Cargo.lock') }}
           restore-keys: |
-            ${{ matrix.runner }}-${{ matrix.target }}-release-
+            ${{ matrix.runner }}-${{ matrix.target }}-${{ matrix.kind }}-release-
 
       - name: Configure aarch64 linker
         if: matrix.linker != ''
@@ -104,7 +152,12 @@ jobs:
           echo "AR_aarch64_unknown_linux_gnu=aarch64-linux-gnu-ar" >> $GITHUB_ENV
 
       - name: Build
-        run: cargo build --release --target ${{ matrix.target }} --no-default-features --features sqlite-bundled
+        shell: bash
+        run: |
+          cargo build --release \
+            --target ${{ matrix.target }} \
+            --no-default-features \
+            --features ${{ matrix.features }}
 
       - name: Stage artifact (Unix)
         if: runner.os != 'Windows'

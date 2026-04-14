@@ -262,7 +262,7 @@
           <div class="feature-icon">🖥</div>
           <div>
             <div class="feature-title" data-i18n="feat.gpu_title">GPU acceleration</div>
-            <div class="feature-desc" data-i18n="feat.gpu_desc">Auto-detects CUDA (NVIDIA), ROCm (AMD), Metal (Apple Silicon), AMX, AVX-512. L3 latency drops from 800ms to &lt;100ms on GPU.</div>
+            <div class="feature-desc" data-i18n="feat.gpu_desc">Enumerates every discrete GPU — NVIDIA via <code style="font-family:var(--font-mono)">nvidia-smi</code>, AMD via ROCm / Windows driver registry / Linux sysfs (Polaris &amp; Vega included), plus Metal, AMX, AVX-512. Multi-vendor selection in <code style="font-family:var(--font-mono)">ntk model setup</code> — pick NVIDIA or AMD explicitly; the daemon scopes <code style="font-family:var(--font-mono)">CUDA_VISIBLE_DEVICES</code> / <code style="font-family:var(--font-mono)">HIP_VISIBLE_DEVICES</code> accordingly and never silently prefers NVIDIA. L3 drops from ~800ms to &lt;100ms on GPU.</div>
           </div>
         </div>
         <div class="feature-card">
@@ -296,7 +296,7 @@
         <li><a href="#step1" class="active" data-i18n="gs.toc1">1. Prerequisites</a></li>
         <li><a href="#step2" data-i18n="gs.toc2">2. Install NTK</a></li>
         <li><a href="#step3" data-i18n="gs.toc3">3. Initialize hook</a></li>
-        <li><a href="#step4" data-i18n="gs.toc4">4. Install model</a></li>
+        <li><a href="#step4" data-i18n="gs.toc4">4. Configure Layer 3</a></li>
         <li><a href="#step5" data-i18n="gs.toc5">5. Start daemon</a></li>
         <li><a href="#step6" data-i18n="gs.toc6">6. Verify</a></li>
         <li><a href="#step7" data-i18n="gs.toc7">Configuration</a></li>
@@ -318,18 +318,14 @@
           <div class="step-num-circle">1</div>
           <div class="step-block-title" data-i18n="gs.step1_title">Prerequisites</div>
         </div>
-        <p data-i18n="gs.step1_desc">NTK requires <strong>Claude Code</strong> (the CLI) installed and configured. Layer 3 inference requires <strong>Ollama</strong> (recommended) or a compatible backend. CPU-only mode works without any AI backend.</p>
+        <p data-i18n="gs.step1_desc">NTK requires <strong>Claude Code</strong> (the CLI) installed and configured. Layers 1+2 run pure Rust and work out-of-the-box. Layer 3 inference is optional and configured later in Step 4 — Ollama is installed then, not now.</p>
         <div class="code-block">
           <div class="code-block-header">
             <span>bash</span>
             <button class="copy-btn" onclick="copyCode(this)">⎘ copy</button>
           </div>
           <pre><span style="color:var(--color-texto-mutado)"># Check Claude Code is installed</span>
-claude --version
-
-<span style="color:var(--color-texto-mutado)"># Install Ollama (optional, recommended for L3)</span>
-curl -fsSL https://ollama.ai/install.sh | sh
-ollama serve &amp;</pre>
+claude --version</pre>
         </div>
       </div>
 
@@ -339,7 +335,7 @@ ollama serve &amp;</pre>
           <div class="step-num-circle">2</div>
           <div class="step-block-title" data-i18n="gs.step2_title">Install NTK</div>
         </div>
-        <p data-i18n="gs.step2_desc">The install script downloads the latest release binary for your OS and architecture:</p>
+        <p data-i18n="gs.step2_desc">The installer enumerates every discrete GPU on the machine (NVIDIA + AMD, any number and mix), lists them, and asks which release variant to install: <strong>NVIDIA</strong> (<code style="font-family:var(--font-mono)">-gpu</code> CUDA / Metal build), <strong>AMD</strong> (<code style="font-family:var(--font-mono)">-cpu</code> build with post-install Vulkan guidance), or <strong>CPU only</strong>. When piped non-interactively, the choice is auto-selected from detection; override with <code style="font-family:var(--font-mono)">NTK_INSTALL_PLATFORM=nvidia|amd|cpu</code>.</p>
         <div class="code-block">
           <div class="code-block-header"><span>bash - Linux / macOS</span><button class="copy-btn" onclick="copyCode(this)">⎘ copy</button></div>
           <pre>curl -fsSL https://ntk.valraw.com/install.sh | sh</pre>
@@ -351,8 +347,18 @@ ollama serve &amp;</pre>
         <p data-i18n="gs.step2_alt">Or install from source:</p>
         <div class="code-block">
           <div class="code-block-header"><span>bash - from source</span><button class="copy-btn" onclick="copyCode(this)">⎘ copy</button></div>
-          <pre>cargo install ntk</pre>
+          <pre><span style="color:var(--color-texto-mutado)"># Auto-picks the right --features flag for your hardware:</span>
+./scripts/build.sh        <span style="color:var(--color-texto-mutado)"># Linux / macOS</span>
+.\scripts\build.ps1       <span style="color:var(--color-texto-mutado)"># Windows</span>
+
+<span style="color:var(--color-texto-mutado)"># Or vanilla Cargo:</span>
+cargo build --release                      <span style="color:var(--color-texto-mutado)"># CPU / Ollama (works everywhere)</span>
+cargo build --release --features cuda      <span style="color:var(--color-texto-mutado)"># NVIDIA (needs CUDA Toolkit)</span>
+cargo build --release --features metal     <span style="color:var(--color-texto-mutado)"># Apple Silicon</span></pre>
         </div>
+        <p data-i18n="gs.step2_note" style="color:var(--color-texto-terciario);font-size:0.875rem;margin-top:0.5rem">
+          <strong>Note:</strong> the <code style="font-family:var(--font-mono)">cuda</code> feature requires the CUDA Toolkit (<code style="font-family:var(--font-mono)">nvcc</code> on PATH). Install it separately — Cargo does not ship SDKs. There is no AMD feature flag; AMD users build the CPU variant and configure a Vulkan <code style="font-family:var(--font-mono)">llama-server</code> via <code style="font-family:var(--font-mono)">ntk model setup</code>.
+        </p>
       </div>
 
       <!-- Step 3 -->
@@ -361,30 +367,36 @@ ollama serve &amp;</pre>
           <div class="step-num-circle">3</div>
           <div class="step-block-title" data-i18n="gs.step3_title">Initialize hook</div>
         </div>
-        <p data-i18n="gs.step3_desc">This patches <code style="font-family:var(--font-mono);color:var(--color-primaria-clara)">~/.claude/settings.json</code> to add the PostToolUse hook, copies the hook script, creates <code style="font-family:var(--font-mono);color:var(--color-primaria-clara)">~/.ntk/config.json</code>, and <strong>automatically launches the model setup wizard</strong> to configure your inference backend:</p>
+        <p data-i18n="gs.step3_desc">This patches <code style="font-family:var(--font-mono);color:var(--color-primaria-clara)">~/.claude/settings.json</code> to add the PostToolUse hook, copies the hook script, and creates <code style="font-family:var(--font-mono);color:var(--color-primaria-clara)">~/.ntk/config.json</code> with sensible defaults. That's the full scope of <code style="font-family:var(--font-mono);color:var(--color-primaria-clara)">ntk init</code> — model backend and GPU choice are handled in Step 4.</p>
         <div class="code-block">
           <div class="code-block-header"><span>bash</span><button class="copy-btn" onclick="copyCode(this)">⎘ copy</button></div>
           <pre>ntk init -g</pre>
         </div>
-        <p data-i18n="gs.step3_note">The <code style="font-family:var(--font-mono);color:var(--color-primaria-clara)">-g</code> flag patches the global settings. Use without it for per-project setup. The operation is idempotent - safe to run multiple times. Use <code style="font-family:var(--font-mono);color:var(--color-primaria-clara)">--hook-only</code> to skip the model wizard.</p>
+        <p data-i18n="gs.step3_note">The <code style="font-family:var(--font-mono);color:var(--color-primaria-clara)">-g</code> flag patches the global settings. Use without it for per-project setup. Safe to re-run (idempotent).</p>
       </div>
 
       <!-- Step 4 -->
       <div class="step-block" id="step4">
         <div class="step-block-header">
           <div class="step-num-circle">4</div>
-          <div class="step-block-title" data-i18n="gs.step4_title">Install model</div>
+          <div class="step-block-title" data-i18n="gs.step4_title">Configure Layer 3 (optional)</div>
         </div>
-        <p data-i18n="gs.step4_desc">Pull Phi-3 Mini (~2GB) via Ollama for Layer 3 semantic compression:</p>
+        <p data-i18n="gs.step4_desc">The model setup wizard detects every NVIDIA and AMD GPU on the system (multi-GPU is fully supported — 2× NVIDIA, 1× NVIDIA + 1× AMD, etc.), lets you pick one, and installs / configures the backend. The chosen vendor is saved to <code style="font-family:var(--font-mono)">config.model.gpu_vendor</code> and enforced at runtime — picking AMD on a machine that also has NVIDIA actually routes inference to AMD. It also installs Ollama on demand when you pick that backend — so there is no separate Ollama step.</p>
         <div class="code-block">
           <div class="code-block-header"><span>bash</span><button class="copy-btn" onclick="copyCode(this)">⎘ copy</button></div>
-          <pre>ntk model pull          <span style="color:var(--color-texto-mutado)"># pulls phi3:mini Q5_K_M</span>
+          <pre>ntk model setup         <span style="color:var(--color-texto-mutado)"># backend + GPU wizard</span>
+
+<span style="color:var(--color-texto-mutado)"># Once the backend is set, pull the default model:</span>
+ntk model pull          <span style="color:var(--color-texto-mutado)"># phi3:mini Q5_K_M (~2GB)</span>
 
 <span style="color:var(--color-texto-mutado)"># Or choose a specific quantization:</span>
 ntk model pull --quant q4_k_m  <span style="color:var(--color-texto-mutado)"># smaller, faster</span>
-ntk model pull --quant q6_k   <span style="color:var(--color-texto-mutado)"># higher quality</span></pre>
+ntk model pull --quant q6_k    <span style="color:var(--color-texto-mutado)"># higher quality</span></pre>
         </div>
-        <p data-i18n="gs.step4_skip">Skip this step to run in L1+L2 only mode (no neural inference, &lt;5ms latency).</p>
+        <p data-i18n="gs.step4_amd" style="color:var(--color-texto-terciario);font-size:0.875rem;margin-top:0.5rem">
+          <strong>AMD users:</strong> the wizard detects your card (Polaris, Vega, RDNA) via the Windows driver registry or Linux sysfs — ROCm is not required. Pick the <code style="font-family:var(--font-mono)">llama.cpp</code> backend and point it at a Vulkan-enabled <code style="font-family:var(--font-mono)">llama-server</code> (prebuilt binaries on <a href="https://github.com/ggerganov/llama.cpp/releases" target="_blank" rel="noopener">llama.cpp releases</a>).
+        </p>
+        <p data-i18n="gs.step4_skip">Skip Step 4 entirely to run in L1+L2 mode (pure Rust, no neural inference, &lt;5ms latency).</p>
       </div>
 
       <!-- Step 5 -->
@@ -499,7 +511,7 @@ rm -rf ~/.ntk           <span style="color:var(--color-texto-mutado)"># remove c
         <div class="cmd-group-title" data-i18n="cmd.g_model">Model</div>
         <div class="cmd-row" data-cmd="model pull"><div class="cmd-name">model <span class="cmd-arg">pull</span></div><div class="cmd-desc" data-i18n="cmd.model_pull">Download phi3:mini (default Q5_K_M, ~2GB) via Ollama.</div></div>
         <div class="cmd-row" data-cmd="model pull --quant"><div class="cmd-name">model <span class="cmd-arg">pull --quant q4_k_m</span></div><div class="cmd-desc" data-i18n="cmd.model_quant">Download a specific quantization (q4_k_m, q5_k_m, q6_k).</div></div>
-        <div class="cmd-row" data-cmd="model setup"><div class="cmd-name">model <span class="cmd-arg">setup</span></div><div class="cmd-desc" data-i18n="cmd.model_setup">Interactive backend selector (Ollama / Candle / llama.cpp) with GPU/CPU hardware detection. Runs automatically after <code style="font-family:var(--font-mono)">ntk init</code>.</div></div>
+        <div class="cmd-row" data-cmd="model setup"><div class="cmd-name">model <span class="cmd-arg">setup</span></div><div class="cmd-desc" data-i18n="cmd.model_setup">Interactive backend selector (Ollama / Candle / llama.cpp) with multi-GPU detection and selection. Installs Ollama on demand. Run after <code style="font-family:var(--font-mono)">ntk init</code>, or anytime to reconfigure.</div></div>
         <div class="cmd-row" data-cmd="model test"><div class="cmd-name">model <span class="cmd-arg">test</span></div><div class="cmd-desc" data-i18n="cmd.model_test">Test model latency and output quality with a sample prompt.</div></div>
         <div class="cmd-row" data-cmd="model test --debug"><div class="cmd-name">model <span class="cmd-arg">test --debug</span></div><div class="cmd-desc" data-i18n="cmd.model_test_debug">Verbose test: shows thread config, mlock status, system prompt preview, timing breakdown, and performance analysis with CPU-tier-aware targets (mobile ≥5 tok/s, desktop ≥10, high-end ≥15, GPU ≥40).</div></div>
         <div class="cmd-row" data-cmd="model bench"><div class="cmd-name">model <span class="cmd-arg">bench</span></div><div class="cmd-desc" data-i18n="cmd.model_bench">Benchmark CPU vs GPU inference latency.</div></div>

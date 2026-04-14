@@ -270,7 +270,26 @@ async fn async_run_daemon(gpu: bool) -> Result<()> {
     let config = ntk::config::load(&cwd)?;
 
     if gpu {
-        tracing::info!("GPU inference requested — auto-detecting backend");
+        let gpus = ntk::gpu::enumerate_gpus();
+        if gpus.is_empty() {
+            tracing::warn!(
+                "--gpu requested but no discrete GPU was detected; falling back to CPU"
+            );
+        } else {
+            let chosen_id = config.model.cuda_device as usize;
+            let chosen = gpus.get(chosen_id).or_else(|| gpus.first()).unwrap();
+            tracing::info!(
+                "GPU inference enabled: {} (device {})",
+                chosen,
+                chosen.device_id
+            );
+            if gpus.len() > 1 {
+                tracing::info!(
+                    "{} GPUs detected — run `ntk model setup` to pick a different one",
+                    gpus.len()
+                );
+            }
+        }
     }
 
     let host = config.daemon.host.clone();
@@ -480,7 +499,11 @@ fn run_status() -> Result<()> {
         }
     });
 
-    let backend = gpu::detect_best_backend();
+    let backend = gpu::resolve_configured_backend(
+        config.model.gpu_layers,
+        config.model.gpu_vendor,
+        config.model.cuda_device,
+    );
 
     use ntk::output::terminal as term;
 
@@ -1433,18 +1456,26 @@ fn run_model_setup() -> Result<()> {
     Ok(())
 }
 
-/// Prompt the user to select a compute backend (CPU / NVIDIA / AMD / Metal).
-/// Returns `(gpu_layers, gpu_auto_detect)` to be saved in config.
+/// Prompt the user to pick a compute target. Enumerates every detected GPU
+/// and offers CPU as the first option. When more than one GPU is present,
+/// each GPU is listed separately and the user selects one explicitly.
 ///
-/// gpu_layers: 0 = CPU only, -1 = offload all layers to GPU.
-fn setup_gpu_selection() -> Result<(i32, bool)> {
-    use ntk::gpu::{detect_amd, detect_nvidia, is_metal_available, GpuBackend};
+/// Returns `(gpu_layers, gpu_auto_detect, device_id, gpu_vendor)`:
+///   * `gpu_layers`: 0 = CPU only, -1 = offload every layer to the chosen GPU
+///   * `gpu_auto_detect`: always `false` after the wizard — the user has
+///     made an explicit choice
+///   * `device_id`: zero-based index within the chosen vendor's enumeration
+///     (0 when CPU is picked — unused in that case)
+///   * `gpu_vendor`: the vendor of the selected GPU. `None` when CPU is
+///     picked or when no discrete GPU exists. Runtime uses this to route
+///     inference to the right card on multi-vendor systems instead of
+///     silently preferring NVIDIA.
+fn setup_gpu_selection() -> Result<(i32, bool, u32, Option<ntk::gpu::GpuVendor>)> {
+    use ntk::gpu::{enumerate_gpus, GpuBackend};
     use ntk::output::terminal as term;
     use std::io::{self, BufRead, Write};
 
-    let nvidia = detect_nvidia();
-    let amd = detect_amd();
-    let metal = is_metal_available();
+    let gpus = enumerate_gpus();
 
     println!("{}  GPU / Compute Selection{}", term::bold(), term::reset());
     println!(
@@ -1453,156 +1484,75 @@ fn setup_gpu_selection() -> Result<(i32, bool)> {
         term::reset()
     );
 
-    // Determine what hardware was auto-detected
-    let detected_label = if let Some(GpuBackend::CudaNvidia {
-        device_id: _,
-        vram_mb,
-    }) = &nvidia
-    {
-        format!("NVIDIA CUDA  ({vram_mb} MB VRAM)")
-    } else if let Some(GpuBackend::AmdGpu {
-        device_id: _,
-        vram_mb,
-    }) = &amd
-    {
-        format!("AMD ROCm  ({vram_mb} MB VRAM)")
-    } else if metal {
-        "Apple Metal (Apple Silicon)".to_string()
-    } else {
-        // show best CPU tier
-        match ntk::gpu::detect_best_backend() {
-            GpuBackend::IntelAmx => "CPU  Intel AMX".to_string(),
-            GpuBackend::Avx512 => "CPU  AVX-512".to_string(),
-            GpuBackend::Avx2 => "CPU  AVX2".to_string(),
-            _ => "CPU  Scalar".to_string(),
-        }
+    let cpu_label = match ntk::gpu::detect_best_backend() {
+        GpuBackend::IntelAmx => "CPU  Intel AMX",
+        GpuBackend::Avx512 => "CPU  AVX-512",
+        GpuBackend::Avx2 => "CPU  AVX2",
+        _ => "CPU  Scalar",
     };
 
-    println!(
-        "  {}Detected:{} {}",
-        term::dim(),
-        term::reset(),
-        detected_label
-    );
+    if gpus.is_empty() {
+        println!(
+            "  {}Detected:{} {} (no discrete GPU found)",
+            term::dim(),
+            term::reset(),
+            cpu_label
+        );
+    } else if gpus.len() == 1 {
+        println!(
+            "  {}Detected:{} {}",
+            term::dim(),
+            term::reset(),
+            gpus[0]
+        );
+    } else {
+        println!(
+            "  {}Detected:{} {} discrete GPUs",
+            term::dim(),
+            term::reset(),
+            gpus.len()
+        );
+    }
     println!();
 
-    // Build option list: (number, label, status_line, is_available)
-    struct GpuOption {
-        num: u8,
-        label: &'static str,
-        status: String,
-        latency: &'static str,
-        available: bool,
-    }
+    // Option 1 is always CPU; GPUs take options 2..=N+1.
+    println!(
+        "  {}[1]{}  {:<28}  {}✓ always available{}",
+        term::bright_cyan(),
+        term::reset(),
+        cpu_label,
+        term::bright_green(),
+        term::reset()
+    );
 
-    let mut options: Vec<GpuOption> = vec![GpuOption {
-        num: 1,
-        label: "CPU only",
-        status: format!(
-            "{}✓ always available{}",
-            term::bright_green(),
-            term::reset()
-        ),
-        latency: "~300ms p50",
-        available: true,
-    }];
-
-    if let Some(GpuBackend::CudaNvidia { vram_mb, .. }) = &nvidia {
-        let hint = if *vram_mb >= 8_000 {
-            "~50ms p50"
+    for (i, gpu) in gpus.iter().enumerate() {
+        let num = i + 2;
+        let vram_label = if gpu.vram_mb > 0 {
+            format!("{} MB VRAM", gpu.vram_mb)
         } else {
-            "~80ms p50"
+            "unified memory".to_string()
         };
-        options.push(GpuOption {
-            num: 2,
-            label: "NVIDIA GPU  (CUDA)",
-            status: format!(
-                "{}✓{} {vram_mb} MB VRAM",
-                term::bright_green(),
-                term::reset()
-            ),
-            latency: hint,
-            available: true,
-        });
-    } else {
-        options.push(GpuOption {
-            num: 2,
-            label: "NVIDIA GPU  (CUDA)",
-            status: format!("{}◌ not detected{}", term::yellow(), term::reset()),
-            latency: "",
-            available: false,
-        });
+        println!(
+            "  {}[{}]{}  {} {:<20}  {}✓{} {}",
+            term::bright_cyan(),
+            num,
+            term::reset(),
+            gpu.vendor.label(),
+            gpu.name,
+            term::bright_green(),
+            term::reset(),
+            vram_label
+        );
     }
 
-    if let Some(GpuBackend::AmdGpu { vram_mb, .. }) = &amd {
-        options.push(GpuOption {
-            num: 3,
-            label: "AMD GPU  (ROCm)",
-            status: format!(
-                "{}✓{} {vram_mb} MB VRAM",
-                term::bright_green(),
-                term::reset()
-            ),
-            latency: "~100ms p50",
-            available: true,
-        });
-    } else {
-        options.push(GpuOption {
-            num: 3,
-            label: "AMD GPU  (ROCm)",
-            status: format!("{}◌ not detected{}", term::yellow(), term::reset()),
-            latency: "",
-            available: false,
-        });
-    }
-
-    if metal {
-        options.push(GpuOption {
-            num: 4,
-            label: "Apple Metal",
-            status: format!("{}✓ Apple Silicon{}", term::bright_green(), term::reset()),
-            latency: "~80ms p50",
-            available: true,
-        });
-    }
-
-    // Default = first available GPU option, or CPU if none
-    let default_num = options
-        .iter()
-        .filter(|o| o.available && o.num > 1)
-        .map(|o| o.num)
-        .next()
-        .unwrap_or(1);
-
-    for opt in &options {
-        if opt.available {
-            println!(
-                "  {}[{}]{}  {:<24}  {}  {}{}{}",
-                term::bright_cyan(),
-                opt.num,
-                term::reset(),
-                opt.label,
-                opt.status,
-                term::dim(),
-                opt.latency,
-                term::reset()
-            );
-        } else {
-            println!(
-                "  {}[{}]  {:<24}  {}{}",
-                term::dim(),
-                opt.num,
-                opt.label,
-                opt.status,
-                term::reset()
-            );
-        }
-    }
+    // Default = first GPU when one is present, otherwise CPU.
+    let default_num: usize = if gpus.is_empty() { 1 } else { 2 };
 
     println!();
     print!(
-        "  {}Choose or Enter for [{}]:{} ",
+        "  {}Choose [1-{}] or Enter for [{}]:{} ",
         term::bright_cyan(),
+        1 + gpus.len(),
         default_num,
         term::reset()
     );
@@ -1613,19 +1563,26 @@ fn setup_gpu_selection() -> Result<(i32, bool)> {
         .lines()
         .next()
         .unwrap_or(Ok(String::new()))?;
-    let choice = choice_str.trim().parse::<u8>().unwrap_or(default_num);
+    let choice: usize = choice_str.trim().parse().unwrap_or(default_num);
 
     println!();
 
-    // Map choice to (gpu_layers, gpu_auto_detect)
-    let (gpu_layers, gpu_auto_detect) = match choice {
-        2 if nvidia.is_some() => (-1i32, false),
-        3 if amd.is_some() => (-1i32, false),
-        4 if metal => (-1i32, false),
-        _ => (0i32, false), // CPU only
-    };
-
-    Ok((gpu_layers, gpu_auto_detect))
+    if choice <= 1 {
+        return Ok((0, false, 0, None));
+    }
+    let gpu_idx = choice - 2;
+    if let Some(gpu) = gpus.get(gpu_idx) {
+        println!(
+            "  {}✓{} Using {} (device {})",
+            term::bright_green(),
+            term::reset(),
+            gpu,
+            gpu.device_id
+        );
+        return Ok((-1, false, gpu.device_id, Some(gpu.vendor)));
+    }
+    // Invalid choice → fall back to CPU rather than crash.
+    Ok((0, false, 0, None))
 }
 
 fn setup_write_config(provider: &str, existing: &ntk::config::NtkConfig) -> Result<()> {
@@ -1841,7 +1798,7 @@ fn setup_candle(existing: &ntk::config::NtkConfig) -> Result<()> {
         println!();
     }
 
-    let (gpu_layers, gpu_auto_detect) = setup_gpu_selection()?;
+    let (gpu_layers, gpu_auto_detect, device_id, gpu_vendor) = setup_gpu_selection()?;
 
     let mut config = existing.clone();
     config.model.provider = ntk::config::ModelProvider::Candle;
@@ -1849,6 +1806,8 @@ fn setup_candle(existing: &ntk::config::NtkConfig) -> Result<()> {
     config.model.tokenizer_path = Some(tokenizer_path);
     config.model.gpu_layers = gpu_layers;
     config.model.gpu_auto_detect = gpu_auto_detect;
+    config.model.cuda_device = device_id;
+    config.model.gpu_vendor = gpu_vendor;
 
     let sp = term::Spinner::start("Saving configuration…");
     let global_path = ntk::config::global_config_path()?;
@@ -2078,13 +2037,15 @@ fn setup_llamacpp(existing: &ntk::config::NtkConfig) -> Result<()> {
         println!();
     }
 
-    let (gpu_layers, gpu_auto_detect) = setup_gpu_selection()?;
+    let (gpu_layers, gpu_auto_detect, device_id, gpu_vendor) = setup_gpu_selection()?;
 
     let mut config = existing.clone();
     config.model.provider = ntk::config::ModelProvider::LlamaCpp;
     config.model.model_path = Some(model_path);
     config.model.gpu_layers = gpu_layers;
     config.model.gpu_auto_detect = gpu_auto_detect;
+    config.model.cuda_device = device_id;
+    config.model.gpu_vendor = gpu_vendor;
 
     let sp = term::Spinner::start("Saving configuration…");
     let global_path = ntk::config::global_config_path()?;
@@ -2567,8 +2528,12 @@ fn run_model_test(debug: bool) -> Result<()> {
         let n_cpus = std::thread::available_parallelism()
             .map(|n| n.get())
             .unwrap_or(0);
-        let gpu_backend = ntk::gpu::detect_best_backend();
         let gpu_layers = config.model.gpu_layers;
+        let gpu_backend = ntk::gpu::resolve_configured_backend(
+            gpu_layers,
+            config.model.gpu_vendor,
+            config.model.cuda_device,
+        );
         let use_gpu = gpu_layers != 0;
 
         // generation threads mirrors layer3_llamacpp::generation_threads()
@@ -3113,7 +3078,11 @@ fn run_model_bench() -> Result<()> {
     }
 
     println!();
-    let gpu = ntk::gpu::detect_best_backend();
+    let gpu = ntk::gpu::resolve_configured_backend(
+        config.model.gpu_layers,
+        config.model.gpu_vendor,
+        config.model.cuda_device,
+    );
     println!(
         "{}GPU backend:{} {}{}{}",
         term::bold(),
@@ -3323,6 +3292,9 @@ fn run_bench(runs: usize, with_l3: bool) -> Result<()> {
     use ntk::compressor::{layer1_filter, layer2_tokenizer};
     use std::time::Instant;
 
+    let cwd = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
+    let config = ntk::config::load(&cwd).unwrap_or_default();
+
     println!("NTK Compression Benchmark  ({runs} runs per payload)");
     println!("══════════════════════════════════════════════════════════════════");
     println!(
@@ -3436,7 +3408,14 @@ fn run_bench(runs: usize, with_l3: bool) -> Result<()> {
     }
 
     println!();
-    println!("GPU backend: {}", ntk::gpu::detect_best_backend());
+    println!(
+        "GPU backend: {}",
+        ntk::gpu::resolve_configured_backend(
+            config.model.gpu_layers,
+            config.model.gpu_vendor,
+            config.model.cuda_device,
+        )
+    );
     Ok(())
 }
 

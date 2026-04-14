@@ -34,6 +34,12 @@ pub struct LlamaCppBackend {
     pub n_gpu_layers: i32,
     pub timeout_ms: u64,
     pub context_size: usize,
+    /// GPU vendor the user explicitly picked in `ntk model setup`, used to
+    /// scope the subprocess visibility (CUDA_VISIBLE_DEVICES / HIP_VISIBLE_DEVICES)
+    /// so inference lands on the chosen card on multi-vendor systems.
+    pub gpu_vendor: Option<crate::gpu::GpuVendor>,
+    /// Zero-based device index within the chosen vendor.
+    pub gpu_device_id: u32,
     /// Running llama-server child process (None if not started or managed externally).
     process: Arc<Mutex<Option<std::process::Child>>>,
 }
@@ -46,8 +52,22 @@ impl LlamaCppBackend {
             n_gpu_layers,
             timeout_ms,
             context_size: 4096,
+            gpu_vendor: None,
+            gpu_device_id: 0,
             process: Arc::new(Mutex::new(None)),
         }
+    }
+
+    /// Pin this backend to a specific GPU (vendor + per-vendor index). Chainable
+    /// alternative to a constructor explosion — call after `new()`.
+    pub fn with_gpu_selection(
+        mut self,
+        vendor: Option<crate::gpu::GpuVendor>,
+        device_id: u32,
+    ) -> Self {
+        self.gpu_vendor = vendor;
+        self.gpu_device_id = device_id;
+        self
     }
 
     /// Constructor for testing: supply an arbitrary server URL instead of spawning
@@ -65,6 +85,8 @@ impl LlamaCppBackend {
             n_gpu_layers,
             timeout_ms,
             context_size,
+            gpu_vendor: None,
+            gpu_device_id: 0,
             process: Arc::new(Mutex::new(None)),
         }
     }
@@ -120,6 +142,27 @@ impl LlamaCppBackend {
         );
 
         let mut cmd = std::process::Command::new(&binary);
+
+        // Route inference to the exact GPU the user picked in `ntk model setup`.
+        // llama-server builds (CUDA / HIP / Vulkan) honour these env vars as
+        // device visibility filters, so a selected AMD card on a system that
+        // also has an NVIDIA card actually gets used instead of CUDA winning.
+        if use_gpu {
+            let id = self.gpu_device_id.to_string();
+            match self.gpu_vendor {
+                Some(crate::gpu::GpuVendor::Nvidia) => {
+                    cmd.env("CUDA_VISIBLE_DEVICES", &id);
+                }
+                Some(crate::gpu::GpuVendor::Amd) => {
+                    cmd.env("HIP_VISIBLE_DEVICES", &id);
+                    cmd.env("ROCR_VISIBLE_DEVICES", &id);
+                    cmd.env("GGML_VK_VISIBLE_DEVICES", &id);
+                }
+                // Apple Metal / Intel / unset — no env scoping needed.
+                _ => {}
+            }
+        }
+
         cmd.arg("--model")
             .arg(&self.model_path)
             .arg("--port")
