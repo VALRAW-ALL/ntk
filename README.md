@@ -1,6 +1,6 @@
 # NTK - Neural Token Killer
 
-> Semantic compression proxy for Claude Code. Reduces tool output token count by 60–90% before it reaches the model context - without losing the information that matters.
+> **v0.2.18** — Semantic compression proxy for Claude Code. Reduces tool output token count by 60–90% before it reaches the model context - without losing the information that matters.
 
 ---
 
@@ -529,18 +529,19 @@ workstation, an M-series Mac, an AMD box, and a bare CPU server alike.
 ### Release binary variants
 
 The `release.yml` workflow publishes one binary per platform × scenario,
-with a `-cpu` or `-gpu` suffix:
+with a `-cpu` or `-gpu` suffix. All 8 artifacts are built and released
+on every version bump:
 
-| Artifact | Contents |
-|---|---|
-| `ntk-linux-x86_64-cpu`        | CPU-only, Candle disabled. |
-| `ntk-linux-x86_64-gpu`        | Candle + CUDA. Requires NVIDIA driver at runtime. |
-| `ntk-linux-aarch64-cpu`       | CPU-only. |
-| `ntk-darwin-x86_64-cpu`       | CPU-only (Intel Macs). |
-| `ntk-darwin-aarch64-cpu`      | CPU-only (Apple Silicon). |
-| `ntk-darwin-aarch64-gpu`      | Candle + Metal (Apple Silicon). |
-| `ntk-windows-x86_64-cpu.exe`  | CPU-only. |
-| `ntk-windows-x86_64-gpu.exe`  | Candle + CUDA. Requires NVIDIA driver. |
+| Artifact | Contents | CI runner |
+|---|---|---|
+| `ntk-linux-x86_64-cpu`        | CPU-only, Candle disabled. | ubuntu-latest |
+| `ntk-linux-x86_64-gpu`        | Candle + CUDA (sm_80+). Requires NVIDIA driver ≥ 520 at runtime. | nvidia/cuda:12.5.1-devel-ubuntu22.04 container |
+| `ntk-linux-aarch64-cpu`       | CPU-only. | ubuntu-latest + taiki-e cross-toolchain |
+| `ntk-darwin-x86_64-cpu`       | CPU-only (Intel Macs). | macos-latest |
+| `ntk-darwin-aarch64-cpu`      | CPU-only (Apple Silicon). | macos-latest |
+| `ntk-darwin-aarch64-gpu`      | Candle + Metal (Apple Silicon). | macos-latest |
+| `ntk-windows-x86_64-cpu.exe`  | CPU-only. | windows-latest |
+| `ntk-windows-x86_64-gpu.exe`  | Candle + CUDA (sm_80+). Requires NVIDIA driver ≥ 520 at runtime. | windows-latest + Jimver CUDA 12.5 |
 
 The shell / PowerShell installers pick the right artifact automatically
 based on the user's platform choice (NVIDIA / AMD / CPU). There is no
@@ -548,6 +549,12 @@ dedicated AMD `-gpu` binary because Candle has no AMD backend — AMD users
 get the `-cpu` binary and point NTK at an external `llama-server`
 compiled with Vulkan (step-by-step in the installer's post-install hint
 and in the [AMD GPUs](#amd-gpus) section below).
+
+> **Compute capability:** the `-gpu` binaries target `sm_80` (Ampere and
+> newer: RTX 30xx, RTX 40xx, A100, H100). They run on any NVIDIA GPU with
+> compute capability ≥ 8.0. For older GPUs (Pascal sm_60, Turing sm_75,
+> etc.) build from source with `CUDA_COMPUTE_CAP=<cap> cargo build
+> --release --features cuda`.
 
 ### Prerequisites for GPU features
 
@@ -557,13 +564,18 @@ which bindings get compiled, and the SDK has to be present at build time.
 | Feature flag | Required on the build machine |
 |---|---|
 | *(none, default)* | Just Rust stable. Nothing GPU-specific. |
-| `cuda` | **CUDA Toolkit ≥ 12.0** with `nvcc` on `PATH`. The runtime host also needs the NVIDIA driver.  Install: `winget install Nvidia.CUDA` (Windows) or NVIDIA's official `.run`/apt packages (Linux). |
-| `metal` | **macOS on Apple Silicon (aarch64)**. Metal ships with Xcode Command Line Tools — `xcode-select --install` is enough. Intel Macs may compile but are not supported; Linux and Windows will not link. |
+| `cuda` | **CUDA Toolkit 12.x** with `nvcc` on `PATH` **and** the following libs: `cudart`, `cublas`, `cublas_dev`, `curand`, `curand_dev`, `nvrtc`, `nvrtc_dev`. Install: `winget install Nvidia.CUDA` (Windows) or the NVIDIA network installer for your distro (Linux). |
+| `metal` | **macOS on Apple Silicon (aarch64)**. Metal ships with Xcode Command Line Tools — `xcode-select --install`. Intel Macs may compile but are not supported at runtime. |
 
-If `cargo build --release --features cuda` fails with
-`Failed to execute nvcc: program not found`, the CUDA Toolkit isn't installed
-(or `nvcc` isn't on `PATH`). Install it, reopen the shell, then
-`cargo clean && cargo build --release --features cuda`.
+**CUDA build troubleshooting:**
+
+| Error | Fix |
+|---|---|
+| `Failed to execute nvcc` | Install CUDA Toolkit, reopen shell |
+| `Cannot find compiler 'cl.exe'` (Windows) | Open **Developer Command Prompt** or activate MSVC env first |
+| `LNK1181: cannot open input file 'nvrtc.lib'` (Windows) | Re-install CUDA with `nvrtc` + `nvrtc_dev` components |
+| `Cannot open input file 'libcuda.so'` (Linux headless) | `export LIBRARY_PATH=/usr/local/cuda/lib64/stubs RUSTFLAGS="-L /usr/local/cuda/lib64/stubs"` |
+| `nvidia-smi` fails at build time | `export CUDA_COMPUTE_CAP=80` (or your GPU's sm number) |
 
 ### AMD GPUs
 
