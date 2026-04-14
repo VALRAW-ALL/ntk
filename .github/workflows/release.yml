@@ -191,7 +191,15 @@ jobs:
           cargo build --release \
             --target ${{ matrix.target }} \
             --no-default-features \
-            --features ${{ matrix.features }}
+            --features ${{ matrix.features }} 2>&1 | tee /tmp/build_output.txt
+          EXIT=${PIPESTATUS[0]}
+          if [ "$EXIT" -ne 0 ]; then
+            echo "## Build failed — cargo output" >> $GITHUB_STEP_SUMMARY
+            echo '```' >> $GITHUB_STEP_SUMMARY
+            tail -100 /tmp/build_output.txt >> $GITHUB_STEP_SUMMARY
+            echo '```' >> $GITHUB_STEP_SUMMARY
+          fi
+          exit $EXIT
 
       - name: Stage artifact (Unix)
         if: runner.os != 'Windows'
