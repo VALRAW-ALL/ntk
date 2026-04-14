@@ -583,7 +583,7 @@ fn amd_gpus_os_fallback() -> Vec<GpuDevice> {
             name,
             vram_mb: vram_bytes / 1_048_576,
         });
-        idx += 1;
+        idx = idx.saturating_add(1);
     }
     out
 }

@@ -275,17 +275,21 @@ async fn async_run_daemon(gpu: bool) -> Result<()> {
             tracing::warn!("--gpu requested but no discrete GPU was detected; falling back to CPU");
         } else {
             let chosen_id = config.model.cuda_device as usize;
-            let chosen = gpus.get(chosen_id).or_else(|| gpus.first()).unwrap();
-            tracing::info!(
-                "GPU inference enabled: {} (device {})",
-                chosen,
-                chosen.device_id
-            );
-            if gpus.len() > 1 {
+            // `gpus` is non-empty (outer branch), so `.first()` is always Some
+            // and this fallback never fails. Prefer a match over `.unwrap()` so
+            // the security-gate clippy lint (`-W clippy::unwrap_used`) stays green.
+            if let Some(chosen) = gpus.get(chosen_id).or_else(|| gpus.first()) {
                 tracing::info!(
-                    "{} GPUs detected — run `ntk model setup` to pick a different one",
-                    gpus.len()
+                    "GPU inference enabled: {} (device {})",
+                    chosen,
+                    chosen.device_id
                 );
+                if gpus.len() > 1 {
+                    tracing::info!(
+                        "{} GPUs detected — run `ntk model setup` to pick a different one",
+                        gpus.len()
+                    );
+                }
             }
         }
     }
@@ -1519,7 +1523,7 @@ fn setup_gpu_selection() -> Result<(i32, bool, u32, Option<ntk::gpu::GpuVendor>)
     );
 
     for (i, gpu) in gpus.iter().enumerate() {
-        let num = i + 2;
+        let num = i.saturating_add(2);
         let vram_label = if gpu.vram_mb > 0 {
             format!("{} MB VRAM", gpu.vram_mb)
         } else {
@@ -1542,10 +1546,11 @@ fn setup_gpu_selection() -> Result<(i32, bool, u32, Option<ntk::gpu::GpuVendor>)
     let default_num: usize = if gpus.is_empty() { 1 } else { 2 };
 
     println!();
+    let max_choice = gpus.len().saturating_add(1);
     print!(
         "  {}Choose [1-{}] or Enter for [{}]:{} ",
         term::bright_cyan(),
-        1 + gpus.len(),
+        max_choice,
         default_num,
         term::reset()
     );
@@ -1563,7 +1568,7 @@ fn setup_gpu_selection() -> Result<(i32, bool, u32, Option<ntk::gpu::GpuVendor>)
     if choice <= 1 {
         return Ok((0, false, 0, None));
     }
-    let gpu_idx = choice - 2;
+    let gpu_idx = choice.saturating_sub(2);
     if let Some(gpu) = gpus.get(gpu_idx) {
         println!(
             "  {}✓{} Using {} (device {})",
