@@ -104,6 +104,9 @@ pub struct ModelConfig {
     pub llama_server_port: u16,
     /// Auto-start llama-server at daemon startup. Default: true.
     pub llama_server_auto_start: bool,
+    /// Milliseconds to wait for llama-server to become healthy after spawning.
+    /// Loading a 2.2 GB GGUF model on CPU can take 30-60 s. Default: 60 000.
+    pub llama_server_start_timeout_ms: u64,
 }
 
 impl Default for ModelConfig {
@@ -125,6 +128,7 @@ impl Default for ModelConfig {
             tokenizer_path: None,
             llama_server_port: 8766,
             llama_server_auto_start: true,
+            llama_server_start_timeout_ms: 60_000,
         }
     }
 }

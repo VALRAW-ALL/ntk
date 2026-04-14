@@ -34,9 +34,11 @@ pub struct LlamaCppBackend {
     pub n_gpu_layers: i32,
     pub timeout_ms: u64,
     pub context_size: usize,
-    /// GPU vendor the user explicitly picked in `ntk model setup`, used to
-    /// scope the subprocess visibility (CUDA_VISIBLE_DEVICES / HIP_VISIBLE_DEVICES)
-    /// so inference lands on the chosen card on multi-vendor systems.
+    /// How long to wait for llama-server to pass its /health check after
+    /// spawning. Loading a 2.2 GB GGUF on CPU takes 30-60 s; the default
+    /// of 10 s was too short. Configurable via model.llama_server_start_timeout_ms.
+    pub start_timeout_ms: u64,
+    /// GPU vendor the user explicitly picked in `ntk model setup`.
     pub gpu_vendor: Option<crate::gpu::GpuVendor>,
     /// Zero-based device index within the chosen vendor.
     pub gpu_device_id: u32,
@@ -52,10 +54,17 @@ impl LlamaCppBackend {
             n_gpu_layers,
             timeout_ms,
             context_size: 4096,
+            start_timeout_ms: 60_000,
             gpu_vendor: None,
             gpu_device_id: 0,
             process: Arc::new(Mutex::new(None)),
         }
+    }
+
+    /// Override the startup health-check timeout (default 60 s).
+    pub fn with_start_timeout(mut self, ms: u64) -> Self {
+        self.start_timeout_ms = ms;
+        self
     }
 
     /// Pin this backend to a specific GPU (vendor + per-vendor index). Chainable
@@ -85,6 +94,7 @@ impl LlamaCppBackend {
             n_gpu_layers,
             timeout_ms,
             context_size,
+            start_timeout_ms: 60_000,
             gpu_vendor: None,
             gpu_device_id: 0,
             process: Arc::new(Mutex::new(None)),
@@ -207,7 +217,7 @@ impl LlamaCppBackend {
         }
 
         // Wait up to 10 s for the server to become healthy.
-        self.wait_for_healthy(10_000).await?;
+        self.wait_for_healthy(self.start_timeout_ms).await?;
         tracing::info!("llama.cpp: server healthy at {}", self.server_url);
         Ok(())
     }
