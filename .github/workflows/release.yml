@@ -180,13 +180,21 @@ jobs:
           "CUDA_COMPUTE_CAP=80"        | Out-File $env:GITHUB_ENV -Append
 
       # nvcc on Windows needs cl.exe (MSVC host compiler) in PATH to compile
-      # .cu kernel files. In a bash shell on GitHub Actions, the Visual Studio
-      # environment is not active by default. ilammy/msvc-dev-cmd runs
-      # vcvarsall.bat and exports all MSVC vars (including cl.exe path) to
-      # GITHUB_ENV so subsequent steps — including the cargo build — see them.
+      # .cu kernel files. ilammy/msvc-dev-cmd runs vcvarsall.bat and exports
+      # MSVC paths to GITHUB_ENV so subsequent steps see cl.exe.
       - name: Set up MSVC environment (Windows CUDA)
         if: matrix.cuda_windows == true
         uses: ilammy/msvc-dev-cmd@v1
+
+      # After ilammy sets up MSVC, Git for Windows puts its own link.exe
+      # (C:\Program Files\Git\usr\bin\link.exe — a Unix hard-link tool) ahead
+      # of the MSVC linker in PATH. Rust picks it up and the link fails with
+      # "/usr/bin/link: extra operand". Remove Git's link.exe so the MSVC
+      # link.exe is resolved correctly.
+      - name: Remove Git link.exe (prevents MSVC linker conflict on Windows)
+        if: matrix.cuda_windows == true
+        shell: pwsh
+        run: Remove-Item "C:\Program Files\Git\usr\bin\link.exe" -Force -ErrorAction SilentlyContinue
 
       # ── Cargo cache ───────────────────────────────────────────────────────
       - name: Cache cargo

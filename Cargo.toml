@@ -1,6 +1,6 @@
 [package]
 name = "ntk"
-version = "0.2.16"
+version = "0.2.17"
 edition = "2021"
 description = "Neural Token Killer — semantic compression proxy for Claude Code"
 license = "Apache-2.0"
