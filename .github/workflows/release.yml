@@ -156,6 +156,11 @@ jobs:
             libcurand-12-5 libcurand-dev-12-5
           echo "CUDA_PATH=/usr/local/cuda-12.5" >> $GITHUB_ENV
           echo "/usr/local/cuda-12.5/bin" >> $GITHUB_PATH
+          # CI runners have no GPU driver (libcuda.so). Point the linker at
+          # NVIDIA's provided stub so cudarc/candle-cuda can link at compile
+          # time even without a physical GPU.
+          echo "LIBRARY_PATH=/usr/local/cuda-12.5/lib64/stubs:${LIBRARY_PATH}" >> $GITHUB_ENV
+          echo "LD_LIBRARY_PATH=/usr/local/cuda-12.5/lib64/stubs:${LD_LIBRARY_PATH}" >> $GITHUB_ENV
 
       - name: Install CUDA 12.5 (Windows)
         if: matrix.cuda == true && runner.os == 'Windows'
@@ -183,6 +188,11 @@ jobs:
           "CUDA_PATH_V12_5=$cudaRoot"     | Out-File -FilePath $env:GITHUB_ENV -Append
           "$cudaRoot\bin"                 | Out-File -FilePath $env:GITHUB_PATH -Append
           "$cudaRoot\libnvvp"             | Out-File -FilePath $env:GITHUB_PATH -Append
+          # Expose the import-lib directory so the Rust linker (link.exe)
+          # finds cuda.lib / cublas.lib / curand.lib at compile time.
+          # CI runners have no GPU driver; these .lib stubs satisfy the
+          # linker without needing a physical GPU present.
+          "LIB=$cudaRoot\lib\x64;$env:LIB" | Out-File -FilePath $env:GITHUB_ENV -Append
 
       - name: Cache cargo
         uses: actions/cache@v4
