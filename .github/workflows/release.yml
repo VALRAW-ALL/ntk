@@ -50,6 +50,7 @@ jobs:
     needs: check-version
     if: needs.check-version.outputs.should_release == 'true'
     runs-on: ${{ matrix.runner }}
+    continue-on-error: ${{ matrix.continue_on_error == true }}
     strategy:
       fail-fast: false
       matrix:
@@ -61,15 +62,16 @@ jobs:
             kind: cpu
             features: sqlite-bundled
 
-          # CUDA 12.5 apt channel is published for Ubuntu 22.04 (jammy);
-          # ubuntu-latest (24.04 noble) doesn't have the metapackages yet,
-          # which makes Jimver/cuda-toolkit's apt-get exit 100.
+          # CUDA 12.5 apt channel is published for Ubuntu 22.04 (jammy).
+          # continue_on_error: true so a CUDA toolchain regression never
+          # blocks releasing the CPU artifacts.
           - runner: ubuntu-22.04
             target: x86_64-unknown-linux-gnu
             artifact: ntk-linux-x86_64-gpu
             kind: gpu
             features: sqlite-bundled,cuda
             cuda: true
+            continue_on_error: true
 
           # --- Linux aarch64 (sem GPU — nenhum backend Candle compatível) ---
           - runner: ubuntu-latest
@@ -112,6 +114,7 @@ jobs:
             kind: gpu
             features: sqlite-bundled,cuda
             cuda: true
+            continue_on_error: true
 
     steps:
       - uses: actions/checkout@v4
@@ -154,13 +157,16 @@ jobs:
             cuda-nvcc-12-5 cuda-cudart-dev-12-5 \
             libcublas-12-5 libcublas-dev-12-5 \
             libcurand-12-5 libcurand-dev-12-5
-          echo "CUDA_PATH=/usr/local/cuda-12.5" >> $GITHUB_ENV
-          echo "/usr/local/cuda-12.5/bin" >> $GITHUB_PATH
-          # CI runners have no GPU driver (libcuda.so). Point the linker at
-          # NVIDIA's provided stub so cudarc/candle-cuda can link at compile
-          # time even without a physical GPU.
-          echo "LIBRARY_PATH=/usr/local/cuda-12.5/lib64/stubs:${LIBRARY_PATH}" >> $GITHUB_ENV
-          echo "LD_LIBRARY_PATH=/usr/local/cuda-12.5/lib64/stubs:${LD_LIBRARY_PATH}" >> $GITHUB_ENV
+          CUDA=/usr/local/cuda-12.5
+          echo "CUDA_PATH=$CUDA" >> $GITHUB_ENV
+          echo "$CUDA/bin" >> $GITHUB_PATH
+          # CI runners have no GPU driver (libcuda.so). Use NVIDIA's provided
+          # linker stubs so cudarc/candle-cuda can link at compile time without
+          # a physical GPU.  Both LIBRARY_PATH (for cc) and RUSTFLAGS -L (for
+          # Rust's own linker invocation) are needed because Rust does not
+          # inherit LIBRARY_PATH on Linux.
+          echo "LIBRARY_PATH=$CUDA/lib64/stubs:${LIBRARY_PATH}" >> $GITHUB_ENV
+          echo "RUSTFLAGS=-L $CUDA/lib64/stubs ${RUSTFLAGS}" >> $GITHUB_ENV
 
       - name: Install CUDA 12.5 (Windows)
         if: matrix.cuda == true && runner.os == 'Windows'
@@ -232,7 +238,12 @@ jobs:
   # ── 3. Cria a release no GitHub ───────────────────────────────────────────
   release:
     name: Create GitHub Release
+    # `always()` lets this job run even when some build matrix entries that
+    # have `continue-on-error: true` (the CUDA GPU builds) fail, so CPU
+    # artifacts are always published.  The `needs.build.result` check still
+    # guards against a total build failure.
     needs: [check-version, build]
+    if: always() && needs.check-version.outputs.should_release == 'true' && needs.build.result != 'cancelled'
     runs-on: ubuntu-latest
     permissions:
       contents: write
