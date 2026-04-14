@@ -163,7 +163,7 @@ jobs:
         with:
           cuda: '12.5.0'
           method: 'network'
-          sub-packages: '["nvcc", "cudart", "cublas", "cublas_dev", "curand", "curand_dev", "visual_studio_integration"]'
+          sub-packages: '["nvcc", "cudart", "cublas", "cublas_dev", "curand", "curand_dev", "nvrtc", "nvrtc_dev", "visual_studio_integration"]'
 
       # Export paths so Rust's linker (link.exe) and cudarc find CUDA.
       - name: Configure CUDA env (Windows)
