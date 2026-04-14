@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(mkdir -p C:/Users/Alessandro/Desktop/ntk/.claude/rules)",
+      "Bash(cp ~/.claude/rules/ntk-cuda-ci.md C:/Users/Alessandro/Desktop/ntk/.claude/rules/cuda-ci.md)",
+      "Bash(cp ~/.claude/rules/ntk-clippy-gate.md C:/Users/Alessandro/Desktop/ntk/.claude/rules/clippy-gate.md)",
+      "Bash(cp ~/.claude/rules/ntk-gpu-vendor.md C:/Users/Alessandro/Desktop/ntk/.claude/rules/gpu-vendor.md)",
+      "Bash(cp ~/.claude/skills/ntk-ci-validate.md C:/Users/Alessandro/Desktop/ntk/.claude/skills/ci-validate.md)"
+    ]
+  }
+}
