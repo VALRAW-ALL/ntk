@@ -82,6 +82,10 @@ pub struct ModelConfig {
     pub model_name: String,
     pub quantization: String,
     pub ollama_url: String,
+    /// Upper bound for a single /compress call including Layer 3 inference.
+    /// Large fixtures (> 1K tokens) on CPU-only Ollama/llama.cpp can take
+    /// 60-180 s; default is 300 000 ms (5 min) so most real-world contexts
+    /// complete before falling back to L2. Scale down for GPU setups.
     pub timeout_ms: u64,
     pub fallback_to_layer1_on_timeout: bool,
     pub temperature: f32,
@@ -116,7 +120,7 @@ impl Default for ModelConfig {
             model_name: "phi3:mini".to_string(),
             quantization: "q5_k_m".to_string(),
             ollama_url: "http://localhost:11434".to_string(),
-            timeout_ms: 2000,
+            timeout_ms: 300_000,
             fallback_to_layer1_on_timeout: true,
             temperature: 0.1,
             gpu_layers: -1,

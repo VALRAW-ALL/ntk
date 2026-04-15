@@ -1,6 +1,6 @@
 # NTK - Neural Token Killer
 
-> **v0.2.25** — Semantic compression proxy for Claude Code. Reduces tool output token count by 60–90% before it reaches the model context - without losing the information that matters.
+> **v0.2.26** — Semantic compression proxy for Claude Code. Reduces tool output token count by 60–90% before it reaches the model context - without losing the information that matters.
 
 ---
 
@@ -373,7 +373,7 @@ NTK merges configuration from two sources, in order:
     "model_name": "phi3:mini",
     "quantization": "q5_k_m",
     "ollama_url": "http://localhost:11434",
-    "timeout_ms": 2000,
+    "timeout_ms": 300000,
     "fallback_to_layer1_on_timeout": true,
     "gpu_layers": -1,
     "gpu_auto_detect": true,
@@ -400,6 +400,7 @@ NTK merges configuration from two sources, in order:
 | Setting | Default | Description |
 |---|---|---|
 | `compression.inference_threshold_tokens` | `300` | Layer 3 only activates above this token count |
+| `model.timeout_ms` | `300000` (5 min) | Upper bound on a single `/compress` call. L3 inference on CPU can take 60-180 s on large inputs. The daemon falls back to L1+L2 after this window. Lower to 60 000 for GPU setups. |
 | `model.fallback_to_layer1_on_timeout` | `true` | Use L1+L2 output if Ollama is slow or unavailable |
 | `model.gpu_layers` | `-1` | `-1` = all layers on GPU; `0` = CPU only |
 | `model.gpu_vendor` | `null` | `"nvidia"` / `"amd"` / `"apple"` — the card the user picked in `ntk model setup`. `null` = auto-detect. Runtime honours this verbatim instead of silently preferring NVIDIA on multi-vendor systems. |

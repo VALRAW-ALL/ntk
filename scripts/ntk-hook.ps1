@@ -11,9 +11,11 @@ $ErrorActionPreference = 'Stop'
 
 $NtkDaemonUrl = if ($env:NTK_DAEMON_URL) { $env:NTK_DAEMON_URL } else { "http://127.0.0.1:8765" }
 $MinChars     = 500
-# 65 s = slightly more than model.timeout_ms (60 s) so the daemon can fall back
-# to L1+L2 before this request times out. Keep below Claude Code's own hook timeout.
-$TimeoutSecs  = 65
+# 305 s = slightly more than model.timeout_ms default (300 s / 5 min) so the
+# daemon can fall back to L1+L2 before this request times out. Wide enough
+# for large L3 inferences on CPU; short enough to stay within Claude Code's
+# own hook timeout if any is enforced by future versions.
+$TimeoutSecs  = 305
 
 # Read stdin — use $input pipeline variable (works for both piped and redirected stdin).
 # [Console]::In.ReadToEnd() fails when PowerShell is launched as a subprocess with

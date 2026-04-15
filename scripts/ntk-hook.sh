@@ -10,7 +10,9 @@ set -euo pipefail
 
 NTK_DAEMON_URL="${NTK_DAEMON_URL:-http://127.0.0.1:8765}"
 MIN_CHARS=500       # skip compression for short outputs
-TIMEOUT_SECS=10     # max wait for daemon response
+# 305 s = just over the daemon's default model.timeout_ms (300 s / 5 min) so
+# the daemon has time to fall back to L1+L2 before this request aborts.
+TIMEOUT_SECS=305
 
 # Read full stdin into a variable.
 input=$(cat)
