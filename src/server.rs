@@ -54,6 +54,16 @@ pub struct CompressRequest {
     pub context: Option<String>,
 }
 
+#[derive(Debug, Serialize, Default)]
+pub struct LayerLatency {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub l1: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub l2: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub l3: Option<u64>,
+}
+
 #[derive(Debug, Serialize)]
 pub struct CompressResponse {
     pub compressed: String,
@@ -61,6 +71,22 @@ pub struct CompressResponse {
     pub layer: u8,
     pub tokens_before: usize,
     pub tokens_after: usize,
+    /// Token count after Layer 1 alone (before L2 runs). `None` for passthrough.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tokens_after_l1: Option<usize>,
+    /// Token count after Layer 2 (before L3 runs). `None` for passthrough.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tokens_after_l2: Option<usize>,
+    /// Token count after Layer 3 (if triggered). `None` when L3 skipped.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tokens_after_l3: Option<usize>,
+    /// Per-layer latency in milliseconds.
+    #[serde(default, skip_serializing_if = "is_empty_latency")]
+    pub latency_ms: LayerLatency,
+}
+
+fn is_empty_latency(l: &LayerLatency) -> bool {
+    l.l1.is_none() && l.l2.is_none() && l.l3.is_none()
 }
 
 #[derive(Debug, Serialize)]
@@ -114,6 +140,10 @@ async fn handle_compress(
             layer: 0,
             tokens_before: tokens,
             tokens_after: tokens,
+            tokens_after_l1: None,
+            tokens_after_l2: None,
+            tokens_after_l3: None,
+            latency_ms: LayerLatency::default(),
         }));
     }
 
@@ -123,26 +153,43 @@ async fn handle_compress(
     let original_tokens = layer2_tokenizer::count_tokens(&req.output)
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
-    // Layer 1
+    // Layer 1 — with per-layer timing
+    let l1_start = Instant::now();
     let l1 = layer1_filter::filter(&req.output);
+    let l1_latency = l1_start.elapsed().as_millis() as u64;
+    let tokens_after_l1 = layer2_tokenizer::count_tokens(&l1.output)
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
     // Layer 2
+    let l2_start = Instant::now();
     let l2 = layer2_tokenizer::process(&l1.output)
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    let l2_latency = l2_start.elapsed().as_millis() as u64;
+    let tokens_after_l2 = l2.compressed_tokens;
 
     let threshold = state.config.compression.inference_threshold_tokens;
     let output_type = detector::detect(&req.output);
 
-    let (output, layer_used) =
+    // Layer 3 (optional, only when threshold exceeded)
+    let mut l3_latency: Option<u64> = None;
+    let mut tokens_after_l3: Option<usize> = None;
+    let (output, layer_used, final_tokens) =
         if state.config.compression.layer3_enabled && l2.compressed_tokens > threshold {
             // Prompts dir: NTK_PROMPTS_DIR env var, or ~/.ntk/system-prompts/, or ./system-prompts/
             let prompts_dir = crate::config::resolve_prompts_dir();
-            match state
+            let l3_start = Instant::now();
+            let l3_result = state
                 .backend
                 .compress(&l2.output, output_type, &prompts_dir)
-                .await
-            {
-                Ok(l3) => (l3.output, 3u8),
+                .await;
+            l3_latency = Some(l3_start.elapsed().as_millis() as u64);
+            match l3_result {
+                Ok(l3) => {
+                    let l3_tokens = layer2_tokenizer::count_tokens(&l3.output)
+                        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+                    tokens_after_l3 = Some(l3_tokens);
+                    (l3.output, 3u8, l3_tokens)
+                }
                 Err(e) => {
                     tracing::warn!(
                         "Layer 3 inference failed ({name}): {e}",
@@ -150,7 +197,7 @@ async fn handle_compress(
                     );
                     // Graceful fallback: Layer 3 unavailable → use Layer 2 output.
                     if state.config.model.fallback_to_layer1_on_timeout {
-                        (l2.output.clone(), 2u8)
+                        (l2.output.clone(), 2u8, l2.compressed_tokens)
                     } else {
                         return Err((
                             StatusCode::SERVICE_UNAVAILABLE,
@@ -163,11 +210,11 @@ async fn handle_compress(
                 }
             }
         } else {
-            (l2.output.clone(), 2u8)
+            (l2.output.clone(), 2u8, l2.compressed_tokens)
         };
 
     let latency_ms = started.elapsed().as_millis() as u64;
-    let compressed_tokens = l2.compressed_tokens;
+    let compressed_tokens = final_tokens;
 
     let ratio = if original_tokens == 0 {
         0.0
@@ -201,13 +248,58 @@ async fn handle_compress(
         });
     }
 
-    Ok(RespJson(CompressResponse {
-        compressed: output,
+    let response = CompressResponse {
+        compressed: output.clone(),
         ratio,
         layer: layer_used,
         tokens_before: original_tokens,
         tokens_after: compressed_tokens,
-    }))
+        tokens_after_l1: Some(tokens_after_l1),
+        tokens_after_l2: Some(tokens_after_l2),
+        tokens_after_l3,
+        latency_ms: LayerLatency {
+            l1: Some(l1_latency),
+            l2: Some(l2_latency),
+            l3: l3_latency,
+        },
+    };
+
+    // Opt-in: persist the full compression trace to ~/.ntk/logs/ for
+    // benchmarking / auditing when NTK_LOG_COMPRESSIONS=1 is set.
+    if std::env::var("NTK_LOG_COMPRESSIONS").ok().as_deref() == Some("1") {
+        let log_payload = CompressionLog {
+            ts: Utc::now(),
+            command: req.command.clone().unwrap_or_default(),
+            cwd: req.context.clone().unwrap_or_default(),
+            input: req.output.clone(),
+            after_l1: l1.output.clone(),
+            after_l2: l2.output.clone(),
+            after_l3: if layer_used == 3 {
+                Some(output.clone())
+            } else {
+                None
+            },
+            final_output: output,
+            tokens: LogTokens {
+                before: original_tokens,
+                l1: tokens_after_l1,
+                l2: tokens_after_l2,
+                l3: tokens_after_l3,
+            },
+            latency_ms_total: latency_ms,
+            latency_ms_l1: l1_latency,
+            latency_ms_l2: l2_latency,
+            latency_ms_l3: l3_latency,
+            layer_used,
+        };
+        tokio::spawn(async move {
+            if let Err(e) = write_compression_log(&log_payload) {
+                tracing::warn!("failed to write compression log: {e}");
+            }
+        });
+    }
+
+    Ok(RespJson(response))
 }
 
 // ---------------------------------------------------------------------------
@@ -301,4 +393,53 @@ async fn handle_state(
         backend_name: state.backend_name.clone(),
         model_info: state.model_info.clone(),
     }))
+}
+
+// ---------------------------------------------------------------------------
+// Compression log — opt-in disk persistence for benchmarking (NTK_LOG_COMPRESSIONS=1)
+// ---------------------------------------------------------------------------
+
+#[derive(Debug, Serialize)]
+struct LogTokens {
+    before: usize,
+    l1: usize,
+    l2: usize,
+    l3: Option<usize>,
+}
+
+#[derive(Debug, Serialize)]
+struct CompressionLog {
+    ts: chrono::DateTime<Utc>,
+    command: String,
+    cwd: String,
+    input: String,
+    after_l1: String,
+    after_l2: String,
+    after_l3: Option<String>,
+    #[serde(rename = "final")]
+    final_output: String,
+    tokens: LogTokens,
+    latency_ms_total: u64,
+    latency_ms_l1: u64,
+    latency_ms_l2: u64,
+    latency_ms_l3: Option<u64>,
+    layer_used: u8,
+}
+
+fn write_compression_log(log: &CompressionLog) -> std::io::Result<()> {
+    let home =
+        dirs::home_dir().ok_or_else(|| std::io::Error::other("cannot determine home directory"))?;
+    let day_dir = home
+        .join(".ntk")
+        .join("logs")
+        .join(log.ts.format("%Y-%m-%d").to_string());
+    std::fs::create_dir_all(&day_dir)?;
+
+    // Collision-free filename without pulling in a uuid crate: timestamp + nanos.
+    let stamp = log.ts.format("%H%M%S%3f").to_string();
+    let file_path = day_dir.join(format!("{stamp}.json"));
+
+    let json =
+        serde_json::to_string_pretty(log).map_err(|e| std::io::Error::other(e.to_string()))?;
+    std::fs::write(file_path, json)
 }

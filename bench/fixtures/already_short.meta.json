@@ -1,0 +1,7 @@
+{
+    "category":  "short",
+    "description":  "Short output below the hook MinChars (500).",
+    "min_ratio":  0,
+    "expected_layer":  0,
+    "command":  "ls missing-file"
+}

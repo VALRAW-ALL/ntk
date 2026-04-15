@@ -1,6 +1,6 @@
 # NTK - Neural Token Killer
 
-> **v0.2.23** — Semantic compression proxy for Claude Code. Reduces tool output token count by 60–90% before it reaches the model context - without losing the information that matters.
+> **v0.2.25** — Semantic compression proxy for Claude Code. Reduces tool output token count by 60–90% before it reaches the model context - without losing the information that matters.
 
 ---
 
@@ -711,6 +711,58 @@ xdg-open target/criterion/report/index.html  # Linux
 | `layer1_100kb` | < 2 ms |
 | `layer2_tokenizer` (1kb) | < 5 ms |
 | Full pipeline L1+L2 (1kb) | < 10 ms |
+
+### Token-savings benchmark (microbench + macrobench)
+
+The `bench/` directory contains a full test harness for measuring how
+many tokens NTK actually saves. See `docs/testing-plan.md` (English)
+or `docs/plano-de-testes.md` (PT-BR) for the full planning doc.
+
+**Quick start:**
+
+```powershell
+# 1. Generate the 8 deterministic fixtures (one-off)
+pwsh bench/generate_fixtures.ps1
+
+# 2. Start the daemon with compression logging ON
+$env:NTK_LOG_COMPRESSIONS = "1"
+ntk start
+
+# 3. Replay every fixture against /compress and write microbench.csv
+pwsh bench/replay.ps1
+
+# 4. Generate the markdown report (optionally with A/B transcripts)
+pwsh bench/report.ps1
+#    Or with before/after Claude Code session transcripts:
+pwsh bench/parse_transcript.ps1 `
+  -Transcript ~/.claude/projects/<proj>/<session-A>.jsonl
+pwsh bench/parse_transcript.ps1 `
+  -Transcript ~/.claude/projects/<proj>/<session-B>.jsonl
+pwsh bench/report.ps1 `
+  -A ~/.claude/projects/<proj>/<session-A>.csv `
+  -B ~/.claude/projects/<proj>/<session-B>.csv
+```
+
+Unix/macOS users can substitute `pwsh` for `bash bench/replay.sh`
+(only the replay step has a shell variant so far; the parser and
+report scripts require PowerShell).
+
+**Outputs:**
+
+- `bench/microbench.csv` — one row per fixture with per-layer token
+  counts, latency and compression ratio.
+- `~/.ntk/logs/YYYY-MM-DD/*.json` — when `NTK_LOG_COMPRESSIONS=1` is
+  set, every compression writes a JSON file with the raw input, each
+  layer's intermediate output, and the final output. Useful for
+  auditing what NTK sent to Claude.
+- `bench/report.md` — rendered markdown with per-fixture table, A/B
+  session delta, and estimated USD cost (Sonnet 4.6 rates editable
+  via script flags).
+
+**Baseline prompt for macrobench:** `bench/prompts/baseline.md`. It
+runs 7 deterministic Bash commands in the NTK repo plus one summary
+turn — paste verbatim into Claude Code for the A (hook off) and
+B (hook on) runs.
 
 ### Linting and security gate
 

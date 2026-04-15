@@ -1,0 +1,72 @@
+   Compiling serde v1.0.0
+   Compiling serde_derive v1.0.0
+   Compiling serde_json v2.1.7
+   Compiling serde_json_derive v2.1.7
+   Compiling tokio v3.2.14
+   Compiling tokio_derive v3.2.14
+   Compiling axum v1.3.1
+   Compiling axum_derive v1.3.1
+   Compiling reqwest v2.4.8
+   Compiling reqwest_derive v2.4.8
+   Compiling hyper v3.5.15
+   Compiling hyper_derive v3.5.15
+   Compiling bytes v1.6.2
+   Compiling bytes_derive v1.6.2
+   Compiling http v2.7.9
+   Compiling http_derive v2.7.9
+   Compiling regex v3.8.16
+   Compiling regex_derive v3.8.16
+   Compiling once_cell v1.9.3
+   Compiling once_cell_derive v1.9.3
+   Compiling clap v2.0.10
+   Compiling clap_derive v2.0.10
+   Compiling anyhow v3.1.17
+   Compiling anyhow_derive v3.1.17
+   Compiling thiserror v1.2.4
+   Compiling thiserror_derive v1.2.4
+   Compiling chrono v2.3.11
+   Compiling chrono_derive v2.3.11
+   Compiling uuid v3.4.18
+   Compiling uuid_derive v3.4.18
+   Compiling sqlx v1.5.5
+   Compiling sqlx_derive v1.5.5
+   Compiling tiktoken-rs v2.6.12
+   Compiling tiktoken-rs_derive v2.6.12
+   Compiling candle-core v3.7.19
+   Compiling candle-core_derive v3.7.19
+   Compiling candle-nn v1.8.6
+   Compiling candle-nn_derive v1.8.6
+   Compiling tracing v2.9.13
+   Compiling tracing_derive v2.9.13
+warning: unused variable: `foo`
+  --> /src/serde/lib.rs:42:9
+   |
+42 |     let foo = 1;
+   |         ^^^ help: if this is intentional, prefix it with an underscore: `_foo`
+
+warning: unused variable: `foo`
+  --> /src/serde_json/lib.rs:42:9
+   |
+42 |     let foo = 1;
+   |         ^^^ help: if this is intentional, prefix it with an underscore: `_foo`
+
+warning: unused variable: `foo`
+  --> /src/tokio/lib.rs:42:9
+   |
+42 |     let foo = 1;
+   |         ^^^ help: if this is intentional, prefix it with an underscore: `_foo`
+
+warning: unused variable: `foo`
+  --> /src/axum/lib.rs:42:9
+   |
+42 |     let foo = 1;
+   |         ^^^ help: if this is intentional, prefix it with an underscore: `_foo`
+
+warning: unused variable: `foo`
+  --> /src/reqwest/lib.rs:42:9
+   |
+42 |     let foo = 1;
+   |         ^^^ help: if this is intentional, prefix it with an underscore: `_foo`
+
+   Compiling ntk v0.2.24 (C:\Users\dev\ntk)
+    Finished `release` profile [optimized] target(s) in 1m 03s

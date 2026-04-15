@@ -1,0 +1,7 @@
+{
+    "category":  "logs",
+    "description":  "Highly repetitive logs â€” L1 dedup should dominate.",
+    "min_ratio":  0.5,
+    "expected_layer":  2,
+    "command":  "docker logs api-service --tail 200"
+}

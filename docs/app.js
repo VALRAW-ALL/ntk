@@ -64,6 +64,8 @@ const TRANSLATIONS = {
     'feat.dash_desc':   '<code style="font-family:var(--font-mono);color:var(--color-primaria-clara)">ntk start</code> opens a full-screen dashboard with real-time metrics, per-layer stats, and a recent commands console. If the daemon is already running, <code style="font-family:var(--font-mono);color:var(--color-primaria-clara)">ntk start</code> attaches to the live TUI without restarting. <code style="font-family:var(--font-mono);color:var(--color-primaria-clara)">ntk dashboard</code> prints a static snapshot to stdout and exits. Safe for scripts and CI.',
     'feat.cross_title': 'Cross-platform',
     'feat.cross_desc':  'Single Rust binary. Works on Windows, macOS, and Linux without any runtime dependencies.',
+    'feat.bench_title': 'Built-in benchmark harness',
+    'feat.bench_desc':  'Every <code style="font-family:var(--font-mono)">/compress</code> response exposes per-layer token counts and latency. Set <code style="font-family:var(--font-mono)">NTK_LOG_COMPRESSIONS=1</code> to persist every compression (input, L1/L2/L3 outputs) to <code style="font-family:var(--font-mono)">~/.ntk/logs/</code> for auditing. Included scripts in <code style="font-family:var(--font-mono)">bench/</code> replay 8 fixture outputs, parse Claude Code transcripts, and produce a markdown report with token savings and estimated cost delta.',
 
     // Get Started
     'gs.badge':    'Installation guide',
@@ -259,6 +261,8 @@ const TRANSLATIONS = {
     'feat.dash_desc':   '<code style="font-family:var(--font-mono);color:var(--color-primaria-clara)">ntk start</code> abre um dashboard em tela cheia com métricas em tempo real, estatísticas por camada e console dos últimos comandos. Se o daemon já estiver rodando, <code style="font-family:var(--font-mono);color:var(--color-primaria-clara)">ntk start</code> reconecta ao TUI sem reiniciar. <code style="font-family:var(--font-mono);color:var(--color-primaria-clara)">ntk dashboard</code> imprime um snapshot estático no stdout e sai. Seguro para scripts e CI.',
     'feat.cross_title': 'Multiplataforma',
     'feat.cross_desc':  'Binário único em Rust. Funciona no Windows, macOS e Linux sem nenhuma dependência de runtime.',
+    'feat.bench_title': 'Harness de benchmark embutido',
+    'feat.bench_desc':  'Toda resposta do <code style="font-family:var(--font-mono)">/compress</code> expõe contagem de tokens por camada e latência. Defina <code style="font-family:var(--font-mono)">NTK_LOG_COMPRESSIONS=1</code> para persistir cada compressão (input + L1/L2/L3) em <code style="font-family:var(--font-mono)">~/.ntk/logs/</code> para auditoria. Scripts em <code style="font-family:var(--font-mono)">bench/</code> replicam 8 fixtures, parseiam transcripts do Claude Code e geram relatório markdown com economia de tokens e estimativa de custo.',
 
     // Get Started
     'gs.badge':    'Guia de instalação',

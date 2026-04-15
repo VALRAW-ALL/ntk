@@ -1,0 +1,7 @@
+{
+    "category":  "logs_unstructured",
+    "description":  "Long unstructured prose log â€” L3 summarization expected.",
+    "min_ratio":  0.5,
+    "expected_layer":  3,
+    "command":  "tail -n 40 /var/log/ingest.log"
+}

@@ -1,0 +1,7 @@
+{
+    "category":  "build",
+    "description":  "Verbose cargo build output with many Compiling lines.",
+    "min_ratio":  0.15,
+    "expected_layer":  2,
+    "command":  "cargo build --release --verbose"
+}

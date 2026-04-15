@@ -1,0 +1,7 @@
+{
+    "category":  "diff",
+    "description":  "Git diff with many hunks.",
+    "min_ratio":  0.05,
+    "expected_layer":  2,
+    "command":  "git diff HEAD~3"
+}

@@ -1,0 +1,7 @@
+{
+    "category":  "stack_trace",
+    "description":  "Deep Java stack trace â€” L3 summary expected.",
+    "min_ratio":  0.4,
+    "expected_layer":  3,
+    "command":  "java -jar app.jar"
+}

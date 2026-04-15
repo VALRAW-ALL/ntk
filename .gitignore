@@ -52,3 +52,8 @@ tarpaulin-report.html
 # Logs
 *.log
 act_output.txt
+
+# Bench outputs (keep scripts + fixtures, ignore results)
+bench/microbench.csv
+bench/report.md
+bench/transcripts/

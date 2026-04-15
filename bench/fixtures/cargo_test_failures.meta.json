@@ -1,0 +1,7 @@
+{
+    "category":  "test",
+    "description":  "Cargo test with many passes and a few failures.",
+    "min_ratio":  0.3,
+    "expected_layer":  2,
+    "command":  "cargo test"
+}

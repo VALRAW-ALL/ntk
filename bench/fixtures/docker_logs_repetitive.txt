@@ -1,0 +1,172 @@
+2026-04-15T10:23:00Z INFO [api] GET /health 200 12ms user=anonymous
+2026-04-15T10:23:01Z INFO [api] GET /health 200 12ms user=anonymous
+2026-04-15T10:23:02Z INFO [api] GET /health 200 12ms user=anonymous
+2026-04-15T10:23:03Z INFO [api] GET /health 200 12ms user=anonymous
+2026-04-15T10:23:04Z INFO [api] GET /health 200 12ms user=anonymous
+2026-04-15T10:23:05Z INFO [api] GET /health 200 12ms user=anonymous
+2026-04-15T10:23:06Z INFO [api] GET /health 200 12ms user=anonymous
+2026-04-15T10:23:07Z INFO [api] GET /health 200 12ms user=anonymous
+2026-04-15T10:23:08Z INFO [api] GET /health 200 12ms user=anonymous
+2026-04-15T10:23:09Z INFO [api] GET /health 200 12ms user=anonymous
+2026-04-15T10:23:10Z INFO [api] GET /health 200 12ms user=anonymous
+2026-04-15T10:23:11Z INFO [api] GET /health 200 12ms user=anonymous
+2026-04-15T10:23:12Z INFO [api] GET /health 200 12ms user=anonymous
+2026-04-15T10:23:13Z INFO [api] GET /health 200 12ms user=anonymous
+2026-04-15T10:23:14Z INFO [api] GET /health 200 12ms user=anonymous
+2026-04-15T10:23:15Z INFO [api] GET /health 200 12ms user=anonymous
+2026-04-15T10:23:16Z INFO [api] GET /health 200 12ms user=anonymous
+2026-04-15T10:23:17Z INFO [api] GET /health 200 12ms user=anonymous
+2026-04-15T10:23:18Z INFO [api] GET /health 200 12ms user=anonymous
+2026-04-15T10:23:19Z INFO [api] GET /health 200 12ms user=anonymous
+2026-04-15T10:23:20Z INFO [api] GET /health 200 12ms user=anonymous
+2026-04-15T10:23:21Z INFO [api] GET /health 200 12ms user=anonymous
+2026-04-15T10:23:22Z INFO [api] GET /health 200 12ms user=anonymous
+2026-04-15T10:23:23Z INFO [api] GET /health 200 12ms user=anonymous
+2026-04-15T10:23:24Z INFO [api] GET /health 200 12ms user=anonymous
+2026-04-15T10:23:25Z INFO [api] GET /health 200 12ms user=anonymous
+2026-04-15T10:23:26Z INFO [api] GET /health 200 12ms user=anonymous
+2026-04-15T10:23:27Z INFO [api] GET /health 200 12ms user=anonymous
+2026-04-15T10:23:28Z INFO [api] GET /health 200 12ms user=anonymous
+2026-04-15T10:23:29Z INFO [api] GET /health 200 12ms user=anonymous
+2026-04-15T10:23:30Z INFO [api] GET /health 200 12ms user=anonymous
+2026-04-15T10:23:31Z INFO [api] GET /health 200 12ms user=anonymous
+2026-04-15T10:23:32Z INFO [api] GET /health 200 12ms user=anonymous
+2026-04-15T10:23:33Z INFO [api] GET /health 200 12ms user=anonymous
+2026-04-15T10:23:34Z INFO [api] GET /health 200 12ms user=anonymous
+2026-04-15T10:23:35Z INFO [api] GET /health 200 12ms user=anonymous
+2026-04-15T10:23:36Z INFO [api] GET /health 200 12ms user=anonymous
+2026-04-15T10:23:37Z INFO [api] GET /health 200 12ms user=anonymous
+2026-04-15T10:23:38Z INFO [api] GET /health 200 12ms user=anonymous
+2026-04-15T10:23:39Z INFO [api] GET /health 200 12ms user=anonymous
+2026-04-15T10:23:40Z INFO [api] GET /health 200 12ms user=anonymous
+2026-04-15T10:23:41Z INFO [api] GET /health 200 12ms user=anonymous
+2026-04-15T10:23:42Z INFO [api] GET /health 200 12ms user=anonymous
+2026-04-15T10:23:43Z INFO [api] GET /health 200 12ms user=anonymous
+2026-04-15T10:23:44Z INFO [api] GET /health 200 12ms user=anonymous
+2026-04-15T10:23:45Z INFO [api] GET /health 200 12ms user=anonymous
+2026-04-15T10:23:46Z INFO [api] GET /health 200 12ms user=anonymous
+2026-04-15T10:23:47Z INFO [api] GET /health 200 12ms user=anonymous
+2026-04-15T10:23:48Z INFO [api] GET /health 200 12ms user=anonymous
+2026-04-15T10:23:49Z INFO [api] GET /health 200 12ms user=anonymous
+2026-04-15T10:23:50Z INFO [api] GET /health 200 12ms user=anonymous
+2026-04-15T10:23:51Z INFO [api] GET /health 200 12ms user=anonymous
+2026-04-15T10:23:52Z INFO [api] GET /health 200 12ms user=anonymous
+2026-04-15T10:23:53Z INFO [api] GET /health 200 12ms user=anonymous
+2026-04-15T10:23:54Z INFO [api] GET /health 200 12ms user=anonymous
+2026-04-15T10:23:55Z INFO [api] GET /health 200 12ms user=anonymous
+2026-04-15T10:23:56Z INFO [api] GET /health 200 12ms user=anonymous
+2026-04-15T10:23:57Z INFO [api] GET /health 200 12ms user=anonymous
+2026-04-15T10:23:58Z INFO [api] GET /health 200 12ms user=anonymous
+2026-04-15T10:23:59Z INFO [api] GET /health 200 12ms user=anonymous
+2026-04-15T10:23:00Z INFO [api] GET /health 200 12ms user=anonymous
+2026-04-15T10:23:01Z INFO [api] GET /health 200 12ms user=anonymous
+2026-04-15T10:23:02Z INFO [api] GET /health 200 12ms user=anonymous
+2026-04-15T10:23:03Z INFO [api] GET /health 200 12ms user=anonymous
+2026-04-15T10:23:04Z INFO [api] GET /health 200 12ms user=anonymous
+2026-04-15T10:23:05Z INFO [api] GET /health 200 12ms user=anonymous
+2026-04-15T10:23:06Z INFO [api] GET /health 200 12ms user=anonymous
+2026-04-15T10:23:07Z INFO [api] GET /health 200 12ms user=anonymous
+2026-04-15T10:23:08Z INFO [api] GET /health 200 12ms user=anonymous
+2026-04-15T10:23:09Z INFO [api] GET /health 200 12ms user=anonymous
+2026-04-15T10:23:10Z INFO [api] GET /health 200 12ms user=anonymous
+2026-04-15T10:23:11Z INFO [api] GET /health 200 12ms user=anonymous
+2026-04-15T10:23:12Z INFO [api] GET /health 200 12ms user=anonymous
+2026-04-15T10:23:13Z INFO [api] GET /health 200 12ms user=anonymous
+2026-04-15T10:23:14Z INFO [api] GET /health 200 12ms user=anonymous
+2026-04-15T10:23:15Z INFO [api] GET /health 200 12ms user=anonymous
+2026-04-15T10:23:16Z INFO [api] GET /health 200 12ms user=anonymous
+2026-04-15T10:23:17Z INFO [api] GET /health 200 12ms user=anonymous
+2026-04-15T10:23:18Z INFO [api] GET /health 200 12ms user=anonymous
+2026-04-15T10:23:19Z INFO [api] GET /health 200 12ms user=anonymous
+2026-04-15T10:24:00Z INFO [api] GET /health 200 13ms user=anonymous
+2026-04-15T10:24:01Z INFO [api] GET /health 200 13ms user=anonymous
+2026-04-15T10:24:02Z INFO [api] GET /health 200 13ms user=anonymous
+2026-04-15T10:24:03Z INFO [api] GET /health 200 13ms user=anonymous
+2026-04-15T10:24:04Z INFO [api] GET /health 200 13ms user=anonymous
+2026-04-15T10:24:05Z INFO [api] GET /health 200 13ms user=anonymous
+2026-04-15T10:24:06Z INFO [api] GET /health 200 13ms user=anonymous
+2026-04-15T10:24:07Z INFO [api] GET /health 200 13ms user=anonymous
+2026-04-15T10:24:08Z INFO [api] GET /health 200 13ms user=anonymous
+2026-04-15T10:24:09Z INFO [api] GET /health 200 13ms user=anonymous
+2026-04-15T10:24:10Z INFO [api] GET /health 200 13ms user=anonymous
+2026-04-15T10:24:11Z INFO [api] GET /health 200 13ms user=anonymous
+2026-04-15T10:24:12Z INFO [api] GET /health 200 13ms user=anonymous
+2026-04-15T10:24:13Z INFO [api] GET /health 200 13ms user=anonymous
+2026-04-15T10:24:14Z INFO [api] GET /health 200 13ms user=anonymous
+2026-04-15T10:24:15Z INFO [api] GET /health 200 13ms user=anonymous
+2026-04-15T10:24:16Z INFO [api] GET /health 200 13ms user=anonymous
+2026-04-15T10:24:17Z INFO [api] GET /health 200 13ms user=anonymous
+2026-04-15T10:24:18Z INFO [api] GET /health 200 13ms user=anonymous
+2026-04-15T10:24:19Z INFO [api] GET /health 200 13ms user=anonymous
+2026-04-15T10:25:01Z ERROR [db] connection pool exhausted, retrying in 500ms
+2026-04-15T10:25:02Z WARN  [db] retry 1/30 failed: timeout
+2026-04-15T10:25:03Z WARN  [db] retry 2/30 failed: timeout
+2026-04-15T10:25:04Z WARN  [db] retry 3/30 failed: timeout
+2026-04-15T10:25:05Z WARN  [db] retry 4/30 failed: timeout
+2026-04-15T10:25:06Z WARN  [db] retry 5/30 failed: timeout
+2026-04-15T10:25:07Z WARN  [db] retry 6/30 failed: timeout
+2026-04-15T10:25:08Z WARN  [db] retry 7/30 failed: timeout
+2026-04-15T10:25:09Z WARN  [db] retry 8/30 failed: timeout
+2026-04-15T10:25:10Z WARN  [db] retry 9/30 failed: timeout
+2026-04-15T10:25:11Z WARN  [db] retry 10/30 failed: timeout
+2026-04-15T10:25:12Z WARN  [db] retry 11/30 failed: timeout
+2026-04-15T10:25:13Z WARN  [db] retry 12/30 failed: timeout
+2026-04-15T10:25:14Z WARN  [db] retry 13/30 failed: timeout
+2026-04-15T10:25:15Z WARN  [db] retry 14/30 failed: timeout
+2026-04-15T10:25:16Z WARN  [db] retry 15/30 failed: timeout
+2026-04-15T10:25:17Z WARN  [db] retry 16/30 failed: timeout
+2026-04-15T10:25:18Z WARN  [db] retry 17/30 failed: timeout
+2026-04-15T10:25:19Z WARN  [db] retry 18/30 failed: timeout
+2026-04-15T10:25:20Z WARN  [db] retry 19/30 failed: timeout
+2026-04-15T10:25:21Z WARN  [db] retry 20/30 failed: timeout
+2026-04-15T10:25:22Z WARN  [db] retry 21/30 failed: timeout
+2026-04-15T10:25:23Z WARN  [db] retry 22/30 failed: timeout
+2026-04-15T10:25:24Z WARN  [db] retry 23/30 failed: timeout
+2026-04-15T10:25:25Z WARN  [db] retry 24/30 failed: timeout
+2026-04-15T10:25:26Z WARN  [db] retry 25/30 failed: timeout
+2026-04-15T10:25:27Z WARN  [db] retry 26/30 failed: timeout
+2026-04-15T10:25:28Z WARN  [db] retry 27/30 failed: timeout
+2026-04-15T10:25:29Z WARN  [db] retry 28/30 failed: timeout
+2026-04-15T10:25:30Z WARN  [db] retry 29/30 failed: timeout
+2026-04-15T10:25:31Z WARN  [db] retry 30/30 failed: timeout
+2026-04-15T10:26:00Z INFO  [db] connection pool restored
+2026-04-15T10:26:00Z INFO [api] GET /health 200 10ms user=anonymous
+2026-04-15T10:26:01Z INFO [api] GET /health 200 10ms user=anonymous
+2026-04-15T10:26:02Z INFO [api] GET /health 200 10ms user=anonymous
+2026-04-15T10:26:03Z INFO [api] GET /health 200 10ms user=anonymous
+2026-04-15T10:26:04Z INFO [api] GET /health 200 10ms user=anonymous
+2026-04-15T10:26:05Z INFO [api] GET /health 200 10ms user=anonymous
+2026-04-15T10:26:06Z INFO [api] GET /health 200 10ms user=anonymous
+2026-04-15T10:26:07Z INFO [api] GET /health 200 10ms user=anonymous
+2026-04-15T10:26:08Z INFO [api] GET /health 200 10ms user=anonymous
+2026-04-15T10:26:09Z INFO [api] GET /health 200 10ms user=anonymous
+2026-04-15T10:26:10Z INFO [api] GET /health 200 10ms user=anonymous
+2026-04-15T10:26:11Z INFO [api] GET /health 200 10ms user=anonymous
+2026-04-15T10:26:12Z INFO [api] GET /health 200 10ms user=anonymous
+2026-04-15T10:26:13Z INFO [api] GET /health 200 10ms user=anonymous
+2026-04-15T10:26:14Z INFO [api] GET /health 200 10ms user=anonymous
+2026-04-15T10:26:15Z INFO [api] GET /health 200 10ms user=anonymous
+2026-04-15T10:26:16Z INFO [api] GET /health 200 10ms user=anonymous
+2026-04-15T10:26:17Z INFO [api] GET /health 200 10ms user=anonymous
+2026-04-15T10:26:18Z INFO [api] GET /health 200 10ms user=anonymous
+2026-04-15T10:26:19Z INFO [api] GET /health 200 10ms user=anonymous
+2026-04-15T10:26:20Z INFO [api] GET /health 200 10ms user=anonymous
+2026-04-15T10:26:21Z INFO [api] GET /health 200 10ms user=anonymous
+2026-04-15T10:26:22Z INFO [api] GET /health 200 10ms user=anonymous
+2026-04-15T10:26:23Z INFO [api] GET /health 200 10ms user=anonymous
+2026-04-15T10:26:24Z INFO [api] GET /health 200 10ms user=anonymous
+2026-04-15T10:26:25Z INFO [api] GET /health 200 10ms user=anonymous
+2026-04-15T10:26:26Z INFO [api] GET /health 200 10ms user=anonymous
+2026-04-15T10:26:27Z INFO [api] GET /health 200 10ms user=anonymous
+2026-04-15T10:26:28Z INFO [api] GET /health 200 10ms user=anonymous
+2026-04-15T10:26:29Z INFO [api] GET /health 200 10ms user=anonymous
+2026-04-15T10:26:30Z INFO [api] GET /health 200 10ms user=anonymous
+2026-04-15T10:26:31Z INFO [api] GET /health 200 10ms user=anonymous
+2026-04-15T10:26:32Z INFO [api] GET /health 200 10ms user=anonymous
+2026-04-15T10:26:33Z INFO [api] GET /health 200 10ms user=anonymous
+2026-04-15T10:26:34Z INFO [api] GET /health 200 10ms user=anonymous
+2026-04-15T10:26:35Z INFO [api] GET /health 200 10ms user=anonymous
+2026-04-15T10:26:36Z INFO [api] GET /health 200 10ms user=anonymous
+2026-04-15T10:26:37Z INFO [api] GET /health 200 10ms user=anonymous
+2026-04-15T10:26:38Z INFO [api] GET /health 200 10ms user=anonymous
+2026-04-15T10:26:39Z INFO [api] GET /health 200 10ms user=anonymous
