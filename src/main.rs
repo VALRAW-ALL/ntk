@@ -2035,7 +2035,44 @@ fn setup_llamacpp(existing: &ntk::config::NtkConfig) -> Result<()> {
         println!();
     }
 
-    let (gpu_layers, gpu_auto_detect, device_id, gpu_vendor) = setup_gpu_selection()?;
+    // Check whether the llama-server binary supports GPU before asking the user
+    // to pick one. A CPU-only binary (no Vulkan/CUDA/HIP shared libs) will exit
+    // immediately with code 1 when --n-gpu-layers != 0 is passed, so offering
+    // GPU options would create a false expectation.
+    let server_supports_gpu = ntk::compressor::layer3_llamacpp::binary_supports_gpu(&server_binary);
+
+    let (gpu_layers, gpu_auto_detect, device_id, gpu_vendor) = if server_supports_gpu {
+        setup_gpu_selection()?
+    } else {
+        println!(
+            "  {}ℹ  The llama-server binary has no GPU shared libraries (Vulkan / CUDA / HIP).{}",
+            term::bright_yellow(),
+            term::reset()
+        );
+        println!(
+            "  {}   GPU options are hidden. Replace ~/.ntk/bin/llama-server with a Vulkan{}",
+            term::dim(),
+            term::reset()
+        );
+        println!(
+            "  {}   or CUDA build from https://github.com/ggerganov/llama.cpp/releases{}",
+            term::dim(),
+            term::reset()
+        );
+        println!(
+            "  {}   then run `ntk model setup` again to enable GPU selection.{}",
+            term::dim(),
+            term::reset()
+        );
+        println!();
+        println!(
+            "  {}Using CPU inference (always available).{}",
+            term::bright_green(),
+            term::reset()
+        );
+        println!();
+        (0, false, 0, None)
+    };
 
     let mut config = existing.clone();
     config.model.provider = ntk::config::ModelProvider::LlamaCpp;
@@ -2201,25 +2238,24 @@ fn select_llama_cpp_asset(assets: &[serde_json::Value]) -> Option<(String, Strin
         })
         .collect();
 
-    // Preference order: avx2 (CPU perf) > plain > cuda/vulkan/kompute (avoid GPU-only builds
-    // unless they are the only option — user can always re-run if they have a GPU).
-    let non_gpu: Vec<_> = candidates
+    // Preference order:
+    //   1. Vulkan — universal GPU (NVIDIA + AMD) without requiring CUDA/ROCm.
+    //              The single build that works for most users with a discrete GPU.
+    //   2. AVX2   — best CPU performance for CPU-only users.
+    //   3. plain  — any remaining candidate.
+    //   (CUDA builds are skipped here; users who want CUDA can download manually.)
+    let vulkan: Option<&(String, String)> = candidates
         .iter()
-        .filter(|(n, _)| {
-            let l = n.to_lowercase();
-            !l.contains("cuda") && !l.contains("vulkan") && !l.contains("kompute")
-        })
-        .collect();
+        .find(|(n, _)| n.to_lowercase().contains("vulkan"));
 
-    let pool: Vec<(String, String)> = if non_gpu.is_empty() {
-        candidates.clone()
-    } else {
-        non_gpu.into_iter().cloned().collect()
-    };
+    if let Some(v) = vulkan {
+        return Some(v.clone());
+    }
 
-    pool.iter()
+    candidates
+        .iter()
         .find(|(n, _)| n.to_lowercase().contains("avx2"))
-        .or_else(|| pool.first())
+        .or_else(|| candidates.first())
         .cloned()
 }
 

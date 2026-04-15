@@ -523,7 +523,7 @@ fn generation_threads(n_gpu_layers: i32) -> usize {
 /// alongside it (Vulkan, CUDA, or HIP .dll/.so files).  A CPU-only build ships
 /// without these and will exit immediately with code 1 if `--n-gpu-layers != 0`
 /// or `--flash-attn` is passed.
-fn binary_supports_gpu(binary: &std::path::Path) -> bool {
+pub fn binary_supports_gpu(binary: &std::path::Path) -> bool {
     let dir = match binary.parent() {
         Some(d) => d,
         None => return false,
