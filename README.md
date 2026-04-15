@@ -1,6 +1,6 @@
 # NTK - Neural Token Killer
 
-> **v0.2.26** — Semantic compression proxy for Claude Code. Reduces tool output token count by 60–90% before it reaches the model context - without losing the information that matters.
+> **v0.2.27** — Semantic compression proxy for Claude Code. Reduces tool output token count by 60–90% before it reaches the model context - without losing the information that matters.
 
 ---
 

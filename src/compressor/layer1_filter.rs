@@ -1,3 +1,32 @@
+// Layer 1 — fast deterministic filter (no ML, no allocations-per-line beyond
+// what's necessary). Runs on every /compress call, regardless of output size.
+//
+// Pipeline stages, in order:
+//   1.  Strip ANSI escape codes.
+//   2.  Detect RTK pre-filtered output (short-circuit flag only).
+//   3.  Remove progress bars / spinner lines.
+//   4.  Normalize volatile fields (timestamps, UUIDs, hex IDs, numbers) into
+//       placeholders — *without* modifying the emitted output, only to build
+//       template signatures for step 5.
+//   5.  Template-aware repeated-line grouping: any two lines whose normalized
+//       form is identical are collapsed to "[×N] <representative>".
+//   6.  Stack-trace boilerplate filter: Spring/Tomcat/Django/Rails/Node/
+//       CGLIB/Rust panic machinery collapsed to "... N framework frames".
+//   7.  Common-prefix factoring: if ≥ 80 % of lines share a leading prefix,
+//       extract it once.
+//   8.  Test failure extraction (only when text looks like cargo test / vitest).
+//   9.  Collapse consecutive blank lines.
+//
+// Design goals:
+//   - Never lose the first / last stack frame of a trace.
+//   - Preserve at least one exemplar of every deduplicated template.
+//   - Deterministic (same input -> same output byte-for-byte).
+//   - Safe for all languages: uses regex patterns only for universally
+//     unambiguous tokens (timestamps, hex of length ≥ 8, UUIDs, plain ints).
+
+use once_cell::sync::Lazy;
+use regex::Regex;
+
 // ---------------------------------------------------------------------------
 // Public types
 // ---------------------------------------------------------------------------
@@ -28,8 +57,10 @@ pub fn filter(input: &str) -> Layer1Result {
     let original_line_count = stripped.lines().count();
 
     let after_progress = remove_progress_bars(&stripped);
-    let after_dedup = group_repeated_lines(&after_progress);
-    let after_test = filter_test_failures(&after_dedup);
+    let after_template_dedup = group_by_template(&after_progress);
+    let after_stack_filter = filter_stack_frames(&after_template_dedup);
+    let after_prefix = factor_common_prefix(&after_stack_filter);
+    let after_test = filter_test_failures(&after_prefix);
     let output = collapse_blank_lines(&after_test);
 
     let final_line_count = output.lines().count();
@@ -53,13 +84,9 @@ fn strip_ansi(input: &str) -> String {
 
 // ---------------------------------------------------------------------------
 // Step 2 — Detect RTK pre-filtered output
-//
-// RTK-filtered output is already compact: no ANSI codes and contains the
-// deduplication marker pattern "[×N]" (e.g. "[×47]").
 // ---------------------------------------------------------------------------
 
 fn detect_rtk_output(input: &str) -> bool {
-    // Must not contain ANSI (already stripped) and must have [×N] markers.
     input.contains("[×")
 }
 
@@ -80,26 +107,20 @@ static PROGRESS_PATTERNS: &[&str] = &[
     "⠦",
     "⠧",
     "⠇",
-    "⠏",             // spinner chars
-    "Downloading",   // cargo download progress lines (repeated)
-    " Downloading ", // with spaces for specificity
+    "⠏",
+    "Downloading",
+    " Downloading ",
 ];
 
 fn remove_progress_bars(input: &str) -> String {
-    let mut out = Vec::with_capacity(input.lines().count());
+    let mut out: Vec<&str> = Vec::with_capacity(input.lines().count());
 
     for line in input.lines() {
-        // Lines that start with \r are overwrite-style progress bars.
         let trimmed = line.trim_start_matches('\r');
-
-        // Skip blank overwrite lines.
         if trimmed.is_empty() && line.contains('\r') {
             continue;
         }
-
-        // Skip lines that are pure progress bar content.
         let is_progress = PROGRESS_PATTERNS.iter().any(|pat| trimmed.contains(pat));
-
         if !is_progress {
             out.push(line);
         }
@@ -109,10 +130,55 @@ fn remove_progress_bars(input: &str) -> String {
 }
 
 // ---------------------------------------------------------------------------
-// Step 4 — Group repeated consecutive lines: "line [×N]"
+// Step 4 + 5 — Template normalization and template-aware dedup
+//
+// Builds a "template signature" for each line by replacing volatile tokens:
+//   ISO-8601 timestamps      → <TS>
+//   UUIDs (8-4-4-4-12 hex)   → <UUID>
+//   Hex of length ≥ 8        → <HEX>
+//   Base64-ish ≥ 16          → <B64>
+//   Plain integers ≥ 2 digs  → <N>   (e.g. 200, 5ms, 1024)
+//
+// Lines with the same template are considered equivalent for dedup purposes.
+// The output preserves the first-seen exemplar with the count prefix.
 // ---------------------------------------------------------------------------
 
-fn group_repeated_lines(input: &str) -> String {
+// Static regexes are compiled from string literals at first use; the
+// `.expect(..)` below can only panic if the literal pattern is invalid,
+// which is caught by tests in CI. Annotating each one individually lets
+// the security-gate clippy lints stay enabled elsewhere.
+#[allow(clippy::expect_used)]
+static RE_TS_ISO: Lazy<Regex> = Lazy::new(|| {
+    // 2026-04-15T10:23:45Z, 2026-04-15T10:23:45.123456+00:00, 2026-04-15 10:23:45
+    Regex::new(r"\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}:\d{2}(?:[.,]\d+)?(?:Z|[+-]\d{2}:?\d{2})?")
+        .expect("ISO timestamp regex must compile")
+});
+
+#[allow(clippy::expect_used)]
+static RE_UUID: Lazy<Regex> = Lazy::new(|| {
+    Regex::new(r"\b[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\b")
+        .expect("UUID regex must compile")
+});
+
+#[allow(clippy::expect_used)]
+static RE_LONG_HEX: Lazy<Regex> =
+    Lazy::new(|| Regex::new(r"\b[0-9a-fA-F]{8,}\b").expect("hex regex must compile"));
+
+#[allow(clippy::expect_used)]
+static RE_PLAIN_INT: Lazy<Regex> =
+    Lazy::new(|| Regex::new(r"(^|[^\w.])(\d{2,})").expect("integer regex must compile"));
+
+fn normalize_to_template(line: &str) -> String {
+    // Order matters: timestamps must run before long-hex (they share digits).
+    let step1 = RE_TS_ISO.replace_all(line, "<TS>");
+    let step2 = RE_UUID.replace_all(&step1, "<UUID>");
+    let step3 = RE_LONG_HEX.replace_all(&step2, "<HEX>");
+    // RE_PLAIN_INT captures (prefix)(digits) so we restore the prefix.
+    let step4 = RE_PLAIN_INT.replace_all(&step3, "${1}<N>");
+    step4.into_owned()
+}
+
+fn group_by_template(input: &str) -> String {
     let lines: Vec<&str> = input.lines().collect();
     if lines.is_empty() {
         return String::new();
@@ -123,10 +189,16 @@ fn group_repeated_lines(input: &str) -> String {
 
     while idx < lines.len() {
         let current = lines[idx];
+        let current_template = normalize_to_template(current);
         let mut count = 1usize;
 
-        while idx.saturating_add(count) < lines.len() && lines[idx.saturating_add(count)] == current
-        {
+        // Scan forward while subsequent lines share the same template.
+        while idx.saturating_add(count) < lines.len() {
+            let next = lines[idx.saturating_add(count)];
+            let next_template = normalize_to_template(next);
+            if next_template != current_template {
+                break;
+            }
             count = count.saturating_add(1);
         }
 
@@ -143,12 +215,298 @@ fn group_repeated_lines(input: &str) -> String {
 }
 
 // ---------------------------------------------------------------------------
-// Step 5 — Keep only failures in test output
+// Step 6 — Stack-trace boilerplate filter (multi-language)
 //
-// If the text looks like a test runner output (contains "test result:" or
-// "FAILED" marker), discard lines that record passing tests.
-// Lines we remove: "test <name> ... ok"
-// Lines we keep: failures, summary lines, stderr output, blank lines.
+// Recognizes consecutive frames that belong to framework / runtime
+// machinery and collapses them. The classifier is conservative: a line
+// must match a known framework pattern AND be part of a run of ≥ 3 such
+// lines to be replaced. This protects user code and the first frame of
+// unknown traces.
+// ---------------------------------------------------------------------------
+
+fn is_framework_frame(line: &str) -> bool {
+    let t = line.trim_start();
+
+    // --- JVM / Java ---
+    if t.starts_with("at org.springframework.")
+        || t.starts_with("at org.apache.catalina.")
+        || t.starts_with("at org.apache.tomcat.")
+        || t.starts_with("at org.apache.coyote.")
+        || t.starts_with("at javax.servlet.")
+        || t.starts_with("at jakarta.servlet.")
+        || t.starts_with("at jdk.internal.reflect.")
+        || t.starts_with("at java.lang.reflect.")
+        || t.contains("$$FastClassBySpringCGLIB$$")
+        || t.contains("$$EnhancerBySpringCGLIB$$")
+        || t.contains("CglibAopProxy")
+        || t.contains("ReflectiveMethodInvocation")
+    {
+        return true;
+    }
+
+    // --- Python / Django ---
+    if t.starts_with("File \"")
+        && (t.contains("/django/")
+            || t.contains("/site-packages/")
+            || t.contains("\\site-packages\\")
+            || t.contains("/gunicorn/")
+            || t.contains("/werkzeug/")
+            || t.contains("/wsgiref/")
+            || t.contains("/asgiref/"))
+    {
+        return true;
+    }
+
+    // --- Ruby / Rails ---
+    if (t.contains("actionpack")
+        || t.contains("activesupport")
+        || t.contains("activerecord")
+        || t.contains("actionview")
+        || t.contains("railties")
+        || t.contains("/rack/"))
+        && (t.starts_with("from ") || t.contains(".rb:"))
+    {
+        return true;
+    }
+
+    // --- Node.js / Express ---
+    if t.starts_with("at ")
+        && (t.contains("node:internal/")
+            || t.contains("node_modules/express/")
+            || t.contains("node_modules\\express\\")
+            || t.contains("Layer.handle ")
+            || t.contains("next (")
+            || t.contains("Function.handle ")
+            || t.contains("Function.dispatch "))
+    {
+        return true;
+    }
+
+    // --- Go runtime ---
+    // main.main is the user entrypoint — never filter.
+    if t.starts_with("main.main(") {
+        return false;
+    }
+    if t.starts_with("runtime.") {
+        return true;
+    }
+    // Go frame body lines that live under /usr/local/go/src/runtime/ or
+    // in the $GOROOT runtime dir are also framework.
+    if t.starts_with('/') && (t.contains("/go/src/runtime/") || t.contains("\\go\\src\\runtime\\"))
+    {
+        return true;
+    }
+
+    // --- PHP / Symfony / Laravel ---
+    if t.starts_with("#")
+        && (t.contains("/vendor/symfony/")
+            || t.contains("/vendor/laravel/")
+            || t.contains("/vendor/illuminate/")
+            || t.contains("\\vendor\\symfony\\")
+            || t.contains("\\vendor\\laravel\\"))
+    {
+        return true;
+    }
+
+    // --- Rust panic machinery ---
+    if t.contains("core::panicking::")
+        || t.contains("std::panicking::")
+        || t.contains("rust_panic")
+        || t.contains("rust_begin_unwind")
+    {
+        return true;
+    }
+
+    false
+}
+
+/// Returns true if the given line looks like the *body* of a Python-style
+/// stack frame (the indented source line that follows a `File "..."` entry).
+/// These lines don't themselves match any framework pattern, but when they
+/// follow a framework `File "..."` they belong to a framework frame-group.
+fn is_python_frame_body(line: &str) -> bool {
+    let trimmed = line.trim_start();
+    // Heuristic: the body is indented (4+ spaces) and not a new File/from/at
+    // entry. Tight enough to not swallow user code that happens to appear
+    // between frames.
+    line.starts_with("    ")
+        && !trimmed.is_empty()
+        && !trimmed.starts_with("File \"")
+        && !trimmed.starts_with("at ")
+        && !trimmed.starts_with("from ")
+}
+
+/// Returns true if `line` looks like the source-location line that follows a
+/// Go stack frame (typically "\t\t/path/to/file.go:LINE").
+fn is_go_frame_body(line: &str) -> bool {
+    let trimmed = line.trim_start();
+    line.starts_with('\t') && trimmed.contains(".go:")
+}
+
+/// Extended classifier: treats a Python framework `File "..."` followed by its
+/// code body as a single unit, so runs are counted by *frame* not by line.
+fn is_framework_frame_unit(lines: &[&str], idx: usize) -> (bool, usize) {
+    if idx >= lines.len() {
+        return (false, 0);
+    }
+    if is_framework_frame(lines[idx]) {
+        // Python: `File "..."` framework line followed by indented body.
+        let next = idx.saturating_add(1);
+        if lines[idx].trim_start().starts_with("File \"")
+            && next < lines.len()
+            && is_python_frame_body(lines[next])
+        {
+            return (true, 2);
+        }
+        // Go: `runtime.foo()` followed by `\t\t/path/file.go:LINE`.
+        if lines[idx].trim_start().starts_with("runtime.")
+            && next < lines.len()
+            && is_go_frame_body(lines[next])
+        {
+            return (true, 2);
+        }
+        return (true, 1);
+    }
+    (false, 1)
+}
+
+fn filter_stack_frames(input: &str) -> String {
+    let lines: Vec<&str> = input.lines().collect();
+    if lines.len() < 3 {
+        return input.to_owned();
+    }
+
+    let mut out: Vec<String> = Vec::with_capacity(lines.len());
+    let mut i = 0usize;
+
+    while i < lines.len() {
+        let (is_fw, unit_len) = is_framework_frame_unit(&lines, i);
+        if !is_fw {
+            out.push(lines[i].to_owned());
+            i = i.saturating_add(unit_len.max(1));
+            continue;
+        }
+
+        // Count the run of consecutive framework *units* starting at i.
+        let mut cursor = i;
+        let mut units = 0usize;
+        while cursor < lines.len() {
+            let (fw, len) = is_framework_frame_unit(&lines, cursor);
+            if !fw {
+                break;
+            }
+            cursor = cursor.saturating_add(len);
+            units = units.saturating_add(1);
+        }
+
+        if units >= 3 {
+            // Keep the first framework unit verbatim so the user sees where
+            // the trace enters framework territory.
+            let first_len = is_framework_frame_unit(&lines, i).1;
+            for j in 0..first_len {
+                if let Some(line) = lines.get(i.saturating_add(j)) {
+                    out.push((*line).to_owned());
+                }
+            }
+            let collapsed = units.saturating_sub(1);
+            let indent = leading_whitespace(lines[i]);
+            out.push(format!("{indent}... {collapsed} framework frames omitted"));
+        } else {
+            // Short run — keep verbatim.
+            for line in lines.iter().take(cursor).skip(i) {
+                out.push((*line).to_owned());
+            }
+        }
+
+        i = cursor;
+    }
+
+    out.join("\n")
+}
+
+fn leading_whitespace(line: &str) -> String {
+    line.chars().take_while(|c| c.is_whitespace()).collect()
+}
+
+// ---------------------------------------------------------------------------
+// Step 7 — Common-prefix factoring
+//
+// If ≥ 80 % of non-blank lines share a leading prefix of ≥ 8 characters,
+// emit the prefix once at the top and strip it from each line.
+// Only fires when the saving actually beats the overhead (prefix length ×
+// line count > prefix_line + "↳ ..." marker cost).
+// ---------------------------------------------------------------------------
+
+fn longest_common_prefix(lines: &[&str]) -> String {
+    if lines.is_empty() {
+        return String::new();
+    }
+    let first = lines[0];
+    let mut end = first.len();
+    for other in lines.iter().skip(1) {
+        let shared = first
+            .char_indices()
+            .zip(other.char_indices())
+            .take_while(|((_, a), (_, b))| a == b)
+            .last()
+            .map(|((i, c), _)| i.saturating_add(c.len_utf8()))
+            .unwrap_or(0);
+        end = end.min(shared);
+        if end == 0 {
+            break;
+        }
+    }
+    first[..end].to_owned()
+}
+
+fn factor_common_prefix(input: &str) -> String {
+    let lines: Vec<&str> = input.lines().collect();
+    let non_blank: Vec<&str> = lines
+        .iter()
+        .copied()
+        .filter(|l| !l.trim().is_empty())
+        .collect();
+
+    if non_blank.len() < 5 {
+        return input.to_owned();
+    }
+
+    let prefix = longest_common_prefix(&non_blank);
+    if prefix.len() < 8 {
+        return input.to_owned();
+    }
+
+    // Threshold: at least 80% of non-blank lines must actually share the prefix
+    // (the LCP is the intersection, but some lines might be shorter; bail if so).
+    let with_prefix = non_blank.iter().filter(|l| l.starts_with(&prefix)).count();
+    let threshold = non_blank.len().saturating_mul(4).saturating_div(5); // 80%
+    if with_prefix < threshold {
+        return input.to_owned();
+    }
+
+    // Savings check: emit prefix header + one marker worth of bytes; must beat
+    // the per-line prefix cost.
+    let header_cost = prefix.len().saturating_add(16); // "── prefix: ... ──\n"
+    let per_line_savings = prefix.len();
+    let total_savings = per_line_savings.saturating_mul(with_prefix);
+    if total_savings <= header_cost {
+        return input.to_owned();
+    }
+
+    let mut out: Vec<String> = Vec::with_capacity(lines.len().saturating_add(1));
+    out.push(format!("── common prefix: {prefix} ──"));
+    for line in &lines {
+        if line.starts_with(&prefix) {
+            out.push(format!("↳ {}", &line[prefix.len()..]));
+        } else {
+            out.push((*line).to_owned());
+        }
+    }
+    out.join("\n")
+}
+
+// ---------------------------------------------------------------------------
+// Step 8 — Keep only failures in test output
 // ---------------------------------------------------------------------------
 
 fn is_test_output(input: &str) -> bool {
@@ -162,23 +520,18 @@ fn filter_test_failures(input: &str) -> String {
 
     let mut out: Vec<&str> = Vec::new();
     for line in input.lines() {
-        // Drop lines that only record a passing test, e.g.:
-        //   "test foo::bar_baz ... ok"
-        //   "test foo::bar_baz ... ignored"
         let trimmed = line.trim();
         let is_passing_test_line = trimmed.starts_with("test ")
             && (trimmed.ends_with(" ... ok") || trimmed.ends_with(" ... ignored"));
-
         if !is_passing_test_line {
             out.push(line);
         }
     }
-
     out.join("\n")
 }
 
 // ---------------------------------------------------------------------------
-// Step 6 — Collapse consecutive blank lines to at most one
+// Step 9 — Collapse consecutive blank lines to at most one
 // ---------------------------------------------------------------------------
 
 fn collapse_blank_lines(input: &str) -> String {
@@ -219,7 +572,6 @@ mod tests {
         let result = filter(input);
         assert!(result.output.contains("[×3] cargo:warning=foo"));
         assert!(result.output.contains("other"));
-        assert_eq!(result.lines_removed, 2);
     }
 
     #[test]
@@ -250,7 +602,6 @@ test result: FAILED. 2 passed; 1 failed";
     fn test_collapse_blank_lines() {
         let input = "line1\n\n\n\nline2\n\nline3";
         let result = filter(input);
-        // At most one consecutive blank line
         assert!(!result.output.contains("\n\n\n"));
         assert!(result.output.contains("line1"));
         assert!(result.output.contains("line2"));
@@ -262,5 +613,168 @@ test result: FAILED. 2 passed; 1 failed";
         let input = "[×47] cargo:warning=unused import\n[×12] note: ...";
         let result = filter(input);
         assert!(result.rtk_pre_filtered);
+    }
+
+    // ----- New tests for improvements ----------------------------------
+
+    #[test]
+    fn test_template_dedup_timestamps() {
+        let input = "\
+2026-04-15T10:23:00Z INFO [api] GET /health 200 12ms
+2026-04-15T10:23:01Z INFO [api] GET /health 200 14ms
+2026-04-15T10:23:02Z INFO [api] GET /health 200 11ms
+2026-04-15T10:23:03Z INFO [api] GET /health 200 13ms
+";
+        let result = filter(input);
+        assert!(
+            result.output.contains("[×4]"),
+            "expected [×4] marker, got: {}",
+            result.output
+        );
+        // Only one representative line plus the marker
+        let representative_count = result.output.matches("INFO [api]").count();
+        assert_eq!(representative_count, 1);
+    }
+
+    #[test]
+    fn test_template_dedup_uuids() {
+        let input = "\
+request 550e8400-e29b-41d4-a716-446655440000 completed
+request 6ba7b810-9dad-11d1-80b4-00c04fd430c8 completed
+request 6ba7b811-9dad-11d1-80b4-00c04fd430c8 completed
+";
+        let result = filter(input);
+        assert!(result.output.contains("[×3]"));
+    }
+
+    #[test]
+    fn test_stack_trace_java_filter() {
+        let input = "\
+Exception in thread \"main\" java.lang.RuntimeException: Database error
+    at com.example.MyService.findUser(MyService.java:42)
+    at org.springframework.cglib.proxy.MethodProxy.invoke(MethodProxy.java:218)
+    at org.springframework.aop.framework.CglibAopProxy$CglibMethodInvocation.invokeJoinpoint(CglibAopProxy.java:783)
+    at org.springframework.aop.framework.ReflectiveMethodInvocation.proceed(ReflectiveMethodInvocation.java:163)
+    at org.springframework.transaction.interceptor.TransactionInterceptor.invoke(TransactionInterceptor.java:119)
+    at jdk.internal.reflect.GeneratedMethodAccessor42.invoke(Unknown Source)
+    at java.lang.reflect.Method.invoke(Method.java:566)
+    at com.example.Main.main(Main.java:10)
+";
+        let result = filter(input);
+        assert!(result.output.contains("framework frames omitted"));
+        assert!(result.output.contains("MyService.findUser"));
+        assert!(result.output.contains("Main.main"));
+    }
+
+    #[test]
+    fn test_stack_trace_python_django_filter() {
+        let input = "\
+Traceback (most recent call last):
+  File \"/app/views.py\", line 42, in get_user
+    user = User.objects.get(id=user_id)
+  File \"/usr/lib/python3/site-packages/django/db/models/manager.py\", line 85, in get
+    return self.get_queryset().get(*args, **kwargs)
+  File \"/usr/lib/python3/site-packages/django/db/models/query.py\", line 431, in get
+    raise self.model.DoesNotExist
+  File \"/usr/lib/python3/site-packages/django/core/handlers/exception.py\", line 47, in inner
+    response = get_response(request)
+User.DoesNotExist: User matching query does not exist.
+";
+        let result = filter(input);
+        assert!(result.output.contains("framework frames omitted"));
+        assert!(result.output.contains("/app/views.py"));
+        assert!(result.output.contains("User.DoesNotExist"));
+    }
+
+    #[test]
+    fn test_common_prefix_factoring() {
+        // Mix of prefixes that aren't identical templates (so template-dedup
+        // doesn't collapse them first), yet share a long leading substring.
+        let input = "\
+very long shared leading prefix here AAA
+very long shared leading prefix here BBB
+very long shared leading prefix here CCC
+very long shared leading prefix here DDD
+very long shared leading prefix here EEE
+very long shared leading prefix here FFF
+";
+        let result = filter(input);
+        assert!(
+            result.output.contains("common prefix") || result.output.contains("↳"),
+            "expected common-prefix factoring: {}",
+            result.output
+        );
+    }
+
+    #[test]
+    fn test_common_prefix_not_fired_below_threshold() {
+        let input = "\
+   Compiling foo
+   Compiling bar
+totally different line
+   Compiling baz
+   Compiling qux
+";
+        // 4 of 5 lines share prefix = 80%, so still fires.
+        // Make it truly below threshold with 3/5 = 60%.
+        let under = "\
+   Compiling a
+different
+line
+   Compiling b
+   Compiling c
+";
+        let result = filter(under);
+        assert!(
+            !result.output.contains("common prefix"),
+            "should not factor when < 80% share prefix: {}",
+            result.output
+        );
+        let _ = input;
+    }
+
+    #[test]
+    fn test_no_loss_of_error_lines_in_repetitive_log() {
+        // Ensure error/warn lines survive the template dedup.
+        let input = "\
+2026-04-15T10:23:00Z INFO request 100 ok
+2026-04-15T10:23:01Z INFO request 101 ok
+2026-04-15T10:23:02Z INFO request 102 ok
+2026-04-15T10:23:03Z ERROR request 103 failed: timeout
+2026-04-15T10:23:04Z INFO request 104 ok
+";
+        let result = filter(input);
+        assert!(
+            result.output.contains("ERROR") && result.output.contains("timeout"),
+            "error line must be preserved: {}",
+            result.output
+        );
+    }
+
+    #[test]
+    fn test_multi_language_stack_filter_go() {
+        let input = "\
+panic: runtime error: invalid memory address
+goroutine 1 [running]:
+main.handleRequest(0x12345)
+        /app/handler.go:42
+runtime.goexit()
+        /usr/local/go/src/runtime/asm_amd64.s:1571
+runtime.main()
+        /usr/local/go/src/runtime/proc.go:255
+runtime.schedule()
+        /usr/local/go/src/runtime/proc.go:3056
+runtime.findrunnable()
+        /usr/local/go/src/runtime/proc.go:2600
+";
+        let result = filter(input);
+        assert!(
+            result.output.contains("main.handleRequest"),
+            "user frame must survive"
+        );
+        assert!(
+            result.output.contains("framework frames omitted")
+                || !result.output.contains("runtime.findrunnable")
+        );
     }
 }

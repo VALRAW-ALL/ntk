@@ -1,6 +1,6 @@
 [package]
 name = "ntk"
-version = "0.2.26"
+version = "0.2.27"
 edition = "2021"
 description = "Neural Token Killer — semantic compression proxy for Claude Code"
 license = "Apache-2.0"
@@ -22,6 +22,8 @@ anyhow = "1"
 thiserror = "1"
 tiktoken-rs = "0.5"
 strip-ansi-escapes = "0.2"
+regex = "1"
+once_cell = "1"
 sqlx = { version = "0.8", features = ["sqlite", "runtime-tokio", "tls-rustls"] }
 libsqlite3-sys = { version = "0.30", features = ["bundled"], optional = true }
 dirs = "5"

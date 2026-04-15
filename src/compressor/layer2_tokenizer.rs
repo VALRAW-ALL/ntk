@@ -1,4 +1,6 @@
 use anyhow::{Context, Result};
+use once_cell::sync::Lazy;
+use regex::Regex;
 use std::sync::OnceLock;
 use tiktoken_rs::{cl100k_base, CoreBPE};
 
@@ -36,8 +38,10 @@ pub fn process(input: &str) -> Result<Layer2Result> {
 
     let original_tokens = bpe.encode_ordinary(input).len();
 
-    let after_paths = shorten_paths(input);
-    let output = consolidate_prefixes(&after_paths);
+    let after_normalize = normalize_opaque_tokens(input);
+    let after_paths = shorten_paths(&after_normalize);
+    let after_whitespace = collapse_whitespace(&after_paths);
+    let output = consolidate_prefixes(&after_whitespace);
 
     let compressed_tokens = bpe.encode_ordinary(&output).len();
 
@@ -46,6 +50,104 @@ pub fn process(input: &str) -> Result<Layer2Result> {
         original_tokens,
         compressed_tokens,
     })
+}
+
+// ---------------------------------------------------------------------------
+// Normalize opaque tokens — URLs with query strings, long hashes, base64
+// blobs, bearer tokens. These are token-expensive under BPE but carry no
+// debugging signal beyond "there was an ID here".
+//
+// Replacements preserve a short prefix + "…" so matching across lines of a
+// single trace still works visually.
+// ---------------------------------------------------------------------------
+
+// Static regex literals — `.expect(..)` here can only fail if the literal
+// pattern itself is malformed (tested in CI), so suppressing the lint is
+// safe while keeping the security-gate clippy rules on elsewhere.
+#[allow(clippy::expect_used)]
+static RE_URL_QUERY: Lazy<Regex> =
+    Lazy::new(|| Regex::new(r"\?[A-Za-z0-9=&_%+.-]{20,}").expect("url query regex must compile"));
+
+#[allow(clippy::expect_used)]
+static RE_JWT: Lazy<Regex> = Lazy::new(|| {
+    Regex::new(r"eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}")
+        .expect("jwt regex must compile")
+});
+
+#[allow(clippy::expect_used)]
+static RE_LONG_HASH: Lazy<Regex> =
+    Lazy::new(|| Regex::new(r"\b[0-9a-fA-F]{32,}\b").expect("long-hash regex must compile"));
+
+#[allow(clippy::expect_used)]
+static RE_BASE64_BLOB: Lazy<Regex> =
+    Lazy::new(|| Regex::new(r"[A-Za-z0-9+/]{40,}={0,2}").expect("base64 regex must compile"));
+
+fn normalize_opaque_tokens(input: &str) -> String {
+    // Order matters: longer / more-specific patterns first so they consume
+    // bytes before the generic base64 regex sees them.
+    let s1 = RE_JWT.replace_all(input, "<JWT>");
+    let s2 = RE_LONG_HASH.replace_all(&s1, |caps: &regex::Captures| {
+        // Preserve a short prefix for visual traceability: sha256 "abc12345…"
+        let full = &caps[0];
+        if full.len() >= 12 {
+            format!("{}...", &full[..8])
+        } else {
+            "<HASH>".to_owned()
+        }
+    });
+    let s3 = RE_URL_QUERY.replace_all(&s2, "?<QUERY>");
+    let s4 = RE_BASE64_BLOB.replace_all(&s3, "<B64>");
+    s4.into_owned()
+}
+
+// ---------------------------------------------------------------------------
+// Smart whitespace collapse
+//
+// BPE charges extra for long runs of spaces ("          " tokenizes as
+// several tokens). Collapsing these to a single space (while preserving
+// meaningful indentation up to 4 columns) is safe and cheap.
+//
+// Rules:
+//   - Leading whitespace up to 4 columns is preserved verbatim.
+//   - Runs of ≥ 3 spaces in the middle of a line collapse to 2 spaces.
+//   - Trailing whitespace is stripped.
+//   - Tabs are preserved (they often convey semantic indentation).
+// ---------------------------------------------------------------------------
+
+fn collapse_whitespace(input: &str) -> String {
+    let mut out = String::with_capacity(input.len());
+    for (i, line) in input.lines().enumerate() {
+        if i > 0 {
+            out.push('\n');
+        }
+
+        // Preserve up to 4 cols of leading space.
+        let leading: String = line.chars().take_while(|c| *c == ' ').take(4).collect();
+        out.push_str(&leading);
+
+        let mut rest = &line[leading.len()..];
+        // Skip the leading spaces we already emitted.
+        rest = rest.trim_start_matches(' ');
+        // Collapse mid-line runs of ≥ 3 spaces to 2.
+        let mut space_run = 0usize;
+        for c in rest.chars() {
+            if c == ' ' {
+                space_run = space_run.saturating_add(1);
+                if space_run <= 2 {
+                    out.push(' ');
+                }
+            } else {
+                space_run = 0;
+                out.push(c);
+            }
+        }
+
+        // Strip trailing whitespace by truncating.
+        while out.ends_with(' ') || out.ends_with('\t') {
+            out.pop();
+        }
+    }
+    out
 }
 
 /// Count tokens in a string using cl100k_base.
@@ -330,6 +432,67 @@ mod tests {
             result.compressed_tokens < 300,
             "expected < 300 tokens, got {}",
             result.compressed_tokens
+        );
+    }
+
+    // ----- New tests ---------------------------------------------------
+
+    #[test]
+    fn test_whitespace_collapse_mid_line() {
+        let input = "key     value     more_value";
+        let result = process(input).unwrap();
+        assert_eq!(result.output.trim_end(), "key  value  more_value");
+    }
+
+    #[test]
+    fn test_whitespace_preserve_leading_indent() {
+        let input = "    indented line";
+        let result = process(input).unwrap();
+        assert!(result.output.starts_with("    indented"));
+    }
+
+    #[test]
+    fn test_whitespace_strip_trailing() {
+        let input = "hello world     ";
+        let result = process(input).unwrap();
+        assert!(!result.output.ends_with(' '));
+    }
+
+    #[test]
+    fn test_long_hash_normalized() {
+        let input = "commit abc1234567890abcdef1234567890abcdef12345678 is bad";
+        let result = process(input).unwrap();
+        assert!(
+            result.compressed_tokens < result.original_tokens,
+            "hash should reduce tokens"
+        );
+        assert!(result.output.contains("..."));
+    }
+
+    #[test]
+    fn test_jwt_normalized() {
+        let input = "Authorization: Bearer eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c";
+        let result = process(input).unwrap();
+        assert!(result.output.contains("<JWT>"));
+    }
+
+    #[test]
+    fn test_url_query_normalized() {
+        let input = "GET /api/items?session=abcd1234efgh5678ijkl&sort=asc";
+        let result = process(input).unwrap();
+        assert!(result.output.contains("<QUERY>"));
+    }
+
+    #[test]
+    fn test_no_loss_of_short_hex() {
+        // Short hex (git SHAs ≤ 12 chars) should not be normalized
+        // because they're still human-readable and useful in error messages.
+        let input = "commit abc1234 is good";
+        let result = process(input).unwrap();
+        assert!(
+            result.output.contains("abc1234"),
+            "short hex should survive: {}",
+            result.output
         );
     }
 }
