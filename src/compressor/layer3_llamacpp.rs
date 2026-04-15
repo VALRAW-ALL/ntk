@@ -139,9 +139,7 @@ impl LlamaCppBackend {
         // CPU-only release download), passing --n-gpu-layers != 0 or
         // --flash-attn makes it exit with code 1 immediately.  Detect this
         // and silently fall back to CPU mode so the daemon still works.
-        let effective_gpu_layers = if self.n_gpu_layers != 0
-            && !binary_supports_gpu(&binary)
-        {
+        let effective_gpu_layers = if self.n_gpu_layers != 0 && !binary_supports_gpu(&binary) {
             tracing::warn!(
                 "llama-server at {} appears to be a CPU-only build (no GPU shared libs). \
                 Falling back to --n-gpu-layers 0. \
@@ -540,16 +538,11 @@ fn binary_supports_gpu(binary: &std::path::Path) -> bool {
 
     std::fs::read_dir(dir)
         .map(|entries| {
-            entries
-                .filter_map(|e| e.ok())
-                .any(|entry| {
-                    let name = entry
-                        .file_name()
-                        .to_string_lossy()
-                        .to_lowercase();
-                    let is_lib = name.ends_with(ext);
-                    is_lib && gpu_patterns.iter().any(|p| name.contains(p))
-                })
+            entries.filter_map(|e| e.ok()).any(|entry| {
+                let name = entry.file_name().to_string_lossy().to_lowercase();
+                let is_lib = name.ends_with(ext);
+                is_lib && gpu_patterns.iter().any(|p| name.contains(p))
+            })
         })
         .unwrap_or(false)
 }
