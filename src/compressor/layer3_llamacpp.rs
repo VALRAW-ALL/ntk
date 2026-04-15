@@ -135,9 +135,27 @@ impl LlamaCppBackend {
             .parse::<u16>()
             .unwrap_or(8766);
 
-        let gen_threads = generation_threads(self.n_gpu_layers);
+        // If the binary has no GPU shared libraries next to it (e.g. the
+        // CPU-only release download), passing --n-gpu-layers != 0 or
+        // --flash-attn makes it exit with code 1 immediately.  Detect this
+        // and silently fall back to CPU mode so the daemon still works.
+        let effective_gpu_layers = if self.n_gpu_layers != 0
+            && !binary_supports_gpu(&binary)
+        {
+            tracing::warn!(
+                "llama-server at {} appears to be a CPU-only build (no GPU shared libs). \
+                Falling back to --n-gpu-layers 0. \
+                Replace with a Vulkan/CUDA build to use GPU acceleration.",
+                binary.display()
+            );
+            0
+        } else {
+            self.n_gpu_layers
+        };
+
+        let gen_threads = generation_threads(effective_gpu_layers);
         let batch_threads = num_cpus();
-        let use_gpu = self.n_gpu_layers != 0;
+        let use_gpu = effective_gpu_layers != 0;
 
         tracing::info!(
             "llama.cpp: starting {} --model {} --port {} --threads {} --threads-batch {} --n-gpu-layers {} {}{}",
@@ -146,7 +164,7 @@ impl LlamaCppBackend {
             port,
             gen_threads,
             batch_threads,
-            self.n_gpu_layers,
+            effective_gpu_layers,
             if use_gpu { "--flash-attn " } else { "--mlock " },
             if !use_gpu { "--no-mmap" } else { "" },
         );
@@ -154,9 +172,6 @@ impl LlamaCppBackend {
         let mut cmd = std::process::Command::new(&binary);
 
         // Route inference to the exact GPU the user picked in `ntk model setup`.
-        // llama-server builds (CUDA / HIP / Vulkan) honour these env vars as
-        // device visibility filters, so a selected AMD card on a system that
-        // also has an NVIDIA card actually gets used instead of CUDA winning.
         if use_gpu {
             let id = self.gpu_device_id.to_string();
             match self.gpu_vendor {
@@ -180,7 +195,7 @@ impl LlamaCppBackend {
             .arg("--ctx-size")
             .arg(self.context_size.to_string())
             .arg("--n-gpu-layers")
-            .arg(self.n_gpu_layers.to_string())
+            .arg(effective_gpu_layers.to_string())
             // Generation threads: sequential token-by-token loop.
             // Beyond 8 adds locking overhead without throughput gain on most CPUs.
             .arg("--threads")
@@ -504,6 +519,39 @@ fn generation_threads(n_gpu_layers: i32) -> usize {
     } else {
         num_cpus().min(8)
     }
+}
+
+/// Returns `true` when the llama-server binary has GPU-capable shared libraries
+/// alongside it (Vulkan, CUDA, or HIP .dll/.so files).  A CPU-only build ships
+/// without these and will exit immediately with code 1 if `--n-gpu-layers != 0`
+/// or `--flash-attn` is passed.
+fn binary_supports_gpu(binary: &std::path::Path) -> bool {
+    let dir = match binary.parent() {
+        Some(d) => d,
+        None => return false,
+    };
+
+    #[cfg(windows)]
+    let gpu_patterns: &[&str] = &["vulkan", "cuda", "hip", "ggml-metal", "ggml-gpu"];
+    #[cfg(not(windows))]
+    let gpu_patterns: &[&str] = &["vulkan", "cuda", "hip", "metal", "ggml-gpu"];
+
+    let ext = if cfg!(windows) { "dll" } else { "so" };
+
+    std::fs::read_dir(dir)
+        .map(|entries| {
+            entries
+                .filter_map(|e| e.ok())
+                .any(|entry| {
+                    let name = entry
+                        .file_name()
+                        .to_string_lossy()
+                        .to_lowercase();
+                    let is_lib = name.ends_with(ext);
+                    is_lib && gpu_patterns.iter().any(|p| name.contains(p))
+                })
+        })
+        .unwrap_or(false)
 }
 
 // ---------------------------------------------------------------------------
