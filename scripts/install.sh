@@ -189,7 +189,7 @@ case "$PLATFORM" in
 esac
 
 # ---------------------------------------------------------------------------
-# Download + install
+# Download + install (always fetches latest, replaces any existing binary)
 # ---------------------------------------------------------------------------
 
 LATEST=$(curl -sSf "https://api.github.com/repos/${REPO}/releases/latest" \
@@ -199,24 +199,36 @@ ARTIFACT="ntk-${OS}-${ARCH}-${SUFFIX}"
 URL="https://github.com/${REPO}/releases/download/${LATEST}/${ARTIFACT}"
 DEST="/usr/local/bin/ntk"
 
+# Show current version if already installed
+CURRENT=""
+if command -v ntk >/dev/null 2>&1; then
+    CURRENT=$(ntk --version 2>/dev/null | awk '{print $2}' || true)
+fi
+
 echo ""
-echo "  Downloading ${ARTIFACT} (${LATEST})…"
-if ! curl -sSfL "$URL" -o /tmp/ntk; then
-    echo "Download failed." >&2
+if [ -n "$CURRENT" ]; then
+    echo "  Updating NTK  ${CURRENT}  →  ${LATEST}"
+else
+    echo "  Installing NTK ${LATEST}"
+fi
+echo "  Downloading ${ARTIFACT}…"
+
+if ! curl -sSfL "$URL" -o /tmp/ntk_new; then
+    echo "  Download failed." >&2
     echo "  URL: $URL" >&2
     echo "  This variant may not exist for your platform — try another choice." >&2
     exit 1
 fi
-chmod +x /tmp/ntk
+chmod +x /tmp/ntk_new
 
+# Atomically replace the existing binary (works even while ntk is running)
 if [ -w /usr/local/bin ]; then
-    mv /tmp/ntk "$DEST"
+    mv /tmp/ntk_new "$DEST"
 else
-    sudo mv /tmp/ntk "$DEST"
+    sudo mv /tmp/ntk_new "$DEST"
 fi
 
-echo ""
-echo "  NTK installed to $DEST"
+echo "  ✓ NTK ${LATEST} installed to ${DEST}"
 echo ""
 
 if [ "${POST_INSTALL_NOTE:-}" = "AMD" ]; then
@@ -245,3 +257,8 @@ ntk model setup
 echo ""
 echo "  ✓ Installation complete. Run  ntk start  to launch the daemon."
 echo ""
+
+# Keep the terminal open so the user can read the output.
+# Works both when launched from a file manager and via curl | sh.
+printf "  Press Enter to close…"
+read -r _

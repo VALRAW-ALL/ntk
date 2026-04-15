@@ -132,17 +132,31 @@ $artifact = "ntk-windows-x86_64-$suffix.exe"
 $url      = "https://github.com/$Repo/releases/download/$latest/$artifact"
 $dest     = "$env:LOCALAPPDATA\ntk\ntk.exe"
 
+# Show current version if already installed
+$current = ''
+try { $current = (& ntk --version 2>$null).Split(' ')[1] } catch {}
+
 Write-Host ''
-Write-Host "  Downloading $artifact ($latest)…"
+if ($current) {
+    Write-Host "  Updating NTK  $current  ->  $latest"
+} else {
+    Write-Host "  Installing NTK $latest"
+}
+Write-Host "  Downloading $artifact..."
+
 New-Item -ItemType Directory -Force -Path "$env:LOCALAPPDATA\ntk" | Out-Null
+$tmp = "$env:TEMP\ntk_new.exe"
 try {
-    Invoke-WebRequest $url -OutFile $dest
+    Invoke-WebRequest $url -OutFile $tmp
 } catch {
-    Write-Host "Download failed." -ForegroundColor Red
+    Write-Host 'Download failed.' -ForegroundColor Red
     Write-Host "  URL: $url"
-    Write-Host "  This variant may not exist — try another choice." -ForegroundColor Red
+    Write-Host '  This variant may not exist — try another choice.' -ForegroundColor Red
     throw
 }
+
+# Atomically replace the existing binary
+Move-Item -Force $tmp $dest
 
 # Add to user PATH if not already present.
 $currentPath = [Environment]::GetEnvironmentVariable('PATH', 'User')
@@ -156,7 +170,7 @@ if ($currentPath -notlike "*$env:LOCALAPPDATA\ntk*") {
 }
 
 Write-Host ''
-Write-Host "  NTK installed to $dest"
+Write-Host "  NTK $latest installed to $dest" -ForegroundColor Green
 Write-Host ''
 
 if ($postNote -eq 'AMD') {
@@ -185,3 +199,7 @@ Write-Host ''
 Write-Host ''
 Write-Host '  Installation complete. Run  ntk start  to launch the daemon.' -ForegroundColor Green
 Write-Host ''
+
+# Keep the terminal open so the user can read the output.
+Write-Host '  Press Enter to close...' -NoNewline
+$null = Read-Host
