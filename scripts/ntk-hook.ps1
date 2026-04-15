@@ -46,20 +46,24 @@ if ($hook.tool_name -ne "Bash") {
     exit 0
 }
 
-$output  = if ($hook.tool_response.output) { $hook.tool_response.output } else { "" }
-$command = if ($hook.tool_input.command)   { $hook.tool_input.command }   else { "" }
-$cwd     = if ($hook.cwd)                  { $hook.cwd }                  else { "" }
+$output         = if ($hook.tool_response.output) { $hook.tool_response.output } else { "" }
+$command        = if ($hook.tool_input.command)   { $hook.tool_input.command }   else { "" }
+$cwd            = if ($hook.cwd)                  { $hook.cwd }                  else { "" }
+$transcriptPath = if ($hook.transcript_path)      { $hook.transcript_path }      else { "" }
 
 # Skip short outputs.
 if ($output.Length -lt $MinChars) {
     exit 0
 }
 
-# Build JSON payload.
+# Build JSON payload.  transcript_path enables Layer 4 context injection on
+# the daemon side — it reads the Claude Code session JSONL to bias L3 toward
+# information relevant to the user's current intent.
 $payload = @{
-    output  = $output
-    command = $command
-    cwd     = $cwd
+    output          = $output
+    command         = $command
+    cwd             = $cwd
+    transcript_path = $transcriptPath
 } | ConvertTo-Json -Compress -Depth 5
 
 # POST to daemon via System.Net.WebRequest (synchronous, no async, works in PS5 subprocesses).

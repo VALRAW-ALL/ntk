@@ -48,7 +48,10 @@ impl Default for CompressionConfig {
             layer2_enabled: true,
             layer3_enabled: true,
             inference_threshold_tokens: 300,
-            context_aware: false,
+            // Layer 4 context injection is on by default now that the
+            // hook passes transcript_path to the daemon on every call.
+            // Disable this to restore pre-v0.2.27 behaviour.
+            context_aware: true,
             max_output_tokens: 500,
             preserve_first_stacktrace: true,
             preserve_error_counts: true,

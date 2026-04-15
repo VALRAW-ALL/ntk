@@ -22,6 +22,7 @@ tool_name=$(printf '%s' "$input" | python3 -c "import sys,json; d=json.load(sys.
 output=$(printf '%s' "$input" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('tool_response',{}).get('output',''))" 2>/dev/null || echo "")
 command=$(printf '%s' "$input" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('tool_input',{}).get('command',''))" 2>/dev/null || echo "")
 cwd=$(printf '%s' "$input" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('cwd',''))" 2>/dev/null || echo "")
+transcript_path=$(printf '%s' "$input" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('transcript_path',''))" 2>/dev/null || echo "")
 
 # Only process Bash tool results.
 if [ "$tool_name" != "Bash" ]; then
@@ -34,15 +35,18 @@ if [ "$char_count" -lt "$MIN_CHARS" ]; then
     exit 0
 fi
 
-# Build JSON payload.
+# Build JSON payload. transcript_path enables Layer 4 context injection on
+# the daemon side — it reads the Claude Code session JSONL to bias L3 toward
+# information relevant to the user's current intent.
 payload=$(python3 -c "
 import json, sys
 print(json.dumps({
     'output': sys.argv[1],
     'command': sys.argv[2],
     'cwd': sys.argv[3],
+    'transcript_path': sys.argv[4],
 }))
-" "$output" "$command" "$cwd" 2>/dev/null)
+" "$output" "$command" "$cwd" "$transcript_path" 2>/dev/null)
 
 if [ -z "$payload" ]; then
     exit 0

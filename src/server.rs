@@ -1,4 +1,4 @@
-use crate::compressor::{layer1_filter, layer2_tokenizer, layer3_backend};
+use crate::compressor::{layer1_filter, layer2_tokenizer, layer3_backend, layer4_context};
 use crate::config::NtkConfig;
 use crate::detector;
 use crate::metrics::{CompressionRecord, MetricsDb, MetricsStore};
@@ -49,9 +49,18 @@ pub struct CompressRequest {
     /// Optional: the Bash command that produced this output (used for metrics).
     #[serde(default)]
     pub command: Option<String>,
-    /// Optional: Claude's current intent (Layer 4, not yet implemented).
+    /// Optional: Layer 4 — direct intent override. When set, this string is
+    /// used as the user-intent prefix; `transcript_path` is ignored.
     #[serde(default)]
     pub context: Option<String>,
+    /// Optional: Layer 4 — path to the Claude Code session .jsonl. When set,
+    /// NTK reads the most recent user message to build an intent-aware prompt
+    /// for L3. Ignored when `context` is already provided.
+    #[serde(default)]
+    pub transcript_path: Option<String>,
+    /// Optional: caller's current working directory (for metric annotation only).
+    #[serde(default)]
+    pub cwd: Option<String>,
 }
 
 #[derive(Debug, Serialize, Default)]
@@ -170,6 +179,44 @@ async fn handle_compress(
     let threshold = state.config.compression.inference_threshold_tokens;
     let output_type = detector::detect(&req.output);
 
+    // Layer 4 — Context Injection.
+    // Build an intent prefix from either the request's explicit `context`
+    // field or by reading the Claude Code transcript at `transcript_path`.
+    // Only active when the config flag is on.
+    let context_prefix: String = if state.config.compression.context_aware {
+        if let Some(direct) = req.context.as_deref() {
+            if !direct.trim().is_empty() {
+                layer4_context::format_context(
+                    &layer4_context::SessionContext {
+                        user_intent: direct.trim().to_owned(),
+                        turns_ago: 0,
+                    },
+                    layer4_context::PromptFormat::default(),
+                )
+            } else {
+                String::new()
+            }
+        } else if let Some(tpath) = req.transcript_path.as_deref() {
+            let path = std::path::Path::new(tpath);
+            match layer4_context::extract_context(path) {
+                Some(ctx) => {
+                    tracing::info!(
+                        "Layer 4: extracted context from {} ({} turns ago): {}...",
+                        path.display(),
+                        ctx.turns_ago,
+                        ctx.user_intent.chars().take(60).collect::<String>()
+                    );
+                    layer4_context::format_context(&ctx, layer4_context::PromptFormat::default())
+                }
+                None => String::new(),
+            }
+        } else {
+            String::new()
+        }
+    } else {
+        String::new()
+    };
+
     // Layer 3 (optional, only when threshold exceeded)
     let mut l3_latency: Option<u64> = None;
     let mut tokens_after_l3: Option<usize> = None;
@@ -177,10 +224,16 @@ async fn handle_compress(
         if state.config.compression.layer3_enabled && l2.compressed_tokens > threshold {
             // Prompts dir: NTK_PROMPTS_DIR env var, or ~/.ntk/system-prompts/, or ./system-prompts/
             let prompts_dir = crate::config::resolve_prompts_dir();
+            // Prepend the context prefix (empty string when L4 is off).
+            let l3_input = if context_prefix.is_empty() {
+                l2.output.clone()
+            } else {
+                format!("{context_prefix}{}", l2.output)
+            };
             let l3_start = Instant::now();
             let l3_result = state
                 .backend
-                .compress(&l2.output, output_type, &prompts_dir)
+                .compress(&l3_input, output_type, &prompts_dir)
                 .await;
             l3_latency = Some(l3_start.elapsed().as_millis() as u64);
             match l3_result {
