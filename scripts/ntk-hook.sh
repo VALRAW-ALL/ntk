@@ -56,13 +56,19 @@ if [ -z "$response" ]; then
     exit 0
 fi
 
-# Extract compressed output and stats.
-compressed=$(printf '%s' "$response" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('output',''))" 2>/dev/null || echo "")
-summary=$(printf '%s' "$response" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('summary',''))" 2>/dev/null || echo "")
+# Extract compressed output and stats from the daemon response.
+# Daemon returns: { "compressed": "...", "layer": N, "tokens_before": N, "tokens_after": N, "ratio": 0.xx }
+compressed=$(printf '%s' "$response" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('compressed',''))" 2>/dev/null || echo "")
+layer=$(printf '%s' "$response"      | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('layer',0))" 2>/dev/null || echo "0")
+tok_in=$(printf '%s' "$response"     | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('tokens_before',0))" 2>/dev/null || echo "0")
+tok_out=$(printf '%s' "$response"    | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('tokens_after',0))" 2>/dev/null || echo "0")
+ratio=$(printf '%s' "$response"      | python3 -c "import sys,json; d=json.load(sys.stdin); print(int(d.get('ratio',0)*100))" 2>/dev/null || echo "0")
 
 if [ -z "$compressed" ]; then
     exit 0
 fi
+
+ntk_note="[NTK L${layer}: ${tok_in}->${tok_out} tokens (${ratio}% saved)]"
 
 # Emit the hook output JSON for Claude Code.
 python3 -c "
@@ -73,7 +79,7 @@ print(json.dumps({
         'additionalContext': sys.argv[1],
     }
 }))
-" "${compressed}${summary:+
-[NTK: $summary]}" 2>/dev/null
+" "${compressed}
+${ntk_note}" 2>/dev/null
 
 exit 0

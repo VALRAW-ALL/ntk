@@ -11,10 +11,26 @@ $ErrorActionPreference = 'Stop'
 
 $NtkDaemonUrl = if ($env:NTK_DAEMON_URL) { $env:NTK_DAEMON_URL } else { "http://127.0.0.1:8765" }
 $MinChars     = 500
-$TimeoutSecs  = 10
+# 65 s = slightly more than model.timeout_ms (60 s) so the daemon can fall back
+# to L1+L2 before this request times out. Keep below Claude Code's own hook timeout.
+$TimeoutSecs  = 65
 
-# Read stdin.
-$input = [Console]::In.ReadToEnd()
+# Read stdin — use $input pipeline variable (works for both piped and redirected stdin).
+# [Console]::In.ReadToEnd() fails when PowerShell is launched as a subprocess with
+# redirected stdin; $input correctly handles both interactive and subprocess contexts.
+$input = $input -join "`n"
+if (-not $input) {
+    # Fallback: read line by line via [Console]::In for compatibility with some callers
+    $lines = @()
+    try {
+        while ($true) {
+            $line = [Console]::In.ReadLine()
+            if ($null -eq $line) { break }
+            $lines += $line
+        }
+    } catch {}
+    $input = $lines -join "`n"
+}
 
 # Parse hook JSON.
 try {
@@ -44,27 +60,36 @@ $payload = @{
     cwd     = $cwd
 } | ConvertTo-Json -Compress -Depth 5
 
-# POST to daemon.
+# POST to daemon via System.Net.WebRequest (synchronous, no async, works in PS5 subprocesses).
 try {
-    $response = Invoke-RestMethod `
-        -Uri "${NtkDaemonUrl}/compress" `
-        -Method Post `
-        -ContentType "application/json" `
-        -Body $payload `
-        -TimeoutSec $TimeoutSecs
+    $bytes   = [System.Text.Encoding]::UTF8.GetBytes($payload)
+    $req     = [System.Net.WebRequest]::Create("${NtkDaemonUrl}/compress")
+    $req.Method      = 'POST'
+    $req.ContentType = 'application/json'
+    $req.Timeout     = $TimeoutSecs * 1000
+    $req.ContentLength = $bytes.Length
+    $reqStream = $req.GetRequestStream()
+    $reqStream.Write($bytes, 0, $bytes.Length)
+    $reqStream.Close()
+    $resp   = $req.GetResponse()
+    $reader = New-Object System.IO.StreamReader($resp.GetResponseStream())
+    $responseJson = $reader.ReadToEnd()
+    $reader.Close()
+    $resp.Close()
 } catch {
     exit 0
 }
 
-if (-not $response -or -not $response.output) {
+$response = try { $responseJson | ConvertFrom-Json } catch { exit 0 }
+
+if (-not $response -or -not $response.compressed) {
     exit 0
 }
 
 # Build additionalContext string.
-$ctx = $response.output
-if ($response.summary) {
-    $ctx += "`n[NTK: $($response.summary)]"
-}
+$ratio_pct = [int]($response.ratio * 100)
+$ctx = $response.compressed
+$ctx += "`n[NTK L$($response.layer): $($response.tokens_before)->$($response.tokens_after) tokens ($ratio_pct% saved)]"
 
 # Emit hook output JSON for Claude Code.
 @{
