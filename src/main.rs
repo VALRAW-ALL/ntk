@@ -439,17 +439,25 @@ async fn async_run_daemon(gpu: bool) -> Result<()> {
 }
 
 fn run_stop() -> Result<()> {
-    // Read PID file and send SIGTERM (Unix) / TerminateProcess (Windows).
     let pid_path = pid_file_path()?;
-    if !pid_path.exists() {
-        println!("NTK daemon is not running (no PID file found).");
+
+    // 1. Fast path — read PID file written at daemon start.
+    let pid_from_file: Option<u32> = std::fs::read_to_string(&pid_path)
+        .ok()
+        .and_then(|s| s.trim().parse().ok());
+
+    // 2. Fallback — scan system sockets for a process listening on our port
+    //    (handles orphans from older versions that did not write the PID file,
+    //    or daemons killed with SIGKILL that left a stale file).
+    let pid_from_socket = pid_listening_on_daemon_port();
+
+    let pid = pid_from_file.or(pid_from_socket);
+
+    let Some(pid) = pid else {
+        println!("NTK daemon is not running.");
+        let _ = std::fs::remove_file(&pid_path);
         return Ok(());
-    }
-    let pid_str = std::fs::read_to_string(&pid_path)?;
-    let pid: u32 = pid_str
-        .trim()
-        .parse()
-        .map_err(|_| anyhow!("invalid PID file"))?;
+    };
 
     #[cfg(unix)]
     {
@@ -480,6 +488,94 @@ fn run_stop() -> Result<()> {
 
     let _ = std::fs::remove_file(&pid_path);
     Ok(())
+}
+
+/// Find the PID of whichever process is listening on the NTK daemon port.
+/// Returns `None` when no process is bound to the port (daemon is down).
+///
+/// Implementation: shells out to a platform-native tool rather than pulling
+/// in a heavy cross-platform socket-enumeration crate.
+fn pid_listening_on_daemon_port() -> Option<u32> {
+    let port = default_daemon_port();
+    let port_str = port.to_string();
+
+    #[cfg(windows)]
+    {
+        // PowerShell is always present on Windows. Get-NetTCPConnection is
+        // reliable across Win10+.  Fall back to netstat if PowerShell fails.
+        let ps = std::process::Command::new("powershell")
+            .args([
+                "-NoProfile",
+                "-Command",
+                &format!(
+                    "(Get-NetTCPConnection -LocalPort {port} -State Listen -ErrorAction SilentlyContinue | \
+                     Select-Object -First 1 -ExpandProperty OwningProcess)"
+                ),
+            ])
+            .output()
+            .ok()?;
+        let s = String::from_utf8_lossy(&ps.stdout).trim().to_owned();
+        if let Ok(pid) = s.parse::<u32>() {
+            return Some(pid);
+        }
+
+        // netstat fallback: parse "TCP 127.0.0.1:8765 ... LISTENING <PID>"
+        let out = std::process::Command::new("netstat")
+            .args(["-ano"])
+            .output()
+            .ok()?;
+        let stdout = String::from_utf8_lossy(&out.stdout);
+        for line in stdout.lines() {
+            if line.contains(&format!(":{port_str}")) && line.contains("LISTENING") {
+                if let Some(tok) = line.split_whitespace().last() {
+                    if let Ok(pid) = tok.parse::<u32>() {
+                        return Some(pid);
+                    }
+                }
+            }
+        }
+        None
+    }
+
+    #[cfg(unix)]
+    {
+        // Prefer `lsof -ti:PORT` — single PID per line.
+        if let Ok(out) = std::process::Command::new("lsof")
+            .args(["-ti", &format!(":{port_str}"), "-sTCP:LISTEN"])
+            .output()
+        {
+            let s = String::from_utf8_lossy(&out.stdout).trim().to_owned();
+            if let Ok(pid) = s.parse::<u32>() {
+                return Some(pid);
+            }
+        }
+        // Fallback: `ss -lntp` or `fuser`.
+        if let Ok(out) = std::process::Command::new("ss").args(["-lntp"]).output() {
+            let stdout = String::from_utf8_lossy(&out.stdout);
+            for line in stdout.lines() {
+                if line.contains(&format!(":{port_str}")) && line.contains("LISTEN") {
+                    // Extract pid=NNN from "users:((\"prog\",pid=12345,fd=...))"
+                    if let Some(idx) = line.find("pid=") {
+                        let rest = &line[idx.saturating_add(4)..];
+                        let num: String = rest.chars().take_while(|c| c.is_ascii_digit()).collect();
+                        if let Ok(pid) = num.parse::<u32>() {
+                            return Some(pid);
+                        }
+                    }
+                }
+            }
+        }
+        None
+    }
+}
+
+/// Reads the daemon port from the loaded config, falling back to the
+/// built-in default (8765) if anything goes wrong.
+fn default_daemon_port() -> u16 {
+    let cwd = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
+    ntk::config::load(&cwd)
+        .map(|c| c.daemon.port)
+        .unwrap_or(8765)
 }
 
 fn run_status() -> Result<()> {
