@@ -1,6 +1,6 @@
 # NTK - Neural Token Killer
 
-> **v0.2.18** — Semantic compression proxy for Claude Code. Reduces tool output token count by 60–90% before it reaches the model context - without losing the information that matters.
+> **v0.2.23** — Semantic compression proxy for Claude Code. Reduces tool output token count by 60–90% before it reaches the model context - without losing the information that matters.
 
 ---
 
@@ -584,16 +584,40 @@ Candle has no AMD backend in the currently pinned version. For AMD GPU
 acceleration on NTK:
 
 1. Build NTK with the default flags (`cargo build --release`).
-2. Download a `llama-server` binary compiled with **Vulkan** from
-   [llama.cpp releases](https://github.com/ggerganov/llama.cpp/releases)
-   and place it on your `PATH` (or `~/.ntk/bin/`).
-3. Run `ntk model setup` → choose the **llama.cpp** backend.
-4. Inference will run on the AMD GPU through `llama-server`; the NTK
-   daemon talks to it over HTTP.
+2. `ntk model setup` → choose **llama.cpp** backend. NTK auto-downloads
+   the latest **Vulkan build** of `llama-server` — it works on Polaris
+   (RX 580), Vega, RDNA, and RDNA2+ without ROCm or any SDK. Runtime
+   automatically scopes `HIP_VISIBLE_DEVICES` / `GGML_VK_VISIBLE_DEVICES`
+   to your selected card.
+3. Inference runs on the AMD GPU through `llama-server`; the NTK
+   daemon talks to it over HTTP at `localhost:8766`.
+
+**If the installed `llama-server` is CPU-only** (e.g. downloaded
+manually from an AVX2 release), `ntk model setup` detects the missing
+GPU DLLs and hides the NVIDIA / AMD GPU options in the wizard — only
+CPU is offered. Replace the binary with a Vulkan build and re-run the
+wizard to enable GPU selection.
 
 The `ntk start --gpu` and `ntk model setup` commands detect AMD cards
 (Polaris / Vega / RDNA) via the Windows driver registry or Linux sysfs,
-so your GPU will show up in the selection list even without ROCm.
+so your GPU shows up in the selection list even without ROCm.
+
+### Ollama backend vs llama.cpp backend
+
+| Feature | Ollama | llama.cpp |
+|---|---|---|
+| NVIDIA CUDA ≥ 5.0 (Maxwell+) | ✅ | ✅ CUDA build |
+| Apple Silicon | ✅ Metal | ✅ Metal build |
+| AMD RDNA2+ on Linux | ✅ via ROCm | ✅ Vulkan / HIP |
+| **AMD Polaris (RX 580, RX 5xx)** | ❌ ROCm dropped support | ✅ **Vulkan** |
+| **NVIDIA Kepler (GT 7xx)** | ❌ compute < 5.0 | ✅ Vulkan |
+| Model management | `ollama pull/list/rm` | Manual GGUF download |
+| Setup complexity | 1 command | auto-download via wizard |
+| L3 latency (CPU) | ~150-300 ms overhead | ~50-100 ms (socket local) |
+
+**TL;DR:** for NVIDIA Turing+ / Apple Silicon → Ollama is simpler. For
+older NVIDIA Kepler or any AMD Polaris → llama.cpp + Vulkan is the
+only path to GPU acceleration.
 
 ---
 

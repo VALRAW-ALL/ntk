@@ -378,6 +378,16 @@ async fn async_run_daemon(gpu: bool) -> Result<()> {
     let listener = tokio::net::TcpListener::bind(&addr).await?;
     tracing::info!("NTK daemon listening on {addr}");
 
+    // Write PID file so `ntk stop` can terminate us. Done after bind so a port
+    // conflict (second daemon attempt) does not overwrite the first daemon's PID.
+    let pid_path = pid_file_path()?;
+    if let Some(parent) = pid_path.parent() {
+        let _ = std::fs::create_dir_all(parent);
+    }
+    if let Err(e) = std::fs::write(&pid_path, std::process::id().to_string()) {
+        tracing::warn!("failed to write PID file at {}: {e}", pid_path.display());
+    }
+
     // Shutdown channel: either the OS sends SIGINT (Ctrl+C in normal mode)
     // or the dashboard detects Ctrl+C as a raw key event and sends `true`.
     // Both paths converge here so the server and dashboard stop together.
@@ -420,6 +430,10 @@ async fn async_run_daemon(gpu: bool) -> Result<()> {
 
     // Wait for the dashboard to finish restoring the terminal before we exit.
     let _ = dashboard_handle.await;
+
+    // Remove PID file on graceful shutdown so a later `ntk status` does not
+    // report "running" for a dead process.
+    let _ = std::fs::remove_file(&pid_path);
 
     Ok(())
 }
