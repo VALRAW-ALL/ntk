@@ -1,0 +1,33 @@
+panic: runtime error: index out of range [5] with length 3
+
+goroutine 1 [running]:
+main.processItems({0xc0000b2000?, 0xc00009e000?, 0x3})
+	/home/dev/app/main.go:48 +0x1f5
+main.main()
+	/home/dev/app/main.go:29 +0x91
+runtime.main()
+	/usr/local/go/src/runtime/proc.go:267 +0x2bb
+runtime.goexit({})
+	/usr/local/go/src/runtime/asm_amd64.s:1650 +0x5
+runtime.systemstack()
+	/usr/local/go/src/runtime/asm_amd64.s:509 +0x4a
+runtime.sysargs()
+	/usr/local/go/src/runtime/runtime1.go:180 +0x88
+runtime.args()
+	/usr/local/go/src/runtime/runtime1.go:66 +0x1e
+runtime.schedinit()
+	/usr/local/go/src/runtime/proc.go:696 +0x8c
+
+goroutine 2 [force gc (idle)]:
+runtime.gopark(0x0?, 0x0?, 0x0?, 0x0?, 0x0?)
+	/usr/local/go/src/runtime/proc.go:398 +0xce
+runtime.goparkunlock(...)
+	/usr/local/go/src/runtime/proc.go:404
+runtime.forcegchelper()
+	/usr/local/go/src/runtime/proc.go:322 +0xb3
+runtime.goexit({})
+	/usr/local/go/src/runtime/asm_amd64.s:1650 +0x5
+created by runtime.init.6 in goroutine 1
+	/usr/local/go/src/runtime/proc.go:310 +0x1a
+
+exit status 2

@@ -1,0 +1,25 @@
+TypeError: Cannot read properties of undefined (reading 'accessToken')
+    at exchangeCodeForToken (/app/src/auth/oauth.ts:142:28)
+    at callbackHandler (/app/src/routes/auth.ts:88:20)
+    at Layer.handle [as handle_request] (/app/node_modules/express/lib/router/layer.js:95:5)
+    at next (/app/node_modules/express/lib/router/route.js:144:13)
+    at Route.dispatch (/app/node_modules/express/lib/router/route.js:114:3)
+    at Layer.handle [as handle_request] (/app/node_modules/express/lib/router/layer.js:95:5)
+    at /app/node_modules/express/lib/router/index.js:284:15
+    at Function.process_params (/app/node_modules/express/lib/router/index.js:346:12)
+    at next (/app/node_modules/express/lib/router/index.js:280:10)
+    at /app/node_modules/express/lib/router/index.js:235:24
+    at Function.handle (/app/node_modules/express/lib/router/index.js:175:3)
+    at router (/app/node_modules/express/lib/router/index.js:47:12)
+    at Layer.handle [as handle_request] (/app/node_modules/express/lib/router/layer.js:95:5)
+    at trim_prefix (/app/node_modules/express/lib/router/index.js:328:13)
+    at /app/node_modules/express/lib/router/index.js:286:9
+    at Function.process_params (/app/node_modules/express/lib/router/index.js:346:12)
+    at next (/app/node_modules/express/lib/router/index.js:280:10)
+    at expressInit (/app/node_modules/express/lib/middleware/init.js:40:5)
+    at Layer.handle [as handle_request] (/app/node_modules/express/lib/router/layer.js:95:5)
+    at trim_prefix (/app/node_modules/express/lib/router/index.js:328:13)
+    at /app/node_modules/express/lib/router/index.js:286:9
+    at processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at async Module.default_1 (node:internal/modules/esm/loader:210:14)
+[express] error: Token exchange failed for session abc123def456

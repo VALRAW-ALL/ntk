@@ -1,0 +1,27 @@
+Symfony\Component\HttpKernel\Exception\NotFoundHttpException: No route found for "GET /api/users/99/orders"
+
+  at /app/vendor/symfony/http-kernel/EventListener/RouterListener.php:136
+  at Symfony\Component\HttpKernel\EventListener\RouterListener->onKernelRequest(object(RequestEvent), 'kernel.request', object(EventDispatcher))
+     (/app/vendor/symfony/event-dispatcher/EventDispatcher.php:270)
+  at Symfony\Component\EventDispatcher\EventDispatcher->callListeners(array(array(object(RouterListener), 'onKernelRequest')), 'kernel.request', object(RequestEvent))
+     (/app/vendor/symfony/event-dispatcher/EventDispatcher.php:230)
+  at Symfony\Component\EventDispatcher\EventDispatcher->doDispatch(array(array(object(RouterListener), 'onKernelRequest')), 'kernel.request', object(RequestEvent))
+     (/app/vendor/symfony/event-dispatcher/EventDispatcher.php:59)
+  at Symfony\Component\EventDispatcher\EventDispatcher->dispatch(object(RequestEvent), 'kernel.request')
+     (/app/vendor/symfony/http-kernel/HttpKernel.php:139)
+  at Symfony\Component\HttpKernel\HttpKernel->handleRaw(object(Request), 1)
+     (/app/vendor/symfony/http-kernel/HttpKernel.php:75)
+  at Symfony\Component\HttpKernel\HttpKernel->handle(object(Request), 1, true)
+     (/app/vendor/symfony/http-kernel/Kernel.php:197)
+  at Symfony\Component\HttpKernel\Kernel->handle(object(Request))
+     (/app/public/index.php:27)
+
+#0 /app/vendor/symfony/http-kernel/HttpKernel.php(76): Symfony\Component\HttpKernel\HttpKernel->handleRaw()
+#1 /app/vendor/symfony/http-kernel/Kernel.php(197): Symfony\Component\HttpKernel\HttpKernel->handle()
+#2 /app/vendor/symfony/runtime/Runner/Symfony/HttpKernelRunner.php(35): Symfony\Component\HttpKernel\Kernel->handle()
+#3 /app/vendor/symfony/runtime/Runner/Symfony/ResponseRunner.php(29): Symfony\Component\Runtime\Runner\Symfony\HttpKernelRunner->run()
+#4 /app/vendor/autoload_runtime.php(29): Symfony\Component\Runtime\Runner\Symfony\ResponseRunner->run()
+#5 /app/public/index.php(5): require_once('...')
+#6 {main}
+
+[2026-04-15T10:23:45+00:00] request.CRITICAL: Uncaught PHP Exception Symfony\Component\HttpKernel\Exception\NotFoundHttpException

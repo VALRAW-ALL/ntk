@@ -1,0 +1,7 @@
+{
+    "category":  "stack_trace",
+    "description":  "Go runtime panic with runtime.main/runtime.goexit framework frames and secondary goroutine dumps.",
+    "min_ratio":  0.40,
+    "expected_layer":  2,
+    "command":  "go run main.go"
+}

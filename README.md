@@ -1,6 +1,6 @@
 # NTK - Neural Token Killer
 
-> **v0.2.27** — Semantic compression proxy for Claude Code. Reduces tool output token count by 60–90% before it reaches the model context - without losing the information that matters.
+> **v0.2.28** — Semantic compression proxy for Claude Code. Reduces tool output token count by 60–90% before it reaches the model context - without losing the information that matters.
 
 ---
 
@@ -364,6 +364,7 @@ NTK merges configuration from two sources, in order:
     "layer2_enabled": true,
     "layer3_enabled": true,
     "inference_threshold_tokens": 300,
+    "context_aware": true,
     "max_output_tokens": 500,
     "preserve_first_stacktrace": true,
     "preserve_error_counts": true
@@ -400,6 +401,7 @@ NTK merges configuration from two sources, in order:
 | Setting | Default | Description |
 |---|---|---|
 | `compression.inference_threshold_tokens` | `300` | Layer 3 only activates above this token count |
+| `compression.context_aware` | `true` | Layer 4 — when the hook forwards `transcript_path`, NTK extracts the user's most recent request and prepends it to the L3 prompt so the summary focuses on relevant info. Disable for pre-v0.2.27 behaviour. |
 | `model.timeout_ms` | `300000` (5 min) | Upper bound on a single `/compress` call. L3 inference on CPU can take 60-180 s on large inputs. The daemon falls back to L1+L2 after this window. Lower to 60 000 for GPU setups. |
 | `model.fallback_to_layer1_on_timeout` | `true` | Use L1+L2 output if Ollama is slow or unavailable |
 | `model.gpu_layers` | `-1` | `-1` = all layers on GPU; `0` = CPU only |
@@ -744,9 +746,10 @@ pwsh bench/report.ps1 `
   -B ~/.claude/projects/<proj>/<session-B>.csv
 ```
 
-Unix/macOS users can substitute `pwsh` for `bash bench/replay.sh`
-(only the replay step has a shell variant so far; the parser and
-report scripts require PowerShell).
+Unix/macOS users can substitute `pwsh bench/run_all.ps1` with
+`bash bench/run_all.sh` — the orchestrator plus `replay.sh` are
+portable; `parse_transcript.ps1` and `report.ps1` still require
+PowerShell (available on Unix via `pwsh`).
 
 **Outputs:**
 
@@ -763,7 +766,54 @@ report scripts require PowerShell).
 **Baseline prompt for macrobench:** `bench/prompts/baseline.md`. It
 runs 7 deterministic Bash commands in the NTK repo plus one summary
 turn — paste verbatim into Claude Code for the A (hook off) and
-B (hook on) runs.
+B (hook on) runs. The PowerShell orchestrator `bench/ab_session.ps1`
+automates the variant management (install / uninstall hook, wait for
+each session, copy transcripts, generate report).
+
+**Multi-language coverage** (12 fixtures). Measured ratios with L3
+skipped (CPU timeout), so the numbers below come purely from L1+L2
+deterministic compression:
+
+| Category | Fixture | Ratio |
+|---|---|---:|
+| repetitive logs | `docker_logs_repetitive` | **92%** |
+| Node trace | `node_express_trace` | **83%** |
+| cargo test | `cargo_test_failures` | **68%** |
+| Python trace | `python_django_trace` | **62%** |
+| Java trace | `stack_trace_java` | **60%** |
+| Go trace | `go_panic_trace` | **56%** |
+| PHP trace | `php_symfony_trace` | 33% |
+| unstructured log | `generic_long_log` | 14% |
+| TS errors | `tsc_errors_node_modules` | 10% |
+| git diff | `git_diff_large` | 9% |
+
+Run `bench/run_all.ps1` (or `.sh`) to reproduce. See `docs/testing-plan.md`
+for the methodology.
+
+### Layer 4 — Context Injection
+
+When the hook forwards the Claude Code `transcript_path` (v0.2.27+),
+the daemon reads the most recent user message and prepends it to the
+L3 prompt so the summary focuses on information relevant to the user's
+actual goal. Four prompt formats are supported:
+
+| Format | Shape |
+|---|---|
+| `Prefix` (default) | `CONTEXT: The user's most recent request was: "..."\n\n<output>` |
+| `XmlWrap` | `<user_intent>...</user_intent>\n\n<output>` |
+| `Goal` | `User goal: ... — extract only info that advances this goal.\n\n<output>` |
+| `Json` | `{"user_intent": "..."}\n\n<output>` |
+
+Override at runtime for experiments:
+```bash
+NTK_L4_FORMAT=xml ntk start
+```
+A/B among formats:
+```powershell
+pwsh bench/prompt_formats.ps1
+```
+Disable entirely by setting `compression.context_aware = false` in
+`~/.ntk/config.json`.
 
 ### Linting and security gate
 

@@ -183,6 +183,15 @@ async fn handle_compress(
     // Build an intent prefix from either the request's explicit `context`
     // field or by reading the Claude Code transcript at `transcript_path`.
     // Only active when the config flag is on.
+    //
+    // Prompt format can be overridden at runtime via NTK_L4_FORMAT=prefix|xml|
+    // goal|json — used by the bench/prompt_formats.ps1 A/B experiment.
+    let prompt_format = match std::env::var("NTK_L4_FORMAT").ok().as_deref() {
+        Some("xml") | Some("xmlwrap") => layer4_context::PromptFormat::XmlWrap,
+        Some("goal") => layer4_context::PromptFormat::Goal,
+        Some("json") => layer4_context::PromptFormat::Json,
+        _ => layer4_context::PromptFormat::default(),
+    };
     let context_prefix: String = if state.config.compression.context_aware {
         if let Some(direct) = req.context.as_deref() {
             if !direct.trim().is_empty() {
@@ -191,7 +200,7 @@ async fn handle_compress(
                         user_intent: direct.trim().to_owned(),
                         turns_ago: 0,
                     },
-                    layer4_context::PromptFormat::default(),
+                    prompt_format,
                 )
             } else {
                 String::new()
@@ -206,7 +215,7 @@ async fn handle_compress(
                         ctx.turns_ago,
                         ctx.user_intent.chars().take(60).collect::<String>()
                     );
-                    layer4_context::format_context(&ctx, layer4_context::PromptFormat::default())
+                    layer4_context::format_context(&ctx, prompt_format)
                 }
                 None => String::new(),
             }

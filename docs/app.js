@@ -65,7 +65,9 @@ const TRANSLATIONS = {
     'feat.cross_title': 'Cross-platform',
     'feat.cross_desc':  'Single Rust binary. Works on Windows, macOS, and Linux without any runtime dependencies.',
     'feat.bench_title': 'Built-in benchmark harness',
-    'feat.bench_desc':  'Every <code style="font-family:var(--font-mono)">/compress</code> response exposes per-layer token counts and latency. Set <code style="font-family:var(--font-mono)">NTK_LOG_COMPRESSIONS=1</code> to persist every compression (input, L1/L2/L3 outputs) to <code style="font-family:var(--font-mono)">~/.ntk/logs/</code> for auditing. Included scripts in <code style="font-family:var(--font-mono)">bench/</code> replay 8 fixture outputs, parse Claude Code transcripts, and produce a markdown report with token savings and estimated cost delta.',
+    'feat.bench_desc':  'Every <code style="font-family:var(--font-mono)">/compress</code> response exposes per-layer token counts and latency. Set <code style="font-family:var(--font-mono)">NTK_LOG_COMPRESSIONS=1</code> to persist every compression (input, L1/L2/L3 outputs) to <code style="font-family:var(--font-mono)">~/.ntk/logs/</code> for auditing. Included scripts in <code style="font-family:var(--font-mono)">bench/</code> replay 12 fixture outputs (including Python Django / Node Express / Go panic / PHP Symfony stack traces), parse Claude Code transcripts, and produce a markdown report with token savings and estimated cost delta.',
+    'feat.l4_title':    'Layer 4: context injection',
+    'feat.l4_desc':     'NTK reads the Claude Code session transcript to grab your most recent request, then prepends it to the L3 summarizer prompt so the compressed output prioritizes information relevant to your actual goal. Four prompt formats supported (Prefix / XmlWrap / Goal / Json), runtime-overridable via <code style="font-family:var(--font-mono)">NTK_L4_FORMAT</code>. Works with any LLM — plain-string prefix, zero model coupling.',
 
     // Get Started
     'gs.badge':    'Installation guide',
@@ -262,7 +264,9 @@ const TRANSLATIONS = {
     'feat.cross_title': 'Multiplataforma',
     'feat.cross_desc':  'Binário único em Rust. Funciona no Windows, macOS e Linux sem nenhuma dependência de runtime.',
     'feat.bench_title': 'Harness de benchmark embutido',
-    'feat.bench_desc':  'Toda resposta do <code style="font-family:var(--font-mono)">/compress</code> expõe contagem de tokens por camada e latência. Defina <code style="font-family:var(--font-mono)">NTK_LOG_COMPRESSIONS=1</code> para persistir cada compressão (input + L1/L2/L3) em <code style="font-family:var(--font-mono)">~/.ntk/logs/</code> para auditoria. Scripts em <code style="font-family:var(--font-mono)">bench/</code> replicam 8 fixtures, parseiam transcripts do Claude Code e geram relatório markdown com economia de tokens e estimativa de custo.',
+    'feat.bench_desc':  'Toda resposta do <code style="font-family:var(--font-mono)">/compress</code> expõe contagem de tokens por camada e latência. Defina <code style="font-family:var(--font-mono)">NTK_LOG_COMPRESSIONS=1</code> para persistir cada compressão (input + L1/L2/L3) em <code style="font-family:var(--font-mono)">~/.ntk/logs/</code> para auditoria. Scripts em <code style="font-family:var(--font-mono)">bench/</code> replicam 12 fixtures (incluindo stack traces Python Django / Node Express / Go panic / PHP Symfony), parseiam transcripts do Claude Code e geram relatório markdown com economia de tokens e estimativa de custo.',
+    'feat.l4_title':    'Camada 4: injeção de contexto',
+    'feat.l4_desc':     'O NTK lê o transcript da sessão do Claude Code para capturar sua requisição mais recente e injeta como prefixo no prompt do L3, fazendo a compressão focar em informações relevantes ao seu objetivo real. Quatro formatos de prompt disponíveis (Prefix / XmlWrap / Goal / Json), sobrescrevíveis em runtime via <code style="font-family:var(--font-mono)">NTK_L4_FORMAT</code>. Funciona com qualquer LLM — prefixo puro em texto, sem acoplamento a modelo.',
 
     // Get Started
     'gs.badge':    'Guia de instalação',

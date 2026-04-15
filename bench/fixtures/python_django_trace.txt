@@ -1,0 +1,22 @@
+Internal Server Error: /api/users/42/profile/
+Traceback (most recent call last):
+  File "/app/views/users.py", line 87, in get_profile
+    profile = user.get_profile_with_preferences()
+  File "/app/models/user.py", line 234, in get_profile_with_preferences
+    prefs = Preferences.objects.get(user_id=self.id, active=True)
+  File "/usr/local/lib/python3.11/site-packages/django/db/models/manager.py", line 85, in manager_method
+    return getattr(self.get_queryset(), name)(*args, **kwargs)
+  File "/usr/local/lib/python3.11/site-packages/django/db/models/query.py", line 431, in get
+    raise self.model.DoesNotExist(
+  File "/usr/local/lib/python3.11/site-packages/django/db/models/base.py", line 612, in __init__
+    pass
+  File "/usr/local/lib/python3.11/site-packages/django/core/handlers/exception.py", line 47, in inner
+    response = get_response(request)
+  File "/usr/local/lib/python3.11/site-packages/django/core/handlers/base.py", line 181, in _get_response
+    response = wrapped_callback(request, *callback_args, **callback_kwargs)
+  File "/usr/local/lib/python3.11/site-packages/asgiref/sync.py", line 477, in __call__
+    ret = await asyncio.wait_for(future, timeout=None)
+  File "/usr/local/lib/python3.11/site-packages/gunicorn/workers/sync.py", line 131, in handle_request
+    self.cfg.post_request(self, req, environ, resp)
+app.models.Preferences.DoesNotExist: Preferences matching query does not exist.
+[2026-04-15 10:23:45,123] ERROR django.request: Internal Server Error: /api/users/42/profile/

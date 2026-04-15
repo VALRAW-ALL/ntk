@@ -1,0 +1,7 @@
+{
+    "category":  "stack_trace",
+    "description":  "Node.js Express stack trace with heavy node_modules/express and node:internal frames.",
+    "min_ratio":  0.50,
+    "expected_layer":  2,
+    "command":  "node server.js"
+}
