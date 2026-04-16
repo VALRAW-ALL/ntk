@@ -1,0 +1,28 @@
+FATAL EXCEPTION: main
+Process: com.example.myapp, PID: 12345
+java.lang.IllegalStateException: View must be attached to a ViewTree
+	at com.example.myapp.ui.home.HomeFragment.onViewCreated(HomeFragment.kt:58)
+	at com.example.myapp.ui.home.HomeViewModel.loadUsers(HomeViewModel.kt:42)
+	at androidx.fragment.app.Fragment.performViewCreated(Fragment.java:3089)
+	at androidx.fragment.app.FragmentStateManager.createView(FragmentStateManager.java:548)
+	at androidx.fragment.app.FragmentStateManager.moveToExpectedState(FragmentStateManager.java:282)
+	at androidx.fragment.app.FragmentManager.executeOpsTogether(FragmentManager.java:2189)
+	at androidx.lifecycle.LiveData.considerNotify(LiveData.java:133)
+	at androidx.lifecycle.LiveData.dispatchingValue(LiveData.java:151)
+	at androidx.lifecycle.LiveData.setValue(LiveData.java:309)
+	at androidx.lifecycle.MutableLiveData.setValue(MutableLiveData.java:50)
+	at kotlinx.coroutines.DispatchedTask.run(DispatchedTask.kt:108)
+	at kotlinx.coroutines.internal.LimitedDispatcher$Worker.run(LimitedDispatcher.kt:115)
+	at kotlinx.coroutines.scheduling.TaskImpl.run(Tasks.kt:103)
+	at kotlinx.coroutines.scheduling.CoroutineScheduler.runSafely(CoroutineScheduler.kt:584)
+	at kotlinx.coroutines.scheduling.CoroutineScheduler$Worker.executeTask(CoroutineScheduler.kt:793)
+	at kotlinx.coroutines.scheduling.CoroutineScheduler$Worker.runWorker(CoroutineScheduler.kt:697)
+	at kotlinx.coroutines.scheduling.CoroutineScheduler$Worker.run(CoroutineScheduler.kt:684)
+	at android.os.Handler.dispatchMessage(Handler.java:106)
+	at android.os.Looper.loop(Looper.java:214)
+	at android.app.ActivityThread.main(ActivityThread.java:7356)
+	at java.lang.reflect.Method.invoke(Native Method)
+	at com.android.internal.os.RuntimeInit$MethodAndArgsCaller.run(RuntimeInit.java:492)
+	at com.android.internal.os.ZygoteInit.main(ZygoteInit.java:930)
+	at dalvik.system.VMRuntime.nativeExit(Native Method)
+E/AndroidRuntime(12345): Shutting down VM due to IllegalStateException

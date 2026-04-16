@@ -2,6 +2,16 @@
 
 > **v0.2.28** — Semantic compression proxy for Claude Code. Reduces tool output token count by 60–90% before it reaches the model context - without losing the information that matters.
 
+> ⚠ **This project is an open initiative — it needs your help to evolve.**
+> NTK started as a one-person effort and the surface area (languages,
+> frameworks, GPUs, editors) has outgrown solo maintenance. If you've
+> ever stared at a 10,000-line log and wished your LLM didn't burn
+> context on it, the quickest way to make this tool better is to
+> contribute a fixture, translate the docs, port the hook to another
+> editor, or benchmark on hardware we don't own. See
+> **[CONTRIBUTING.md](CONTRIBUTING.md)** for starter tasks — most take
+> under an hour and land as a single PR.
+
 ---
 
 ## Table of Contents
@@ -15,6 +25,7 @@
 - [GPU Acceleration](#gpu-acceleration)
 - [RTK + NTK Coexistence](#rtk--ntk-coexistence)
 - [Development](#development)
+- [Contributing](#contributing)
 - [Privacy Policy](#privacy-policy)
 - [License](#license)
 - [Third-Party Licenses](#third-party-licenses)
@@ -871,6 +882,29 @@ tests/
   benchmarks/              - criterion.rs benchmarks
   fixtures/                - Real captured outputs (cargo, tsc, vitest, docker, next.js)
 ```
+
+---
+
+## Contributing
+
+NTK is an open initiative maintained on a shoestring. There is a
+**concrete, pre-scoped list of starter tasks** in
+[CONTRIBUTING.md](CONTRIBUTING.md) — fixture additions, language
+support for the stack-trace filter, editor-hook ports, GPU benchmarks,
+and translations.
+
+Short version of the workflow:
+
+1. Pick one task from `CONTRIBUTING.md` (or open an issue to propose a new one).
+2. Fork, branch, implement. Most starter tasks touch 2–3 files.
+3. Run the clippy gate + `cargo test` locally.
+4. Open a PR. One change per PR is easier to review.
+
+**Project-specific rules and playbooks** live under
+[`.claude/rules/`](.claude/rules/) (enforced invariants) and
+[`.claude/skills/`](.claude/skills/) (step-by-step playbooks). The
+files are plain Markdown — even if you don't use Claude Code they
+document the "how we do it here" conventions.
 
 ---
 

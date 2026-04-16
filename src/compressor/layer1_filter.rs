@@ -189,12 +189,25 @@ fn group_by_template(input: &str) -> String {
 
     while idx < lines.len() {
         let current = lines[idx];
+
+        // Blank / whitespace-only lines are handled by the dedicated blank-line
+        // collapse stage later. Grouping them here would produce marker lines
+        // like "[×2] " that violate invariant #2 (exemplar must be readable).
+        if current.trim().is_empty() {
+            out.push(current.to_owned());
+            idx = idx.saturating_add(1);
+            continue;
+        }
+
         let current_template = normalize_to_template(current);
         let mut count = 1usize;
 
         // Scan forward while subsequent lines share the same template.
         while idx.saturating_add(count) < lines.len() {
             let next = lines[idx.saturating_add(count)];
+            if next.trim().is_empty() {
+                break;
+            }
             let next_template = normalize_to_template(next);
             if next_template != current_template {
                 break;
@@ -313,6 +326,56 @@ fn is_framework_frame(line: &str) -> bool {
         || t.contains("std::panicking::")
         || t.contains("rust_panic")
         || t.contains("rust_begin_unwind")
+    {
+        return true;
+    }
+
+    // --- .NET / C# / ASP.NET Core ---
+    // Frames look like: "   at Microsoft.AspNetCore.Foo.Bar(...)"
+    //                   "   at System.Threading.Tasks.Task.Xyz()"
+    if t.starts_with("at Microsoft.AspNetCore.")
+        || t.starts_with("at Microsoft.Extensions.")
+        || t.starts_with("at System.Threading.Tasks.")
+        || t.starts_with("at System.Runtime.ExceptionServices.")
+        || t.starts_with("at System.Runtime.CompilerServices.")
+        || t.starts_with("at Microsoft.EntityFrameworkCore.")
+    {
+        return true;
+    }
+
+    // --- JavaScript / TypeScript (browser bundlers + zone.js) ---
+    if t.starts_with("at ")
+        && (t.contains("webpack://")
+            || t.contains("webpack-internal:")
+            || t.contains("node_modules/react-dom/")
+            || t.contains("node_modules\\react-dom\\")
+            || t.contains("node_modules/react/")
+            || t.contains("node_modules\\react\\")
+            || t.contains("node_modules/next/")
+            || t.contains("node_modules\\next\\")
+            || t.contains("__zone_symbol__")
+            || t.contains("zone.js"))
+    {
+        return true;
+    }
+
+    // --- React Native / Metro ---
+    if t.starts_with("at ")
+        && (t.contains("node_modules/react-native/")
+            || t.contains("node_modules\\react-native\\")
+            || t.contains("node_modules/metro-")
+            || t.contains("node_modules\\metro-")
+            || t.contains("ReactNativeRenderer"))
+    {
+        return true;
+    }
+
+    // --- Kotlin / Android ---
+    if t.starts_with("at androidx.")
+        || t.starts_with("at com.android.")
+        || t.starts_with("at kotlinx.coroutines.")
+        || t.starts_with("at kotlin.coroutines.")
+        || t.starts_with("at dalvik.system.")
     {
         return true;
     }
@@ -776,5 +839,68 @@ runtime.findrunnable()
             result.output.contains("framework frames omitted")
                 || !result.output.contains("runtime.findrunnable")
         );
+    }
+
+    #[test]
+    fn test_stack_trace_csharp_aspnet_filter() {
+        let input = "\
+System.InvalidOperationException: Sequence contains no elements
+   at System.Linq.ThrowHelper.ThrowNoElementsException()
+   at MyApp.Services.OrderService.GetLatest(Int32 userId) in /app/Services/OrderService.cs:line 42
+   at MyApp.Controllers.OrdersController.GetLatest(Int32 userId) in /app/Controllers/OrdersController.cs:line 28
+   at Microsoft.AspNetCore.Mvc.Infrastructure.ControllerActionInvoker.InvokeActionMethodAsync()
+   at Microsoft.AspNetCore.Mvc.Infrastructure.ControllerActionInvoker.InvokeNextActionFilterAsync()
+   at Microsoft.AspNetCore.Mvc.Infrastructure.ResourceInvoker.InvokeFilterPipelineAsync()
+   at Microsoft.AspNetCore.Routing.EndpointMiddleware.Invoke(HttpContext context)
+   at Microsoft.AspNetCore.Authorization.AuthorizationMiddleware.Invoke(HttpContext context)
+   at Microsoft.AspNetCore.Diagnostics.DeveloperExceptionPageMiddleware.Invoke(HttpContext context)
+   at System.Threading.Tasks.Task.<>c.<ThrowAsync>b__128_0(Object state)
+   at System.Runtime.ExceptionServices.ExceptionDispatchInfo.Throw()
+";
+        let result = filter(input);
+        // Invariant #1 — exception message never dropped.
+        assert!(result.output.contains("InvalidOperationException"));
+        // User frames survive.
+        assert!(result.output.contains("OrderService.GetLatest"));
+        assert!(result.output.contains("OrdersController.GetLatest"));
+    }
+
+    #[test]
+    fn test_stack_trace_ts_react_filter() {
+        let input = "\
+TypeError: Cannot read properties of null (reading 'x')
+    at useLayoutEffect (webpack-internal:///./src/components/Modal.tsx:42:23)
+    at commitLayoutEffectOnFiber (webpack-internal:///./node_modules/react-dom/cjs/react-dom.development.js:23168:17)
+    at commitRootImpl (webpack-internal:///./node_modules/react-dom/cjs/react-dom.development.js:26825:5)
+    at commitRoot (webpack-internal:///./node_modules/react-dom/cjs/react-dom.development.js:26546:5)
+    at performConcurrentWorkOnRoot (webpack-internal:///./node_modules/react-dom/cjs/react-dom.development.js:25655:7)
+    at workLoop (webpack-internal:///./node_modules/scheduler/cjs/scheduler.development.js:266:34)
+    at ZoneDelegate.invokeTask (webpack-internal:///./node_modules/zone.js/bundles/zone.umd.js:412:31)
+    at Object.onInvokeTask (__zone_symbol__ZoneAwareError.js:2:12)
+";
+        let result = filter(input);
+        assert!(result.output.contains("TypeError"));
+        // User frame (Modal.tsx) must survive; react-dom and zone frames can be collapsed.
+        assert!(result.output.contains("Modal.tsx"));
+    }
+
+    #[test]
+    fn test_stack_trace_kotlin_android_filter() {
+        let input = "\
+java.lang.IllegalStateException: View must be attached
+	at com.example.myapp.ui.home.HomeFragment.onViewCreated(HomeFragment.kt:58)
+	at androidx.fragment.app.Fragment.performViewCreated(Fragment.java:3089)
+	at androidx.fragment.app.FragmentStateManager.createView(FragmentStateManager.java:548)
+	at androidx.lifecycle.LiveData.considerNotify(LiveData.java:133)
+	at androidx.lifecycle.LiveData.dispatchingValue(LiveData.java:151)
+	at kotlinx.coroutines.DispatchedTask.run(DispatchedTask.kt:108)
+	at kotlinx.coroutines.scheduling.CoroutineScheduler.runSafely(CoroutineScheduler.kt:584)
+	at kotlinx.coroutines.scheduling.CoroutineScheduler$Worker.run(CoroutineScheduler.kt:684)
+	at com.android.internal.os.ZygoteInit.main(ZygoteInit.java:930)
+";
+        let result = filter(input);
+        assert!(result.output.contains("IllegalStateException"));
+        // User frame must survive.
+        assert!(result.output.contains("HomeFragment.onViewCreated"));
     }
 }

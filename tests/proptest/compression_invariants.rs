@@ -134,3 +134,108 @@ proptest! {
         );
     }
 }
+
+// ---------------------------------------------------------------------------
+// Invariant 6: Layer 1 is idempotent — filter(filter(x)) == filter(x)
+//
+// Re-running the pipeline on already-compressed output must not degrade or
+// further mutate it. This catches regex double-rewrites and accidental
+// template re-dedup of synthetic "[×N]" exemplars.
+// ---------------------------------------------------------------------------
+
+proptest! {
+    #[test]
+    fn prop_layer1_filter_is_idempotent(input in arb_tool_output()) {
+        let once = layer1_filter::filter(&input).output;
+        let twice = layer1_filter::filter(&once).output;
+        prop_assert_eq!(&once, &twice, "layer1 filter is not idempotent");
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Invariant 7: error / warning / panic lines are never dropped by L1.
+//
+// The canonical NTK promise: "error information preservation 100%".
+// If any line in the INPUT matches a known error signal, at least one line
+// in the OUTPUT must still contain that signal (possibly as exemplar of a
+// `[×N]` group). This is the strongest guarantee L1 must uphold.
+// ---------------------------------------------------------------------------
+
+/// Generate inputs that always contain at least one error-like line mixed
+/// with ordinary chatter, so the invariant has something to defend.
+fn arb_output_with_errors() -> impl Strategy<Value = String> {
+    let chatter: Vec<BoxedStrategy<String>> = vec![
+        "[a-zA-Z0-9 /.:_-]{1,60}\n".prop_map(String::from).boxed(),
+        Just("info: something happened\n".to_owned()).boxed(),
+        Just("\n".to_owned()).boxed(),
+    ];
+    let errors: Vec<BoxedStrategy<String>> = vec![
+        Just("ERROR: database connection refused\n".to_owned()).boxed(),
+        Just("error: expected identifier\n".to_owned()).boxed(),
+        Just("panic: index out of bounds\n".to_owned()).boxed(),
+        Just("warning: unused import `foo`\n".to_owned()).boxed(),
+        Just("Traceback (most recent call last):\n".to_owned()).boxed(),
+        Just("Exception in thread \"main\": null\n".to_owned()).boxed(),
+        Just("FAILED: assertion failed\n".to_owned()).boxed(),
+    ];
+
+    (
+        proptest::collection::vec(proptest::strategy::Union::new(chatter), 1..30),
+        proptest::collection::vec(proptest::strategy::Union::new(errors), 1..5),
+    )
+        .prop_map(|(mut chat, errs)| {
+            chat.extend(errs);
+            chat.concat()
+        })
+}
+
+proptest! {
+    #[test]
+    fn prop_error_signals_are_preserved(input in arb_output_with_errors()) {
+        // Tokens that must survive (case-sensitive where the L1 filter is).
+        const SIGNALS: &[&str] = &[
+            "ERROR", "error:", "panic:", "warning:",
+            "Traceback", "Exception", "FAILED",
+        ];
+        let out = layer1_filter::filter(&input).output;
+        for sig in SIGNALS {
+            if input.contains(sig) {
+                prop_assert!(
+                    out.contains(sig),
+                    "L1 dropped error signal {:?}\ninput:\n{}\noutput:\n{}",
+                    sig, input, out
+                );
+            }
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Invariant 8: template dedup preserves a real exemplar (no synthetic
+// placeholders). When L1 emits `[×N]`, there must be a sibling line whose
+// content isn't just the marker — i.e. the user can still read ONE concrete
+// line to understand what the group collapsed.
+// ---------------------------------------------------------------------------
+
+proptest! {
+    #[test]
+    fn prop_dedup_keeps_real_exemplar(input in arb_tool_output()) {
+        let out = layer1_filter::filter(&input).output;
+        // Any line with `[×N]` marker must also carry non-marker content.
+        for line in out.lines() {
+            if let Some(idx) = line.find("[×") {
+                let tail = &line[idx..];
+                // tail looks like "[×12] some real content"
+                let after_bracket = tail
+                    .split_once(']')
+                    .map(|(_, rest)| rest.trim())
+                    .unwrap_or("");
+                prop_assert!(
+                    !after_bracket.is_empty(),
+                    "L1 produced [×N] marker with no exemplar body: {:?}",
+                    line
+                );
+            }
+        }
+    }
+}

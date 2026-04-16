@@ -1,0 +1,7 @@
+{
+    "category":  "stack_trace",
+    "description":  "React 18 + webpack bundle runtime error with heavy react-dom + scheduler + zone.js frames.",
+    "min_ratio":  0.45,
+    "expected_layer":  2,
+    "command":  "npm run dev"
+}

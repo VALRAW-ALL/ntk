@@ -50,3 +50,79 @@ fn test_threshold_not_triggered_below_300() {
         result.compressed_tokens
     );
 }
+
+// --- Opaque token normalization (v0.2.27+) ------------------------------
+
+#[test]
+fn test_opaque_jwt_is_shortened() {
+    let input = "Authorization: Bearer eyJhbGciOiJIUzI1NiJ9.eyJ1c2VyX2lkIjoxMjMsImV4cCI6MTczMjAwMDAwMH0.k3pQY8R3zN2XhF4mA1vD2wKJ9sP5bG7LhT0oE8uY2cQ";
+    let result = process(input).unwrap();
+    assert!(
+        result.compressed_tokens < result.original_tokens,
+        "JWT should be shortened: {} → {}",
+        result.original_tokens,
+        result.compressed_tokens
+    );
+    // Scheme + field name must still be readable.
+    assert!(result.output.contains("Authorization"));
+    assert!(result.output.contains("Bearer"));
+}
+
+#[test]
+fn test_opaque_long_hash_is_shortened() {
+    let input = "commit 7f8e2d3c4b5a6f7e8d9c0b1a2e3f4d5c6b7a8e9f0d1c2b3a4e5f6d7c8b9a0 added";
+    let result = process(input).unwrap();
+    // 64-char hex must be truncated; "added" must survive.
+    assert!(result.output.contains("added"));
+    assert!(result.compressed_tokens < result.original_tokens);
+}
+
+#[test]
+fn test_opaque_url_query_is_shortened() {
+    let input = "GET /api?token=abcdef1234567890abcdef1234567890&next=/home 200";
+    let result = process(input).unwrap();
+    // Status code must survive and the query blob must be collapsed.
+    assert!(result.output.contains("200"));
+    assert!(
+        !result
+            .output
+            .contains("token=abcdef1234567890abcdef1234567890"),
+        "raw query string must not survive: {}",
+        result.output
+    );
+    assert!(
+        result.compressed_tokens < result.original_tokens,
+        "tokens should decrease: {} → {}",
+        result.original_tokens,
+        result.compressed_tokens
+    );
+}
+
+// --- Whitespace collapse -------------------------------------------------
+
+#[test]
+fn test_whitespace_collapse_preserves_leading_indent() {
+    // Stack-frame indent (4 cols) must survive so structure stays readable.
+    let input = "error:\n    at foo(bar.js:10)\n    at baz(bar.js:12)";
+    let result = process(input).unwrap();
+    assert!(
+        result.output.contains("    at foo"),
+        "4-col leading indent must survive: {:?}",
+        result.output
+    );
+}
+
+#[test]
+fn test_whitespace_collapse_trims_trailing() {
+    let input = "line1   \nline2\t\t\n";
+    let result = process(input).unwrap();
+    // No line should end with trailing whitespace.
+    for line in result.output.lines() {
+        assert_eq!(
+            line,
+            line.trim_end(),
+            "line has trailing whitespace: {:?}",
+            line
+        );
+    }
+}

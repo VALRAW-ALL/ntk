@@ -276,6 +276,258 @@ Write-Fixture 'stack_trace_java' $body @{
     description='Deep Java stack trace -- L3 summary expected.'
 }
 
+# ------------------------------------------------------------------
+# 9. python_django_trace -- Django + gunicorn/asgiref frames
+# ------------------------------------------------------------------
+$body = @'
+Internal Server Error: /api/users/42/profile/
+Traceback (most recent call last):
+  File "/app/views/users.py", line 87, in get_profile
+    profile = user.get_profile_with_preferences()
+  File "/app/models/user.py", line 234, in get_profile_with_preferences
+    prefs = Preferences.objects.get(user_id=self.id, active=True)
+  File "/usr/local/lib/python3.11/site-packages/django/db/models/manager.py", line 85, in manager_method
+    return getattr(self.get_queryset(), name)(*args, **kwargs)
+  File "/usr/local/lib/python3.11/site-packages/django/db/models/query.py", line 431, in get
+    raise self.model.DoesNotExist(
+  File "/usr/local/lib/python3.11/site-packages/django/db/models/base.py", line 612, in __init__
+    pass
+  File "/usr/local/lib/python3.11/site-packages/django/core/handlers/exception.py", line 47, in inner
+    response = get_response(request)
+  File "/usr/local/lib/python3.11/site-packages/django/core/handlers/base.py", line 181, in _get_response
+    response = wrapped_callback(request, *callback_args, **callback_kwargs)
+  File "/usr/local/lib/python3.11/site-packages/asgiref/sync.py", line 477, in __call__
+    ret = await asyncio.wait_for(future, timeout=None)
+  File "/usr/local/lib/python3.11/site-packages/gunicorn/workers/sync.py", line 131, in handle_request
+    self.cfg.post_request(self, req, environ, resp)
+app.models.Preferences.DoesNotExist: Preferences matching query does not exist.
+[2026-04-15 10:23:45,123] ERROR django.request: Internal Server Error: /api/users/42/profile/
+'@
+Write-Fixture 'python_django_trace' $body @{
+    category='stack_trace'; expected_layer=2; min_ratio=0.30
+    command='python manage.py runserver'
+    description='Django request handler stack trace with asgiref/gunicorn framework frames.'
+}
+
+# ------------------------------------------------------------------
+# 10. node_express_trace -- Express middleware + node:internal frames
+# ------------------------------------------------------------------
+$body = @'
+TypeError: Cannot read properties of undefined (reading 'accessToken')
+    at exchangeCodeForToken (/app/src/auth/oauth.ts:142:28)
+    at callbackHandler (/app/src/routes/auth.ts:88:20)
+    at Layer.handle [as handle_request] (/app/node_modules/express/lib/router/layer.js:95:5)
+    at next (/app/node_modules/express/lib/router/route.js:144:13)
+    at Route.dispatch (/app/node_modules/express/lib/router/route.js:114:3)
+    at Layer.handle [as handle_request] (/app/node_modules/express/lib/router/layer.js:95:5)
+    at /app/node_modules/express/lib/router/index.js:284:15
+    at Function.process_params (/app/node_modules/express/lib/router/index.js:346:12)
+    at next (/app/node_modules/express/lib/router/index.js:280:10)
+    at /app/node_modules/express/lib/router/index.js:235:24
+    at Function.handle (/app/node_modules/express/lib/router/index.js:175:3)
+    at router (/app/node_modules/express/lib/router/index.js:47:12)
+    at Layer.handle [as handle_request] (/app/node_modules/express/lib/router/layer.js:95:5)
+    at trim_prefix (/app/node_modules/express/lib/router/index.js:328:13)
+    at /app/node_modules/express/lib/router/index.js:286:9
+    at Function.process_params (/app/node_modules/express/lib/router/index.js:346:12)
+    at next (/app/node_modules/express/lib/router/index.js:280:10)
+    at expressInit (/app/node_modules/express/lib/middleware/init.js:40:5)
+    at Layer.handle [as handle_request] (/app/node_modules/express/lib/router/layer.js:95:5)
+    at trim_prefix (/app/node_modules/express/lib/router/index.js:328:13)
+    at /app/node_modules/express/lib/router/index.js:286:9
+    at processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at async Module.default_1 (node:internal/modules/esm/loader:210:14)
+[express] error: Token exchange failed for session abc123def456
+'@
+Write-Fixture 'node_express_trace' $body @{
+    category='stack_trace'; expected_layer=2; min_ratio=0.50
+    command='node server.js'
+    description='Node.js Express stack trace with heavy node_modules/express and node:internal frames.'
+}
+
+# ------------------------------------------------------------------
+# 11. go_panic_trace -- Go runtime panic with goroutine dumps
+# ------------------------------------------------------------------
+$body = @'
+panic: runtime error: index out of range [5] with length 3
+
+goroutine 1 [running]:
+main.processItems({0xc0000b2000?, 0xc00009e000?, 0x3})
+	/home/dev/app/main.go:48 +0x1f5
+main.main()
+	/home/dev/app/main.go:29 +0x91
+runtime.main()
+	/usr/local/go/src/runtime/proc.go:267 +0x2bb
+runtime.goexit({})
+	/usr/local/go/src/runtime/asm_amd64.s:1650 +0x5
+runtime.systemstack()
+	/usr/local/go/src/runtime/asm_amd64.s:509 +0x4a
+runtime.sysargs()
+	/usr/local/go/src/runtime/runtime1.go:180 +0x88
+runtime.args()
+	/usr/local/go/src/runtime/runtime1.go:66 +0x1e
+runtime.schedinit()
+	/usr/local/go/src/runtime/proc.go:696 +0x8c
+
+goroutine 2 [force gc (idle)]:
+runtime.gopark(0x0?, 0x0?, 0x0?, 0x0?, 0x0?)
+	/usr/local/go/src/runtime/proc.go:398 +0xce
+runtime.goparkunlock(...)
+	/usr/local/go/src/runtime/proc.go:404
+runtime.forcegchelper()
+	/usr/local/go/src/runtime/proc.go:322 +0xb3
+runtime.goexit({})
+	/usr/local/go/src/runtime/asm_amd64.s:1650 +0x5
+created by runtime.init.6 in goroutine 1
+	/usr/local/go/src/runtime/proc.go:310 +0x1a
+
+exit status 2
+'@
+Write-Fixture 'go_panic_trace' $body @{
+    category='stack_trace'; expected_layer=2; min_ratio=0.40
+    command='go run main.go'
+    description='Go runtime panic with runtime.main/runtime.goexit framework frames and secondary goroutine dumps.'
+}
+
+# ------------------------------------------------------------------
+# 12. php_symfony_trace -- Symfony HttpKernel + /vendor frames
+# ------------------------------------------------------------------
+$body = @'
+Symfony\Component\HttpKernel\Exception\NotFoundHttpException: No route found for "GET /api/users/99/orders"
+
+  at /app/vendor/symfony/http-kernel/EventListener/RouterListener.php:136
+  at Symfony\Component\HttpKernel\EventListener\RouterListener->onKernelRequest(object(RequestEvent), 'kernel.request', object(EventDispatcher))
+     (/app/vendor/symfony/event-dispatcher/EventDispatcher.php:270)
+  at Symfony\Component\EventDispatcher\EventDispatcher->callListeners(array(array(object(RouterListener), 'onKernelRequest')), 'kernel.request', object(RequestEvent))
+     (/app/vendor/symfony/event-dispatcher/EventDispatcher.php:230)
+  at Symfony\Component\EventDispatcher\EventDispatcher->doDispatch(array(array(object(RouterListener), 'onKernelRequest')), 'kernel.request', object(RequestEvent))
+     (/app/vendor/symfony/event-dispatcher/EventDispatcher.php:59)
+  at Symfony\Component\EventDispatcher\EventDispatcher->dispatch(object(RequestEvent), 'kernel.request')
+     (/app/vendor/symfony/http-kernel/HttpKernel.php:139)
+  at Symfony\Component\HttpKernel\HttpKernel->handleRaw(object(Request), 1)
+     (/app/vendor/symfony/http-kernel/HttpKernel.php:75)
+  at Symfony\Component\HttpKernel\HttpKernel->handle(object(Request), 1, true)
+     (/app/vendor/symfony/http-kernel/Kernel.php:197)
+  at Symfony\Component\HttpKernel\Kernel->handle(object(Request))
+     (/app/public/index.php:27)
+
+#0 /app/vendor/symfony/http-kernel/HttpKernel.php(76): Symfony\Component\HttpKernel\HttpKernel->handleRaw()
+#1 /app/vendor/symfony/http-kernel/Kernel.php(197): Symfony\Component\HttpKernel\HttpKernel->handle()
+#2 /app/vendor/symfony/runtime/Runner/Symfony/HttpKernelRunner.php(35): Symfony\Component\HttpKernel\Kernel->handle()
+#3 /app/vendor/symfony/runtime/Runner/Symfony/ResponseRunner.php(29): Symfony\Component\Runtime\Runner\Symfony\HttpKernelRunner->run()
+#4 /app/vendor/autoload_runtime.php(29): Symfony\Component\Runtime\Runner\Symfony\ResponseRunner->run()
+#5 /app/public/index.php(5): require_once('...')
+#6 {main}
+
+[2026-04-15T10:23:45+00:00] request.CRITICAL: Uncaught PHP Exception Symfony\Component\HttpKernel\Exception\NotFoundHttpException
+'@
+Write-Fixture 'php_symfony_trace' $body @{
+    category='stack_trace'; expected_layer=2; min_ratio=0.35
+    command='php bin/console'
+    description='Symfony HttpKernel NotFoundHttpException with heavy /vendor/symfony framework frames.'
+}
+
+# ------------------------------------------------------------------
+# 13. csharp_aspnet_trace -- ASP.NET Core 8 request pipeline exception
+# ------------------------------------------------------------------
+$body = @'
+System.InvalidOperationException: Sequence contains no elements
+   at System.Linq.ThrowHelper.ThrowNoElementsException()
+   at System.Linq.Enumerable.First[TSource](IEnumerable`1 source)
+   at MyApp.Services.OrderService.GetLatest(Int32 userId) in /app/Services/OrderService.cs:line 42
+   at MyApp.Controllers.OrdersController.GetLatest(Int32 userId) in /app/Controllers/OrdersController.cs:line 28
+   at lambda_method47(Closure , Object , Object[] )
+   at Microsoft.AspNetCore.Mvc.Infrastructure.ActionMethodExecutor.SyncActionResultExecutor.Execute(IActionResultTypeMapper mapper, ObjectMethodExecutor executor, Object controller, Object[] arguments)
+   at Microsoft.AspNetCore.Mvc.Infrastructure.ControllerActionInvoker.InvokeActionMethodAsync()
+   at Microsoft.AspNetCore.Mvc.Infrastructure.ControllerActionInvoker.Next(State& next, Scope& scope, Object& state, Boolean& isCompleted)
+   at Microsoft.AspNetCore.Mvc.Infrastructure.ControllerActionInvoker.InvokeNextActionFilterAsync()
+   at System.Threading.Tasks.Task.<>c.<ThrowAsync>b__128_0(Object state)
+   at System.Threading.Tasks.ThreadPoolTaskScheduler.TryExecuteTaskInline(Task task, Boolean taskWasPreviouslyQueued)
+   at Microsoft.AspNetCore.Mvc.Infrastructure.ResourceInvoker.Rethrow(ActionExecutedContextSealed context)
+   at Microsoft.AspNetCore.Mvc.Infrastructure.ResourceInvoker.Next(State& next, Scope& scope, Object& state, Boolean& isCompleted)
+   at Microsoft.AspNetCore.Mvc.Infrastructure.ResourceInvoker.InvokeFilterPipelineAsync()
+   at Microsoft.AspNetCore.Routing.EndpointMiddleware.<Invoke>d__3.MoveNext()
+   at Microsoft.AspNetCore.Authorization.AuthorizationMiddleware.Invoke(HttpContext context)
+   at Microsoft.AspNetCore.Diagnostics.DeveloperExceptionPageMiddleware.Invoke(HttpContext context)
+   at Microsoft.AspNetCore.HostFiltering.HostFilteringMiddleware.Invoke(HttpContext context)
+   at Microsoft.AspNetCore.Server.Kestrel.Core.Internal.Http.HttpProtocol.ProcessRequests[TContext](IHttpApplication``1 application)
+   at System.Runtime.ExceptionServices.ExceptionDispatchInfo.Throw()
+fail: Microsoft.AspNetCore.Server.Kestrel[13] Connection id "0HMV..." request reached an unexpected state
+'@
+Write-Fixture 'csharp_aspnet_trace' $body @{
+    category='stack_trace'; expected_layer=2; min_ratio=0.35
+    command='dotnet run'
+    description='ASP.NET Core 8 request-pipeline exception with EndpointMiddleware / Kestrel / ExceptionDispatchInfo frames.'
+}
+
+# ------------------------------------------------------------------
+# 14. typescript_react_trace -- React 18 + webpack bundle + zone.js
+# ------------------------------------------------------------------
+$body = @'
+TypeError: Cannot read properties of null (reading 'getBoundingClientRect')
+    at useLayoutEffect (webpack-internal:///./src/components/Modal.tsx:42:23)
+    at commitHookEffectListMount (webpack-internal:///./node_modules/react-dom/cjs/react-dom.development.js:23050:26)
+    at commitLayoutEffectOnFiber (webpack-internal:///./node_modules/react-dom/cjs/react-dom.development.js:23168:17)
+    at commitLayoutMountEffects_complete (webpack-internal:///./node_modules/react-dom/cjs/react-dom.development.js:24689:9)
+    at commitLayoutEffects_begin (webpack-internal:///./node_modules/react-dom/cjs/react-dom.development.js:24675:7)
+    at commitLayoutEffects (webpack-internal:///./node_modules/react-dom/cjs/react-dom.development.js:24613:3)
+    at commitRootImpl (webpack-internal:///./node_modules/react-dom/cjs/react-dom.development.js:26825:5)
+    at commitRoot (webpack-internal:///./node_modules/react-dom/cjs/react-dom.development.js:26546:5)
+    at finishConcurrentRender (webpack-internal:///./node_modules/react-dom/cjs/react-dom.development.js:25843:9)
+    at performConcurrentWorkOnRoot (webpack-internal:///./node_modules/react-dom/cjs/react-dom.development.js:25655:7)
+    at workLoop (webpack-internal:///./node_modules/scheduler/cjs/scheduler.development.js:266:34)
+    at flushWork (webpack-internal:///./node_modules/scheduler/cjs/scheduler.development.js:239:14)
+    at MessagePort.performWorkUntilDeadline (webpack-internal:///./node_modules/scheduler/cjs/scheduler.development.js:533:21)
+    at ZoneDelegate.invokeTask (webpack-internal:///./node_modules/zone.js/bundles/zone.umd.js:412:31)
+    at Object.onInvokeTask (__zone_symbol__ZoneAwareError.js:2:12)
+    at Zone.runTask (webpack-internal:///./node_modules/zone.js/bundles/zone.umd.js:181:47)
+Error boundary caught the error: Modal opened before ref was attached
+'@
+Write-Fixture 'typescript_react_trace' $body @{
+    category='stack_trace'; expected_layer=2; min_ratio=0.45
+    command='npm run dev'
+    description='React 18 + webpack bundle runtime error with heavy react-dom + scheduler + zone.js frames.'
+}
+
+# ------------------------------------------------------------------
+# 15. kotlin_android_trace -- Android IllegalStateException + coroutines
+# ------------------------------------------------------------------
+$body = @"
+FATAL EXCEPTION: main
+Process: com.example.myapp, PID: 12345
+java.lang.IllegalStateException: View must be attached to a ViewTree
+`tat com.example.myapp.ui.home.HomeFragment.onViewCreated(HomeFragment.kt:58)
+`tat com.example.myapp.ui.home.HomeViewModel.loadUsers(HomeViewModel.kt:42)
+`tat androidx.fragment.app.Fragment.performViewCreated(Fragment.java:3089)
+`tat androidx.fragment.app.FragmentStateManager.createView(FragmentStateManager.java:548)
+`tat androidx.fragment.app.FragmentStateManager.moveToExpectedState(FragmentStateManager.java:282)
+`tat androidx.fragment.app.FragmentManager.executeOpsTogether(FragmentManager.java:2189)
+`tat androidx.lifecycle.LiveData.considerNotify(LiveData.java:133)
+`tat androidx.lifecycle.LiveData.dispatchingValue(LiveData.java:151)
+`tat androidx.lifecycle.LiveData.setValue(LiveData.java:309)
+`tat androidx.lifecycle.MutableLiveData.setValue(MutableLiveData.java:50)
+`tat kotlinx.coroutines.DispatchedTask.run(DispatchedTask.kt:108)
+`tat kotlinx.coroutines.internal.LimitedDispatcher`$Worker.run(LimitedDispatcher.kt:115)
+`tat kotlinx.coroutines.scheduling.TaskImpl.run(Tasks.kt:103)
+`tat kotlinx.coroutines.scheduling.CoroutineScheduler.runSafely(CoroutineScheduler.kt:584)
+`tat kotlinx.coroutines.scheduling.CoroutineScheduler`$Worker.executeTask(CoroutineScheduler.kt:793)
+`tat kotlinx.coroutines.scheduling.CoroutineScheduler`$Worker.runWorker(CoroutineScheduler.kt:697)
+`tat kotlinx.coroutines.scheduling.CoroutineScheduler`$Worker.run(CoroutineScheduler.kt:684)
+`tat android.os.Handler.dispatchMessage(Handler.java:106)
+`tat android.os.Looper.loop(Looper.java:214)
+`tat android.app.ActivityThread.main(ActivityThread.java:7356)
+`tat java.lang.reflect.Method.invoke(Native Method)
+`tat com.android.internal.os.RuntimeInit`$MethodAndArgsCaller.run(RuntimeInit.java:492)
+`tat com.android.internal.os.ZygoteInit.main(ZygoteInit.java:930)
+`tat dalvik.system.VMRuntime.nativeExit(Native Method)
+E/AndroidRuntime(12345): Shutting down VM due to IllegalStateException
+"@
+Write-Fixture 'kotlin_android_trace' $body @{
+    category='stack_trace'; expected_layer=2; min_ratio=0.35
+    command='adb logcat'
+    description='Android / Kotlin IllegalStateException with androidx fragment lifecycle + kotlinx.coroutines scheduler frames.'
+}
+
 Write-Host ''
 Write-Host 'Generated fixtures:'
 Get-ChildItem $out -Filter '*.txt' | Sort-Object Name | ForEach-Object {

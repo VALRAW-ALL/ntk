@@ -1,0 +1,7 @@
+{
+    "category":  "stack_trace",
+    "description":  "Android / Kotlin IllegalStateException with androidx fragment lifecycle + kotlinx.coroutines scheduler frames.",
+    "min_ratio":  0.35,
+    "expected_layer":  2,
+    "command":  "adb logcat"
+}

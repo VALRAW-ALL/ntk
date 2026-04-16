@@ -29,7 +29,10 @@
 param(
     [string]$DaemonUrl = 'http://127.0.0.1:8765',
     [string]$OutputCsv = '',
-    [int]$TimeoutSec = 300
+    [int]$TimeoutSec = 300,
+    # When set, posted in the /compress `context` field to engage Layer 4.
+    # Leave empty to benchmark L1+L2+L3 without L4 (the historical default).
+    [string]$Context = ''
 )
 
 $ErrorActionPreference = 'Stop'
@@ -84,11 +87,15 @@ foreach ($fxPath in $filePaths) {
         if ($meta.command) { $cmd = $meta.command }
     }
 
-    $payload = @{
+    $payloadObj = @{
         output  = $content
         command = $cmd
         cwd     = 'bench'
-    } | ConvertTo-Json -Compress -Depth 5
+    }
+    if (-not [string]::IsNullOrWhiteSpace($Context)) {
+        $payloadObj.context = $Context
+    }
+    $payload = $payloadObj | ConvertTo-Json -Compress -Depth 5
 
     $tmpPayload = [System.IO.Path]::Combine($env:TEMP, "ntk_bench_$($name).json")
     [System.IO.File]::WriteAllText($tmpPayload, $payload, [System.Text.UTF8Encoding]::new($false))

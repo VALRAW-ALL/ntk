@@ -966,7 +966,7 @@ a:hover { color: var(--color-texto-principal); }
 .gpu-badge-cuda { background: rgba(118,185,0,0.12); color: #76B900; border: 1px solid rgba(118,185,0,0.25); }
 .gpu-badge-metal { background: rgba(255,145,0,0.12); color: #FF9100; border: 1px solid rgba(255,145,0,0.25); }
 .gpu-badge-amx { background: rgba(41,121,255,0.12); color: var(--color-primaria-clara); border: 1px solid var(--color-primaria-border); }
-.gpu-badge-cpu { background: rgba(124,77,255,0.12); color: var(--color-secundaria-clara); border: 1px solid var(--color-secundaria-border); }
+.gpu-badge-cpu { background: rgba(124,77,255,0.12); color: var(--color-secundaria-clara); border: 1px solid var(--color-secundaria-border); border-radius: 16px; }
 .gpu-latency-fast { color: var(--color-acento-verde); font-family: var(--font-mono); font-weight: 700; }
 .gpu-latency-mid { color: var(--color-primaria-clara); font-family: var(--font-mono); font-weight: 700; }
 .gpu-latency-slow { color: var(--color-acento-amarelo); font-family: var(--font-mono); font-weight: 700; }

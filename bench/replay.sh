@@ -13,6 +13,9 @@ HERE="$(cd "$(dirname "$0")" && pwd)"
 FIXTURES="$HERE/fixtures"
 OUT_CSV="${OUT_CSV:-$HERE/microbench.csv}"
 TIMEOUT_SEC="${TIMEOUT_SEC:-300}"
+# NTK_BENCH_CONTEXT — when non-empty, forwarded as the /compress `context`
+# field so the replay exercises Layer 4. Leave unset for L1+L2+L3 only.
+CONTEXT="${NTK_BENCH_CONTEXT:-}"
 
 # Sanity: daemon reachable?
 if ! curl -sf --max-time 3 "$DAEMON_URL/health" > /dev/null; then
@@ -43,8 +46,13 @@ for fx in "$FIXTURES"/*.txt; do
         cmd=$(jq -r '.command // "unknown"' "$meta")
     fi
 
-    payload=$(jq -n --rawfile out "$fx" --arg cmd "$cmd" \
-        '{output: $out, command: $cmd, cwd: "bench"}')
+    if [ -n "$CONTEXT" ]; then
+        payload=$(jq -n --rawfile out "$fx" --arg cmd "$cmd" --arg ctx "$CONTEXT" \
+            '{output: $out, command: $cmd, cwd: "bench", context: $ctx}')
+    else
+        payload=$(jq -n --rawfile out "$fx" --arg cmd "$cmd" \
+            '{output: $out, command: $cmd, cwd: "bench"}')
+    fi
 
     t0=$(date +%s%N 2>/dev/null || date +%s)
     tmp_resp=$(mktemp)

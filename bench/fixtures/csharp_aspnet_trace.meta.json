@@ -1,0 +1,7 @@
+{
+    "category":  "stack_trace",
+    "description":  "ASP.NET Core 8 request-pipeline exception with EndpointMiddleware / Kestrel / ExceptionDispatchInfo frames.",
+    "min_ratio":  0.35,
+    "expected_layer":  2,
+    "command":  "dotnet run"
+}

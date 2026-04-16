@@ -130,3 +130,80 @@ async fn test_compress_rejects_oversized_input() {
 
     resp.assert_status(axum::http::StatusCode::PAYLOAD_TOO_LARGE);
 }
+
+// --- Layer 4 (context injection) — endpoint-level tests ------------------
+
+#[tokio::test]
+async fn test_compress_accepts_context_field() {
+    // Invariant: /compress must accept the L4 `context` field without error,
+    // even when L3 is disabled or the input is too small to trigger L3.
+    let server = test_server();
+    let resp = server
+        .post("/compress")
+        .json(&serde_json::json!({
+            "output": "cargo:warning=foo\n".repeat(30),
+            "command": "cargo build",
+            "context": "I am debugging a compilation error and need the actual error line."
+        }))
+        .await;
+    resp.assert_status_ok();
+    let body: serde_json::Value = resp.json();
+    // L1/L2 must still run and produce a shorter output.
+    assert!(body["compressed"].as_str().is_some());
+    assert!(body["tokens_after"].as_u64().unwrap() > 0);
+}
+
+#[tokio::test]
+async fn test_compress_accepts_transcript_path() {
+    // Write a minimal Claude Code transcript with a user message.
+    let tmp = std::env::temp_dir().join(format!("ntk_l4_test_{}.jsonl", std::process::id()));
+    std::fs::write(
+        &tmp,
+        r#"{"type":"user","message":{"role":"user","content":[{"type":"text","text":"find the failing test"}]}}
+{"type":"assistant","message":{"role":"assistant","content":[{"type":"text","text":"ok"}]}}
+"#,
+    )
+    .unwrap();
+
+    let server = test_server();
+    let resp = server
+        .post("/compress")
+        .json(&serde_json::json!({
+            "output": "cargo:warning=foo\n".repeat(30),
+            "transcript_path": tmp.to_string_lossy(),
+        }))
+        .await;
+
+    let status = resp.status_code();
+    let _ = std::fs::remove_file(&tmp);
+    assert_eq!(status.as_u16(), 200, "expected 200, got {status}");
+}
+
+#[tokio::test]
+async fn test_compress_graceful_on_missing_transcript() {
+    // Invariant (l4-context-injection.md #3): any L4 failure falls back silently.
+    // Pointing transcript_path at a non-existent file must NOT return 500.
+    let server = test_server();
+    let resp = server
+        .post("/compress")
+        .json(&serde_json::json!({
+            "output": "cargo:warning=foo\n".repeat(30),
+            "transcript_path": "/this/path/definitely/does/not/exist.jsonl"
+        }))
+        .await;
+    resp.assert_status_ok();
+}
+
+#[tokio::test]
+async fn test_compress_accepts_cwd_field() {
+    // cwd is forwarded by the hook for metric annotation; must not break anything.
+    let server = test_server();
+    let resp = server
+        .post("/compress")
+        .json(&serde_json::json!({
+            "output": "cargo:warning=foo\n".repeat(30),
+            "cwd": "/tmp/some/project"
+        }))
+        .await;
+    resp.assert_status_ok();
+}

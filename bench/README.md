@@ -25,8 +25,8 @@ This will:
 
 | Script | Purpose |
 |---|---|
-| `generate_fixtures.ps1` | Creates the 8 `.txt` + `.meta.json` fixture pairs. Idempotent. |
-| `replay.ps1` / `replay.sh` | Loops fixtures, calls `/compress`, writes CSV. Shell version available for Unix. |
+| `generate_fixtures.ps1` | Creates the 12 `.txt` + `.meta.json` fixture pairs. Idempotent. |
+| `replay.ps1` / `replay.sh` | Loops fixtures, calls `/compress`, writes CSV. Shell version available for Unix. Pass `-Context "<intent>"` (PS) or `NTK_BENCH_CONTEXT=...` (sh) to also exercise Layer 4. |
 | `parse_transcript.ps1` | Parses a Claude Code session `.jsonl` into a per-turn token CSV. |
 | `report.ps1` | Aggregates microbench + A/B CSVs into `report.md`. |
 | `run_all.ps1` | Orchestrator calling the three above. |

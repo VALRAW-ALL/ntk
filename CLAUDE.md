@@ -2,9 +2,41 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Project status & community
+
+NTK is an **open initiative**. The current maintainer can only cover so
+much ground — we actively need collaborators for: stack-trace classifier
+coverage (more languages/frameworks), real-hardware benchmarks on GPUs
+we don't own (AMD / Apple Silicon / Intel AMX), L3 prompt A/B testing,
+hook compatibility with editors other than Claude Code & OpenCode, and
+translations of the docs site. Issues and PRs are welcome at
+<https://github.com/VALRAW-ALL/ntk>. See **`CONTRIBUTING.md`** for the
+concrete starter tasks.
+
 ## Implementation Guide
 
 > **Implementando do zero?** Siga `IMPLEMENTATION-SEQUENCE.md` — 26 etapas ordenadas por dependência, com critério de "pronto" em cada uma. Não pule etapas.
+
+## Project-specific rules (`.claude/rules/`)
+
+These rules are loaded automatically when you work on matching files:
+
+| Rule | Triggers on |
+|---|---|
+| `clippy-gate.md` | any Rust change — the CI clippy flags that must pass locally |
+| `cuda-ci.md` | edits to `.github/workflows/release.yml` with CUDA steps |
+| `gpu-vendor.md` | `src/gpu.rs`, `src/config.rs`, `src/main.rs` setup wizard, `layer3_llamacpp.rs` |
+| `l1-l2-invariants.md` | any L1/L2 algorithm change — the 5 invariants CI enforces |
+| `l1-template-dedup.md` | `group_by_template` changes — blank-line handling |
+| `stack-trace-classifier.md` | `is_framework_frame` extensions, new language support |
+| `l4-context-injection.md` | `layer4_context.rs`, server handler, hook scripts |
+
+## Project-specific skills (`.claude/skills/`)
+
+| Skill | When to invoke |
+|---|---|
+| `bench-runner` | Running microbench / full bench / prompt A/B / Claude Code A/B |
+| `add-stack-trace-language` | Extending L1's classifier to a new language/framework |
 
 ## Skills e Agentes Disponíveis neste Projeto
 

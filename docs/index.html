@@ -145,7 +145,6 @@
     <div class="container">
       <div class="demo-grid">
         <div class="demo-text fade-in">
-          <div class="section-badge section-badge-green" data-i18n="demo.badge">Live demo</div>
           <h2 class="section-title" style="text-align:left;max-width:480px" data-i18n="demo.title">Installs in 30 seconds</h2>
           <p style="color:var(--color-texto-terciario);margin-bottom:1.5rem;line-height:1.7;font-size:0.9375rem" data-i18n="demo.desc">
             One command installs the binary, patches Claude Code's <code style="font-family:var(--font-mono);color:var(--color-primaria-clara)">settings.json</code>
@@ -176,19 +175,19 @@
               <div class="ntk-metrics-grid">
                 <div class="ntk-metric-box ntk-metric-box-green">
                   <div class="ntk-metric-val ntk-metric-val-green">72,243</div>
-                  <div class="ntk-metric-label">tokens saved</div>
+                  <div class="ntk-metric-label" data-i18n="widget.tokens_saved">tokens saved</div>
                 </div>
                 <div class="ntk-metric-box">
                   <div class="ntk-metric-val ntk-metric-val-blue">85%</div>
-                  <div class="ntk-metric-label">avg ratio</div>
+                  <div class="ntk-metric-label" data-i18n="widget.avg_ratio">avg ratio</div>
                 </div>
                 <div class="ntk-metric-box">
                   <div class="ntk-metric-val">847</div>
-                  <div class="ntk-metric-label">compressions</div>
+                  <div class="ntk-metric-label" data-i18n="widget.compressions">compressions</div>
                 </div>
               </div>
 
-              <div class="ntk-widget-section-title">Layer Distribution</div>
+              <div class="ntk-widget-section-title" data-i18n="widget.layer_dist">Layer Distribution</div>
               <div class="ntk-layer-row">
                 <span class="ntk-layer-l1 ntk-cmd-layer">L1</span>
                 <div class="ntk-layer-bar-bg"><div class="ntk-layer-bar-fill ntk-layer-bar-l1" style="width:42%"></div></div>
@@ -205,7 +204,7 @@
                 <span class="ntk-layer-count">23%</span>
               </div>
 
-              <div class="ntk-widget-section-title" style="margin-top:0.875rem">Recent</div>
+              <div class="ntk-widget-section-title" style="margin-top:0.875rem" data-i18n="widget.recent">Recent</div>
               <div class="ntk-cmd-row">
                 <span class="ntk-layer-l3 ntk-cmd-layer">L3</span>
                 <span class="ntk-cmd-name">cargo test</span>
@@ -304,6 +303,86 @@
   </section>
 
   <div class="divider"></div>
+
+  <!-- ═════════════ Community / Contribute ═════════════ -->
+  <section class="section">
+    <div class="container">
+      <div class="section-header fade-in">
+        <div class="section-badge section-badge-green" data-i18n="contrib.badge">Open initiative</div>
+        <h2 class="section-title" data-i18n="contrib.title">NTK needs your help to evolve</h2>
+        <p class="section-desc" data-i18n="contrib.desc">
+          This project started solo and the surface area (languages, frameworks, GPUs, editors) outgrew one-person maintenance.
+          There is a concrete, pre-scoped list of starter tasks — most land as a single PR under an hour.
+        </p>
+      </div>
+
+      <div class="features-grid fade-in" style="margin-top:2rem">
+        <div class="feature-card">
+          <div class="feature-icon"><i class="ph-duotone ph-file-code"></i></div>
+          <div>
+            <div class="feature-title" data-i18n="contrib.fixture_title">Add a fixture</div>
+            <div class="feature-desc" data-i18n="contrib.fixture_desc">
+              Capture a real log from a tool or language we don't cover (Ruby, Elixir, Scala, Swift, Flutter, Terraform, kubectl). Two files: one <code style="font-family:var(--font-mono)">.txt</code> + one <code style="font-family:var(--font-mono)">.meta.json</code>.
+            </div>
+          </div>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon"><i class="ph-duotone ph-stack"></i></div>
+          <div>
+            <div class="feature-title" data-i18n="contrib.stack_title">Extend the stack-trace filter</div>
+            <div class="feature-desc" data-i18n="contrib.stack_desc">
+              Still open: Erlang/OTP, Scala/Akka, Elixir/Phoenix, Swift/iOS, Flutter/Dart, Clojure. Playbook in <code style="font-family:var(--font-mono)">.claude/skills/add-stack-trace-language.md</code>.
+            </div>
+          </div>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon"><i class="ph-duotone ph-plug"></i></div>
+          <div>
+            <div class="feature-title" data-i18n="contrib.hook_title">Port the hook to your editor</div>
+            <div class="feature-desc" data-i18n="contrib.hook_desc">
+              Claude Code and OpenCode work today. Cursor, Aider, Zed, Continue, Windsurf all use similar tool-output hooks. A fresh copy of the script with their JSON schema is a self-contained PR.
+            </div>
+          </div>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon"><i class="ph-duotone ph-gauge"></i></div>
+          <div>
+            <div class="feature-title" data-i18n="contrib.gpu_title">Benchmark on your GPU</div>
+            <div class="feature-desc" data-i18n="contrib.gpu_desc">
+              AMD / Apple Silicon / Intel AMX / RTX 40-50 p50+p95 numbers are partly estimates. If you own the hardware, run <code style="font-family:var(--font-mono)">ntk model bench</code> and PR the measurement in.
+            </div>
+          </div>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon"><i class="ph-duotone ph-translate"></i></div>
+          <div>
+            <div class="feature-title" data-i18n="contrib.i18n_title">Translate the docs</div>
+            <div class="feature-desc" data-i18n="contrib.i18n_desc">
+              <code style="font-family:var(--font-mono)">docs/app.js</code> has EN + PT blocks. Adding ES, FR, DE, JA is a pure copy-then-translate task — no code required.
+            </div>
+          </div>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon"><i class="ph-duotone ph-bug"></i></div>
+          <div>
+            <div class="feature-title" data-i18n="contrib.invariant_title">Break an invariant</div>
+            <div class="feature-desc" data-i18n="contrib.invariant_desc">
+              Find an input that produces a misleading compression (lost error, empty exemplar, non-idempotent output) — that's a proptest we should add. See <code style="font-family:var(--font-mono)">tests/proptest/compression_invariants.rs</code>.
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div style="margin-top:2.5rem;text-align:center">
+        <a class="btn btn-blue" href="https://github.com/VALRAW-ALL/ntk/blob/master/CONTRIBUTING.md" target="_blank" rel="noopener" data-i18n="contrib.cta_guide">
+          <i class="ph-fill ph-book-open"></i> Read CONTRIBUTING.md
+        </a>
+        <a class="btn btn-secondary" href="https://github.com/VALRAW-ALL/ntk/issues" target="_blank" rel="noopener" style="margin-left:0.5rem" data-i18n="contrib.cta_issues">
+          <i class="ph-fill ph-github-logo"></i> Browse open issues
+        </a>
+      </div>
+    </div>
+  </section>
 </div><!-- /page-home -->
 
 <!-- ════════════════════════ PAGE: GET STARTED ════════════════════════ -->
@@ -630,13 +709,13 @@ rm -rf ~/.ntk           <span style="color:var(--color-texto-mutado)"># remove c
             </thead>
             <tbody>
               <tr>
-                <td><strong>Repetitive logs</strong></td>
+                <td><strong data-i18n="met.fx_repetitive">Repetitive logs</strong></td>
                 <td><span style="font-family:var(--font-mono);font-size:0.8125rem">docker_logs_repetitive</span></td>
                 <td><span class="range-badge">92%</span></td>
                 <td class="progress-cell"><div class="progress-bar-bg"><div class="progress-bar-fill" data-width="92"></div></div></td>
               </tr>
               <tr>
-                <td><strong>Node.js trace</strong></td>
+                <td><strong data-i18n="met.fx_node">Node.js trace</strong></td>
                 <td><span style="font-family:var(--font-mono);font-size:0.8125rem">node_express_trace</span></td>
                 <td><span class="range-badge">83%</span></td>
                 <td class="progress-cell"><div class="progress-bar-bg"><div class="progress-bar-fill" data-width="83"></div></div></td>
@@ -648,43 +727,61 @@ rm -rf ~/.ntk           <span style="color:var(--color-texto-mutado)"># remove c
                 <td class="progress-cell"><div class="progress-bar-bg"><div class="progress-bar-fill" data-width="68"></div></div></td>
               </tr>
               <tr>
-                <td><strong>Python Django trace</strong></td>
+                <td><strong data-i18n="met.fx_python">Python Django trace</strong></td>
                 <td><span style="font-family:var(--font-mono);font-size:0.8125rem">python_django_trace</span></td>
                 <td><span class="range-badge">62%</span></td>
                 <td class="progress-cell"><div class="progress-bar-bg"><div class="progress-bar-fill" data-width="62"></div></div></td>
               </tr>
               <tr>
-                <td><strong>Java stack trace</strong></td>
+                <td><strong data-i18n="met.fx_java">Java stack trace</strong></td>
                 <td><span style="font-family:var(--font-mono);font-size:0.8125rem">stack_trace_java</span></td>
                 <td><span class="range-badge">60%</span></td>
                 <td class="progress-cell"><div class="progress-bar-bg"><div class="progress-bar-fill" data-width="60"></div></div></td>
               </tr>
               <tr>
-                <td><strong>Go panic</strong></td>
+                <td><strong data-i18n="met.fx_go">Go panic</strong></td>
                 <td><span style="font-family:var(--font-mono);font-size:0.8125rem">go_panic_trace</span></td>
                 <td><span class="range-badge">56%</span></td>
                 <td class="progress-cell"><div class="progress-bar-bg"><div class="progress-bar-fill" data-width="56"></div></div></td>
               </tr>
               <tr>
-                <td><strong>PHP Symfony trace</strong></td>
+                <td><strong data-i18n="met.fx_php">PHP Symfony trace</strong></td>
                 <td><span style="font-family:var(--font-mono);font-size:0.8125rem">php_symfony_trace</span></td>
                 <td><span class="range-badge">33%</span></td>
                 <td class="progress-cell"><div class="progress-bar-bg"><div class="progress-bar-fill" data-width="33"></div></div></td>
               </tr>
               <tr>
-                <td><strong>Unstructured log</strong></td>
+                <td><strong data-i18n="met.fx_csharp">C# ASP.NET Core trace</strong></td>
+                <td><span style="font-family:var(--font-mono);font-size:0.8125rem">csharp_aspnet_trace</span></td>
+                <td><span class="range-badge" style="color:var(--color-texto-mutado)">N/A</span></td>
+                <td class="progress-cell"><div class="progress-bar-bg"></div></td>
+              </tr>
+              <tr>
+                <td><strong data-i18n="met.fx_tsreact">TypeScript React trace</strong></td>
+                <td><span style="font-family:var(--font-mono);font-size:0.8125rem">typescript_react_trace</span></td>
+                <td><span class="range-badge" style="color:var(--color-texto-mutado)">N/A</span></td>
+                <td class="progress-cell"><div class="progress-bar-bg"></div></td>
+              </tr>
+              <tr>
+                <td><strong data-i18n="met.fx_kotlin">Kotlin Android trace</strong></td>
+                <td><span style="font-family:var(--font-mono);font-size:0.8125rem">kotlin_android_trace</span></td>
+                <td><span class="range-badge" style="color:var(--color-texto-mutado)">N/A</span></td>
+                <td class="progress-cell"><div class="progress-bar-bg"></div></td>
+              </tr>
+              <tr>
+                <td><strong data-i18n="met.fx_generic">Unstructured log</strong></td>
                 <td><span style="font-family:var(--font-mono);font-size:0.8125rem">generic_long_log</span></td>
                 <td><span class="range-badge">14%</span></td>
                 <td class="progress-cell"><div class="progress-bar-bg"><div class="progress-bar-fill" data-width="14"></div></div></td>
               </tr>
               <tr>
-                <td><strong>TypeScript errors</strong></td>
+                <td><strong data-i18n="met.fx_ts">TypeScript errors</strong></td>
                 <td><span style="font-family:var(--font-mono);font-size:0.8125rem">tsc_errors_node_modules</span></td>
                 <td><span class="range-badge">10%</span></td>
                 <td class="progress-cell"><div class="progress-bar-bg"><div class="progress-bar-fill" data-width="10"></div></div></td>
               </tr>
               <tr>
-                <td><strong>Git diff</strong></td>
+                <td><strong data-i18n="met.fx_gitdiff">Git diff</strong></td>
                 <td><span style="font-family:var(--font-mono);font-size:0.8125rem">git_diff_large</span></td>
                 <td><span class="range-badge">9%</span></td>
                 <td class="progress-cell"><div class="progress-bar-bg"><div class="progress-bar-fill" data-width="9"></div></div></td>
@@ -706,7 +803,7 @@ rm -rf ~/.ntk           <span style="color:var(--color-texto-mutado)"># remove c
       <p style="font-size:0.875rem;color:var(--color-texto-mutado);margin-bottom:1rem" data-i18n="met.combined_note">
         Combined savings formula: <code style="font-family:var(--font-mono)">1 − (1 − rtk%) × (1 − ntk_incremental%)</code>
       </p>
-      <p style="font-size:0.8125rem;color:var(--color-amarelo,#FFC107);margin-bottom:1rem">
+      <p style="font-size:0.8125rem;color:var(--color-amarelo,#FFC107);margin-bottom:1rem" data-i18n="met.pending_note">
         <strong>Pending:</strong> combined NTK+RTK measurements have not been recorded against the current fixture library. Run
         <code style="font-family:var(--font-mono)">pwsh bench/run_all.ps1</code> with RTK filtering on to populate. Numbers below are estimates derived from single-layer measurements; treat as illustrative until the combined bench lands.
       </p>
@@ -725,45 +822,45 @@ rm -rf ~/.ntk           <span style="color:var(--color-texto-mutado)"># remove c
             <tbody>
               <tr>
                 <td><strong data-i18n="met.cat_tests">Tests</strong></td>
-                <td><span class="range-badge" style="color:var(--color-texto-terciario)">90%</span></td>
-                <td><span class="range-badge" style="color:var(--color-texto-terciario)">~9%</span></td>
-                <td><span class="range-badge combined">~99%</span></td>
-                <td class="progress-cell"><div class="progress-bar-bg"><div class="progress-bar-fill combined" data-width="99"></div></div></td>
+                <td><span class="range-badge" style="color:var(--color-texto-mutado)">N/A</span></td>
+                <td><span class="range-badge" style="color:var(--color-texto-mutado)">N/A</span></td>
+                <td><span class="range-badge" style="color:var(--color-texto-mutado)">N/A</span></td>
+                <td class="progress-cell"><div class="progress-bar-bg"></div></td>
               </tr>
               <tr>
                 <td><strong data-i18n="met.cat_build">Build</strong></td>
-                <td><span class="range-badge" style="color:var(--color-texto-terciario)">83%</span></td>
-                <td><span class="range-badge" style="color:var(--color-texto-terciario)">~24%</span></td>
-                <td><span class="range-badge combined">~96%</span></td>
-                <td class="progress-cell"><div class="progress-bar-bg"><div class="progress-bar-fill combined" data-width="96"></div></div></td>
+                <td><span class="range-badge" style="color:var(--color-texto-mutado)">N/A</span></td>
+                <td><span class="range-badge" style="color:var(--color-texto-mutado)">N/A</span></td>
+                <td><span class="range-badge" style="color:var(--color-texto-mutado)">N/A</span></td>
+                <td class="progress-cell"><div class="progress-bar-bg"></div></td>
               </tr>
               <tr>
                 <td><strong data-i18n="met.cat_git">Git</strong></td>
-                <td><span class="range-badge" style="color:var(--color-texto-terciario)">70%</span></td>
-                <td><span class="range-badge" style="color:var(--color-texto-terciario)">~33%</span></td>
-                <td><span class="range-badge combined">~79%</span></td>
-                <td class="progress-cell"><div class="progress-bar-bg"><div class="progress-bar-fill combined" data-width="79"></div></div></td>
+                <td><span class="range-badge" style="color:var(--color-texto-mutado)">N/A</span></td>
+                <td><span class="range-badge" style="color:var(--color-texto-mutado)">N/A</span></td>
+                <td><span class="range-badge" style="color:var(--color-texto-mutado)">N/A</span></td>
+                <td class="progress-cell"><div class="progress-bar-bg"></div></td>
               </tr>
               <tr>
                 <td><strong data-i18n="met.cat_gh">GitHub CLI</strong></td>
-                <td><span class="range-badge" style="color:var(--color-texto-terciario)">80%</span></td>
-                <td><span class="range-badge" style="color:var(--color-texto-terciario)">~35%</span></td>
-                <td><span class="range-badge combined">~87%</span></td>
-                <td class="progress-cell"><div class="progress-bar-bg"><div class="progress-bar-fill combined" data-width="87"></div></div></td>
+                <td><span class="range-badge" style="color:var(--color-texto-mutado)">N/A</span></td>
+                <td><span class="range-badge" style="color:var(--color-texto-mutado)">N/A</span></td>
+                <td><span class="range-badge" style="color:var(--color-texto-mutado)">N/A</span></td>
+                <td class="progress-cell"><div class="progress-bar-bg"></div></td>
               </tr>
               <tr>
                 <td><strong data-i18n="met.cat_pkg">Package Managers</strong></td>
-                <td><span class="range-badge" style="color:var(--color-texto-terciario)">85%</span></td>
-                <td><span class="range-badge" style="color:var(--color-texto-terciario)">~33%</span></td>
-                <td><span class="range-badge combined">~90%</span></td>
-                <td class="progress-cell"><div class="progress-bar-bg"><div class="progress-bar-fill combined" data-width="90"></div></div></td>
+                <td><span class="range-badge" style="color:var(--color-texto-mutado)">N/A</span></td>
+                <td><span class="range-badge" style="color:var(--color-texto-mutado)">N/A</span></td>
+                <td><span class="range-badge" style="color:var(--color-texto-mutado)">N/A</span></td>
+                <td class="progress-cell"><div class="progress-bar-bg"></div></td>
               </tr>
               <tr>
                 <td><strong data-i18n="met.cat_infra">Infrastructure</strong></td>
-                <td><span class="range-badge" style="color:var(--color-texto-terciario)">85%</span></td>
-                <td><span class="range-badge" style="color:var(--color-texto-terciario)">0%</span></td>
-                <td><span class="range-badge combined">~85%</span></td>
-                <td class="progress-cell"><div class="progress-bar-bg"><div class="progress-bar-fill combined" data-width="85"></div></div></td>
+                <td><span class="range-badge" style="color:var(--color-texto-mutado)">N/A</span></td>
+                <td><span class="range-badge" style="color:var(--color-texto-mutado)">N/A</span></td>
+                <td><span class="range-badge" style="color:var(--color-texto-mutado)">N/A</span></td>
+                <td class="progress-cell"><div class="progress-bar-bg"></div></td>
               </tr>
             </tbody>
           </table>

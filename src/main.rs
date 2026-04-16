@@ -84,6 +84,18 @@ enum Command {
     TestCompress {
         /// Path to the file to compress.
         file: PathBuf,
+        /// Also run Layer 3 (local inference) against the daemon.
+        #[arg(long)]
+        with_l3: bool,
+        /// User intent to inject as Layer 4 context (implies --with-l3).
+        #[arg(long)]
+        context: Option<String>,
+        /// L4 prompt format: prefix | xml | goal | json (default: prefix).
+        #[arg(long, default_value = "prefix")]
+        l4_format: String,
+        /// Daemon URL (used when --with-l3 or --context is set).
+        #[arg(long, default_value = "http://127.0.0.1:8765")]
+        daemon_url: String,
     },
 
     /// Manage the local inference model.
@@ -179,7 +191,13 @@ fn main() -> Result<()> {
 
         Some(Command::Config { file }) => run_config(file),
 
-        Some(Command::TestCompress { file }) => run_test_compress(&file),
+        Some(Command::TestCompress {
+            file,
+            with_l3,
+            context,
+            l4_format,
+            daemon_url,
+        }) => run_test_compress(&file, with_l3, context, &l4_format, &daemon_url),
 
         Some(Command::Model { action }) => run_model(action),
 
@@ -981,7 +999,13 @@ fn run_config(file: Option<PathBuf>) -> Result<()> {
     Ok(())
 }
 
-fn run_test_compress(file: &std::path::Path) -> Result<()> {
+fn run_test_compress(
+    file: &std::path::Path,
+    with_l3: bool,
+    context: Option<String>,
+    l4_format: &str,
+    daemon_url: &str,
+) -> Result<()> {
     use ntk::compressor::{layer1_filter, layer2_tokenizer};
 
     let canonical = file
@@ -995,21 +1019,94 @@ fn run_test_compress(file: &std::path::Path) -> Result<()> {
     let l1 = layer1_filter::filter(&input);
     let l2 = layer2_tokenizer::process(&l1.output)?;
 
-    let ratio = if original_tokens > 0 {
+    let ratio_l2 = if original_tokens > 0 {
         let saved = original_tokens.saturating_sub(l2.compressed_tokens);
         (saved as f64 / original_tokens as f64) * 100.0
     } else {
         0.0
     };
 
-    println!("File:             {}", canonical.display());
-    println!("Original tokens:  {original_tokens}");
-    println!("L1 lines removed: {}", l1.lines_removed);
-    println!("After L2 tokens:  {}", l2.compressed_tokens);
-    println!("Compression:      {ratio:.1}%");
-    println!();
-    println!("--- Compressed output ---");
-    println!("{}", l2.output);
+    println!("File:              {}", canonical.display());
+    println!("Original tokens:   {original_tokens}");
+    println!("L1 lines removed:  {}", l1.lines_removed);
+    println!("After L2 tokens:   {}", l2.compressed_tokens);
+    println!("L1+L2 compression: {ratio_l2:.1}%");
+
+    // Fire a full-pipeline request through the daemon when requested.
+    let want_full_pipeline = with_l3 || context.is_some();
+    if want_full_pipeline {
+        println!();
+        println!("--- Running L3/L4 via daemon at {daemon_url} ---");
+
+        let mut payload = serde_json::json!({
+            "output": input,
+            "command": "ntk test-compress",
+            "cwd": canonical.parent().map_or(".".to_string(), |p| p.display().to_string()),
+        });
+        if let Some(ctx) = &context {
+            payload["context"] = serde_json::Value::String(ctx.clone());
+        }
+
+        // Daemon inherits NTK_L4_FORMAT from its own env; we hint the user instead
+        // of spawning a new daemon here (which would race with the one on :8765).
+        if !matches!(l4_format, "prefix" | "xml" | "xmlwrap" | "goal" | "json") {
+            println!("warning: unknown --l4-format '{l4_format}', daemon default will be used");
+        } else if l4_format != "prefix" {
+            println!(
+                "note: set NTK_L4_FORMAT={l4_format} before `ntk start` for this format to apply"
+            );
+        }
+
+        let url = format!("{}/compress", daemon_url.trim_end_matches('/'));
+        let rt = tokio::runtime::Runtime::new()?;
+        let body: serde_json::Value = rt.block_on(async {
+            let client = reqwest::Client::builder()
+                .timeout(std::time::Duration::from_secs(300))
+                .build()?;
+            let resp =
+                client.post(&url).json(&payload).send().await.map_err(|e| {
+                    anyhow!("daemon unreachable at {url}: {e}. Run `ntk start` first.")
+                })?;
+            let status = resp.status();
+            if !status.is_success() {
+                let text = resp.text().await.unwrap_or_default();
+                return Err(anyhow!("daemon returned {status}: {text}"));
+            }
+            resp.json::<serde_json::Value>()
+                .await
+                .map_err(|e| anyhow!("invalid JSON response: {e}"))
+        })?;
+
+        let layer = body.get("layer").and_then(|v| v.as_u64()).unwrap_or(0);
+        let tokens_after = body
+            .get("tokens_after")
+            .and_then(|v| v.as_u64())
+            .unwrap_or(0);
+        let ratio = body
+            .get("ratio")
+            .and_then(|v| v.as_f64())
+            .map(|r| r * 100.0)
+            .unwrap_or(0.0);
+        let compressed = body
+            .get("compressed")
+            .and_then(|v| v.as_str())
+            .unwrap_or("");
+
+        println!("Layer reached:     L{layer}");
+        println!("Final tokens:      {tokens_after}");
+        println!("Total compression: {ratio:.1}%");
+        println!();
+        println!("--- Compressed output ---");
+        println!("{compressed}");
+    } else {
+        println!();
+        println!("--- Compressed output (L1+L2) ---");
+        println!("{}", l2.output);
+        println!();
+        println!(
+            "tip: pass --with-l3 (or --context \"<intent>\") to also run Layer 3/4 via the daemon."
+        );
+    }
     Ok(())
 }
 
