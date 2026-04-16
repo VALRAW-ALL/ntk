@@ -12,7 +12,7 @@
 [![Rust](https://img.shields.io/badge/rust-1.90%2B-orange?logo=rust)](https://www.rust-lang.org)
 [![Issues](https://img.shields.io/github/issues/VALRAW-ALL/ntk)](https://github.com/VALRAW-ALL/ntk/issues)
 
-[Website](https://ntk.valraw.com) • [Install](#installation) • [Usage](#usage) • [Contributing](CONTRIBUTING.md) • [Report an issue](https://github.com/VALRAW-ALL/ntk/issues/new/choose)
+[Website](https://ntk.valraw.com) • [Install](#installation) • [Usage](#usage) • [Contributing](CONTRIBUTING.md) • [How to open an issue](HOW_TO_OPEN_AN_ISSUE.md) • [Report an issue](https://github.com/VALRAW-ALL/ntk/issues/new/choose)
 
 </div>
 
@@ -977,25 +977,20 @@ When telemetry is disabled, **no network requests are made** and no payload is c
 
 ## License
 
-Copyright 2026 Alessandro Mota
+Copyright (c) 2026 Alessandro Mota
 
-Licensed under the **Apache License, Version 2.0** (the "License"). You may not use this software except in compliance with the License.
+Licensed under the **MIT License**. You are free to use, copy, modify, merge,
+publish, distribute, sublicense, and/or sell copies of this software, subject
+to the conditions stated in the license.
 
-You may obtain a copy of the License at:
-
-```
-http://www.apache.org/licenses/LICENSE-2.0
-```
-
-Unless required by applicable law or agreed to in writing, software distributed under the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the specific language governing permissions and limitations under the License.
-
-A copy of the full license text is available in the [`LICENSE`](LICENSE) file.
+The software is provided "AS IS", without warranty of any kind, express or
+implied. See the [`LICENSE`](LICENSE) file for the full text.
 
 ---
 
 ## Third-Party Licenses
 
-NTK depends on the following open-source libraries. All are compatible with the Apache-2.0 license.
+NTK depends on the following open-source libraries. All are compatible with the MIT license.
 
 ### Runtime dependencies
 

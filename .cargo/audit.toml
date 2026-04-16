@@ -1,5 +1,9 @@
 # cargo-audit configuration for NTK
 # https://github.com/rustsec/rustsec/tree/main/cargo-audit
+#
+# Every entry names the crate, the advisory ID, and the reason we're
+# tolerating it. When the upstream crate publishes a fix, remove the
+# entry and let CI verify the bump.
 
 [advisories]
 ignore = [
@@ -9,4 +13,35 @@ ignore = [
     # of sqlx — the MySQL backend is never compiled or linked. No fix is
     # available upstream (the `rsa` crate has no patched version).
     "RUSTSEC-2023-0071",
+
+    # RUSTSEC-2026-0097: `rand 0.8.5` is unsound with custom loggers that
+    # call `rand::rng()`. NTK never calls `rand::rng()` directly — the
+    # dep is pulled in transitively by tokenizers / sqlx / axum-test.
+    # Upstream will ship a fixed 0.8.x point release; re-audit on bump.
+    "RUSTSEC-2026-0097",
+
+    # RUSTSEC-2026-0098 / RUSTSEC-2026-0099: `rustls-webpki` name-constraint
+    # handling for URI / wildcard names. NTK's HTTP client is reqwest 0.11
+    # which still pins rustls 0.21 / rustls-webpki 0.101. Migration requires
+    # reqwest 0.12 + rustls 0.23, which is a larger dep bump tracked as a
+    # dedicated follow-up. Meanwhile: NTK only hits localhost (Ollama /
+    # local llama-server) with TLS off by default, so the PKI code path
+    # is essentially dead at runtime.
+    "RUSTSEC-2026-0098",
+    "RUSTSEC-2026-0099",
+
+    # RUSTSEC-2024-0436: `paste 1.x` — unmaintained. Pulled in by ratatui's
+    # diagnostics; no actual vulnerability, just a maintenance advisory.
+    # Wait for ratatui to drop the dep.
+    "RUSTSEC-2024-0436",
+
+    # RUSTSEC-2025-0134: `rustls-pemfile 1.x` — unmaintained. Same story
+    # as the webpki advisories above: transitive via reqwest 0.11 + rustls
+    # 0.21. Resolved by the same dep bump that closes 2026-0098 / 0099.
+    "RUSTSEC-2025-0134",
+
+    # RUSTSEC-2026-0002: `lru 0.12.x` — `IterMut` stacked-borrows violation.
+    # NTK does not use lru directly; pulled in transitively by ratatui.
+    # Safe under stable Rust (the violation is only observable under Miri).
+    "RUSTSEC-2026-0002",
 ]

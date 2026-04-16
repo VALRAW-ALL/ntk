@@ -610,6 +610,14 @@ fn collapse_blank_lines(input: &str) -> String {
         prev_blank = is_blank;
     }
 
+    // Drop trailing blank lines so filter() is idempotent.
+    // Without this, input "a\n\n\n\n" becomes "a\n" on the first pass (lines
+    // ["a",""] joined by "\n") and then "a" on a second pass — a violation
+    // of the prop_layer1_filter_is_idempotent proptest invariant.
+    while out.last().is_some_and(|l| l.trim().is_empty()) {
+        out.pop();
+    }
+
     out.join("\n")
 }
 

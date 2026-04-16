@@ -175,6 +175,17 @@ fn test_idempotent_filter() {
 }
 
 #[test]
+fn test_idempotent_on_trailing_blank_lines() {
+    // Regression: input "a\n\n\n\n" used to round-trip as
+    // "a\n" (first pass) → "a" (second pass), violating idempotency.
+    // Caught by prop_layer1_filter_is_idempotent on CI.
+    let input = "a\n\n\n\n";
+    let once = filter(input).output;
+    let twice = filter(&once).output;
+    assert_eq!(once, twice, "trailing blank lines must not toggle");
+}
+
+#[test]
 fn test_error_lines_never_dropped() {
     // Invariant #1: error/warning signals survive.
     let input = "\

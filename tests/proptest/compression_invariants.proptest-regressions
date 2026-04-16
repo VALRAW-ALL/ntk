@@ -6,3 +6,4 @@
 # everyone who runs the test benefits from these saved cases.
 cc 7660161fcb99a540ece6b37af40facc618dde00c0eaa9d4da4066a166182c34d # shrinks to input = "\n\n_\n"
 cc 5dfebf50a0c043139a6629434b9962dc6c90f2a0419d62ff8b65c4b772f837b6 # shrinks to input = "\n\n\n"
+cc 2a7e7efacd4deaf3193e830079b761d9fee7b0a4a94040156d43b1b136c3ab54 # shrinks to input = "a\n\n\n\n"
