@@ -57,3 +57,6 @@ act_output.txt
 bench/microbench.csv
 bench/report.md
 bench/transcripts/
+
+# Marketing / launch posts — drafted locally, not part of the source
+marketing/
