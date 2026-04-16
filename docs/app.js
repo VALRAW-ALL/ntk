@@ -32,7 +32,7 @@ const TRANSLATIONS = {
 
     // How it works
     'how.badge':    'How it works',
-    'how.title':    'Three layers, one result',
+    'how.title':    'Four layers, one result',
     'how.desc':     'Each layer activates only when needed, keeping latency near zero for small outputs.',
     'how.l1_title': 'Fast Filter',
     'how.l1_desc':  'ANSI removal, line deduplication, test failure extraction. Always on. <1ms.',
@@ -40,6 +40,8 @@ const TRANSLATIONS = {
     'how.l2_desc':  'cl100k_base BPE token counting, path shortening. Always on. <5ms.',
     'how.l3_title': 'Local Inference',
     'how.l3_desc':  'Ollama/Phi-3 Mini with type-specific prompts. Only triggers when output >300 tokens.',
+    'how.l4_title': 'Context Injection',
+    'how.l4_desc':  'Reads the Claude Code transcript and prepends your most recent intent to the L3 prompt. Plain-string prefix, works with any LLM.',
 
     // Demo
     'demo.badge': 'Live demo',
@@ -231,7 +233,7 @@ const TRANSLATIONS = {
 
     // How it works
     'how.badge':    'Como funciona',
-    'how.title':    'Três camadas, um resultado',
+    'how.title':    'Quatro camadas, um resultado',
     'how.desc':     'Cada camada ativa apenas quando necessário, mantendo a latência próxima de zero para saídas pequenas.',
     'how.l1_title': 'Filtro Rápido',
     'how.l1_desc':  'Remoção de ANSI, deduplicação de linhas, extração de falhas de teste. Sempre ativo. <1ms.',
@@ -239,6 +241,8 @@ const TRANSLATIONS = {
     'how.l2_desc':  'Contagem de tokens cl100k_base BPE, encurtamento de caminhos. Sempre ativo. <5ms.',
     'how.l3_title': 'Inferência Local',
     'how.l3_desc':  'Ollama/Phi-3 Mini com prompts específicos por tipo. Só ativa quando saída >300 tokens.',
+    'how.l4_title': 'Injeção de Contexto',
+    'how.l4_desc':  'Lê o transcript do Claude Code e prefixa sua intenção mais recente no prompt da L3. Prefixo em texto puro, funciona com qualquer LLM.',
 
     // Demo
     'demo.badge': 'Demo ao vivo',
