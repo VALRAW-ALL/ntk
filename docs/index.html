@@ -4,9 +4,9 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>NTK - Neural Token Killer</title>
-  <meta name="description" content="Semantic compression proxy daemon for Claude Code. Reduces tool output by 70–99% before it reaches the LLM context using progressive neural compression layers." />
+  <meta name="description" content="Semantic compression proxy daemon for Claude Code. Reduces tool output by up to 92% (docker logs) before it reaches the LLM context using four progressive compression layers." />
   <meta property="og:title" content="NTK - Neural Token Killer" />
-  <meta property="og:description" content="Semantic compression proxy for Claude Code. 70–99% token savings with local neural inference." />
+  <meta property="og:description" content="Semantic compression proxy for Claude Code. Up to 92% token savings measured, multi-language stack-trace support." />
   <meta property="og:type" content="website" />
   <meta name="theme-color" content="#2979FF" />
   <link rel="stylesheet" href="style.css" />
@@ -64,8 +64,8 @@
 
       <p class="hero-subtitle" data-i18n="hero.subtitle">
         Semantic compression proxy daemon for Claude Code.
-        Reduces tool output by <strong>70–99%</strong> before it reaches the LLM context -
-        using three progressive compression layers with optional local neural inference.
+        Reduces tool output by up to <strong>92%</strong> (measured on docker logs; stack traces 56–83%) before it reaches the LLM context.
+        Four progressive compression layers, optional local neural inference, model-agnostic context injection.
       </p>
 
       <div class="hero-actions">
@@ -87,15 +87,15 @@
 
       <div class="stats-row fade-in">
         <div class="stat-card">
-          <div class="stat-value" data-counter="99">0</div>
-          <div class="stat-label" data-i18n="hero.stat1">% max savings</div>
+          <div class="stat-value" data-counter="92">0</div>
+          <div class="stat-label" data-i18n="hero.stat1">% max savings (L1+L2)</div>
         </div>
         <div class="stat-card">
-          <div class="stat-value" data-i18n="hero.stat2_val">&lt;1ms</div>
+          <div class="stat-value" data-i18n="hero.stat2_val">&lt;20ms</div>
           <div class="stat-label" data-i18n="hero.stat2">L1+L2 latency</div>
         </div>
         <div class="stat-card">
-          <div class="stat-value" data-counter="3">0</div>
+          <div class="stat-value" data-counter="4">0</div>
           <div class="stat-label" data-i18n="hero.stat3">compression layers</div>
         </div>
         <div class="stat-card">
@@ -570,31 +570,31 @@ rm -rf ~/.ntk           <span style="color:var(--color-texto-mutado)"># remove c
       Measured against real-world command output captured during development sessions.
     </p>
 
-    <!-- KPI row -->
+    <!-- KPI row — real numbers from bench/microbench.csv (v0.2.28 run) -->
     <div class="kpi-grid" style="margin-bottom:3rem">
       <div class="kpi-card fade-in">
         <div class="kpi-icon kpi-icon-green">⚡</div>
-        <div class="kpi-value gradient-text-green">99%</div>
-        <div class="kpi-label" data-i18n="met.kpi1">Max savings (vitest)</div>
-        <div class="kpi-sublabel" data-i18n="met.kpi1_sub">L1+L2+L3</div>
+        <div class="kpi-value gradient-text-green">92%</div>
+        <div class="kpi-label" data-i18n="met.kpi1">Max savings (docker logs)</div>
+        <div class="kpi-sublabel" data-i18n="met.kpi1_sub">L1+L2 only, no L3</div>
       </div>
       <div class="kpi-card fade-in">
         <div class="kpi-icon kpi-icon-blue">🧠</div>
-        <div class="kpi-value gradient-text-blue">~85%</div>
-        <div class="kpi-label" data-i18n="met.kpi2">Avg NTK+RTK combined</div>
-        <div class="kpi-sublabel" data-i18n="met.kpi2_sub">across all commands</div>
+        <div class="kpi-value gradient-text-blue">~55%</div>
+        <div class="kpi-label" data-i18n="met.kpi2">Avg stack-trace compression</div>
+        <div class="kpi-sublabel" data-i18n="met.kpi2_sub">Java / Python / Go / Node / PHP</div>
       </div>
       <div class="kpi-card fade-in">
         <div class="kpi-icon kpi-icon-blue" style="background:var(--color-secundaria-dim);border-color:var(--color-secundaria-border);color:var(--color-secundaria-clara)">⏱</div>
-        <div class="kpi-value" style="background:linear-gradient(135deg,#448AFF,#B388FF);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text">&lt;1ms</div>
+        <div class="kpi-value" style="background:linear-gradient(135deg,#448AFF,#B388FF);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text">&lt;20ms</div>
         <div class="kpi-label" data-i18n="met.kpi3">L1+L2 overhead</div>
         <div class="kpi-sublabel" data-i18n="met.kpi3_sub">always on, zero impact</div>
       </div>
       <div class="kpi-card fade-in">
         <div class="kpi-icon kpi-icon-green" style="background:rgba(0,230,118,0.1)">📉</div>
-        <div class="kpi-value gradient-text-green">3×</div>
-        <div class="kpi-label" data-i18n="met.kpi4">Faster responses</div>
-        <div class="kpi-sublabel" data-i18n="met.kpi4_sub">less context = less latency</div>
+        <div class="kpi-value gradient-text-green">12</div>
+        <div class="kpi-label" data-i18n="met.kpi4">Fixture scenarios</div>
+        <div class="kpi-sublabel" data-i18n="met.kpi4_sub">multi-language coverage</div>
       </div>
     </div>
 
@@ -604,67 +604,90 @@ rm -rf ~/.ntk           <span style="color:var(--color-texto-mutado)"># remove c
       <button class="metrics-tab" onclick="switchMetricsTab('combined')" data-i18n="met.tab_combined">NTK + RTK combined</button>
     </div>
 
-    <!-- NTK only panel -->
+    <!-- NTK only panel — every row below is from bench/microbench.csv (v0.2.28) -->
     <div class="metrics-panel active" id="panel-ntk">
+      <p style="font-size:0.8125rem;color:var(--color-texto-mutado);margin-bottom:0.75rem">
+        Measured on 12 deterministic fixtures in <code style="font-family:var(--font-mono)">bench/fixtures/</code>.
+        All numbers are L1+L2 only (L3 not triggered in this run). Reproduce with
+        <code style="font-family:var(--font-mono)">pwsh bench/run_all.ps1</code> or <code style="font-family:var(--font-mono)">bash bench/run_all.sh</code>.
+      </p>
       <div class="savings-table-wrap fade-in">
         <div class="savings-tabs-wrap">
           <table class="savings-table" id="table-ntk">
             <thead>
               <tr>
-                <th data-i18n="met.th_category">Category</th>
-                <th data-i18n="met.th_commands">Commands</th>
-                <th data-i18n="met.th_savings">NTK Savings</th>
+                <th data-i18n="met.th_category">Scenario</th>
+                <th data-i18n="met.th_commands">Fixture</th>
+                <th data-i18n="met.th_savings">Ratio</th>
                 <th class="progress-cell" data-i18n="met.th_visual">Visual</th>
               </tr>
             </thead>
             <tbody>
               <tr>
-                <td><strong data-i18n="met.cat_tests">Tests</strong></td>
-                <td><span style="font-family:var(--font-mono);font-size:0.8125rem">vitest, playwright, cargo test</span></td>
-                <td><span class="range-badge">90–99%</span></td>
-                <td class="progress-cell"><div class="progress-bar-bg"><div class="progress-bar-fill" data-width="99"></div></div></td>
+                <td><strong>Repetitive logs</strong></td>
+                <td><span style="font-family:var(--font-mono);font-size:0.8125rem">docker_logs_repetitive</span></td>
+                <td><span class="range-badge">92%</span></td>
+                <td class="progress-cell"><div class="progress-bar-bg"><div class="progress-bar-fill" data-width="92"></div></div></td>
               </tr>
               <tr>
-                <td><strong data-i18n="met.cat_build">Build</strong></td>
-                <td><span style="font-family:var(--font-mono);font-size:0.8125rem">next build, tsc, cargo build</span></td>
-                <td><span class="range-badge">70–87%</span></td>
-                <td class="progress-cell"><div class="progress-bar-bg"><div class="progress-bar-fill" data-width="87"></div></div></td>
+                <td><strong>Node.js trace</strong></td>
+                <td><span style="font-family:var(--font-mono);font-size:0.8125rem">node_express_trace</span></td>
+                <td><span class="range-badge">83%</span></td>
+                <td class="progress-cell"><div class="progress-bar-bg"><div class="progress-bar-fill" data-width="83"></div></div></td>
               </tr>
               <tr>
-                <td><strong data-i18n="met.cat_git">Git</strong></td>
-                <td><span style="font-family:var(--font-mono);font-size:0.8125rem">status, log, diff, add, commit</span></td>
-                <td><span class="range-badge">59–80%</span></td>
-                <td class="progress-cell"><div class="progress-bar-bg"><div class="progress-bar-fill" data-width="80"></div></div></td>
+                <td><strong>cargo test</strong></td>
+                <td><span style="font-family:var(--font-mono);font-size:0.8125rem">cargo_test_failures</span></td>
+                <td><span class="range-badge">68%</span></td>
+                <td class="progress-cell"><div class="progress-bar-bg"><div class="progress-bar-fill" data-width="68"></div></div></td>
               </tr>
               <tr>
-                <td><strong data-i18n="met.cat_gh">GitHub CLI</strong></td>
-                <td><span style="font-family:var(--font-mono);font-size:0.8125rem">gh pr, gh run, gh issue</span></td>
-                <td><span class="range-badge">26–87%</span></td>
-                <td class="progress-cell"><div class="progress-bar-bg"><div class="progress-bar-fill" data-width="87"></div></div></td>
+                <td><strong>Python Django trace</strong></td>
+                <td><span style="font-family:var(--font-mono);font-size:0.8125rem">python_django_trace</span></td>
+                <td><span class="range-badge">62%</span></td>
+                <td class="progress-cell"><div class="progress-bar-bg"><div class="progress-bar-fill" data-width="62"></div></div></td>
               </tr>
               <tr>
-                <td><strong data-i18n="met.cat_pkg">Package Managers</strong></td>
-                <td><span style="font-family:var(--font-mono);font-size:0.8125rem">pnpm, npm, npx, cargo</span></td>
-                <td><span class="range-badge">70–90%</span></td>
-                <td class="progress-cell"><div class="progress-bar-bg"><div class="progress-bar-fill" data-width="90"></div></div></td>
+                <td><strong>Java stack trace</strong></td>
+                <td><span style="font-family:var(--font-mono);font-size:0.8125rem">stack_trace_java</span></td>
+                <td><span class="range-badge">60%</span></td>
+                <td class="progress-cell"><div class="progress-bar-bg"><div class="progress-bar-fill" data-width="60"></div></div></td>
               </tr>
               <tr>
-                <td><strong data-i18n="met.cat_files">Files / Search</strong></td>
-                <td><span style="font-family:var(--font-mono);font-size:0.8125rem">ls, grep, find, read</span></td>
-                <td><span class="range-badge">60–75%</span></td>
-                <td class="progress-cell"><div class="progress-bar-bg"><div class="progress-bar-fill" data-width="75"></div></div></td>
+                <td><strong>Go panic</strong></td>
+                <td><span style="font-family:var(--font-mono);font-size:0.8125rem">go_panic_trace</span></td>
+                <td><span class="range-badge">56%</span></td>
+                <td class="progress-cell"><div class="progress-bar-bg"><div class="progress-bar-fill" data-width="56"></div></div></td>
               </tr>
               <tr>
-                <td><strong data-i18n="met.cat_infra">Infrastructure</strong></td>
-                <td><span style="font-family:var(--font-mono);font-size:0.8125rem">docker, kubectl</span></td>
-                <td><span class="range-badge">85%</span></td>
-                <td class="progress-cell"><div class="progress-bar-bg"><div class="progress-bar-fill" data-width="85"></div></div></td>
+                <td><strong>PHP Symfony trace</strong></td>
+                <td><span style="font-family:var(--font-mono);font-size:0.8125rem">php_symfony_trace</span></td>
+                <td><span class="range-badge">33%</span></td>
+                <td class="progress-cell"><div class="progress-bar-bg"><div class="progress-bar-fill" data-width="33"></div></div></td>
               </tr>
               <tr>
-                <td><strong data-i18n="met.cat_net">Network</strong></td>
-                <td><span style="font-family:var(--font-mono);font-size:0.8125rem">curl, wget</span></td>
-                <td><span class="range-badge">65–70%</span></td>
-                <td class="progress-cell"><div class="progress-bar-bg"><div class="progress-bar-fill" data-width="70"></div></div></td>
+                <td><strong>Unstructured log</strong></td>
+                <td><span style="font-family:var(--font-mono);font-size:0.8125rem">generic_long_log</span></td>
+                <td><span class="range-badge">14%</span></td>
+                <td class="progress-cell"><div class="progress-bar-bg"><div class="progress-bar-fill" data-width="14"></div></div></td>
+              </tr>
+              <tr>
+                <td><strong>TypeScript errors</strong></td>
+                <td><span style="font-family:var(--font-mono);font-size:0.8125rem">tsc_errors_node_modules</span></td>
+                <td><span class="range-badge">10%</span></td>
+                <td class="progress-cell"><div class="progress-bar-bg"><div class="progress-bar-fill" data-width="10"></div></div></td>
+              </tr>
+              <tr>
+                <td><strong>Git diff</strong></td>
+                <td><span style="font-family:var(--font-mono);font-size:0.8125rem">git_diff_large</span></td>
+                <td><span class="range-badge">9%</span></td>
+                <td class="progress-cell"><div class="progress-bar-bg"><div class="progress-bar-fill" data-width="9"></div></div></td>
+              </tr>
+              <tr>
+                <td><strong>cargo build</strong></td>
+                <td><span style="font-family:var(--font-mono);font-size:0.8125rem">cargo_build_verbose</span></td>
+                <td><span class="range-badge">3%</span></td>
+                <td class="progress-cell"><div class="progress-bar-bg"><div class="progress-bar-fill" data-width="3"></div></div></td>
               </tr>
             </tbody>
           </table>
@@ -672,10 +695,14 @@ rm -rf ~/.ntk           <span style="color:var(--color-texto-mutado)"># remove c
       </div>
     </div>
 
-    <!-- NTK+RTK combined panel -->
+    <!-- NTK+RTK combined panel — placeholder until we run the combined bench -->
     <div class="metrics-panel" id="panel-combined">
       <p style="font-size:0.875rem;color:var(--color-texto-mutado);margin-bottom:1rem" data-i18n="met.combined_note">
         Combined savings formula: <code style="font-family:var(--font-mono)">1 − (1 − rtk%) × (1 − ntk_incremental%)</code>
+      </p>
+      <p style="font-size:0.8125rem;color:var(--color-amarelo,#FFC107);margin-bottom:1rem">
+        <strong>Pending:</strong> combined NTK+RTK measurements have not been recorded against the current fixture library. Run
+        <code style="font-family:var(--font-mono)">pwsh bench/run_all.ps1</code> with RTK filtering on to populate. Numbers below are estimates derived from single-layer measurements; treat as illustrative until the combined bench lands.
       </p>
       <div class="savings-table-wrap fade-in">
         <div class="savings-tabs-wrap">
@@ -742,7 +769,7 @@ rm -rf ~/.ntk           <span style="color:var(--color-texto-mutado)"># remove c
     <div style="margin-top:3rem;padding:1.5rem;border-radius:var(--radius-2xl);background:rgba(255,255,255,0.03);border:1px solid var(--color-borda-sutil)">
       <h3 style="font-size:1rem;font-weight:600;margin-bottom:0.75rem" data-i18n="met.how_title">How savings are measured</h3>
       <p style="font-size:0.875rem;color:var(--color-texto-terciario);line-height:1.7" data-i18n="met.how_desc">
-        Token counts use <strong>cl100k_base</strong> (tiktoken-rs), the same tokenizer as Claude/GPT. Measurements are taken on real captured outputs from development sessions: cargo test suites, tsc compiler errors, vitest runs, git operations, and docker logs. Layer 3 activates only when post-L1+L2 output exceeds 300 tokens, so small outputs incur zero neural inference latency.
+        Token counts use <strong>cl100k_base</strong> (tiktoken-rs), the same tokenizer as Claude. All figures come from <code style="font-family:var(--font-mono)">bench/microbench.csv</code> produced by <code style="font-family:var(--font-mono)">pwsh bench/run_all.ps1</code> (or <code style="font-family:var(--font-mono)">bash bench/run_all.sh</code>) on the 12 fixtures under <code style="font-family:var(--font-mono)">bench/fixtures/</code>. L3 activates only when post-L1+L2 output exceeds 300 tokens, so small outputs incur zero neural inference latency. L4 (context injection) is prepended to the L3 prompt when the Claude Code hook forwards <code style="font-family:var(--font-mono)">transcript_path</code>.
       </p>
     </div>
 

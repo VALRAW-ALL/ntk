@@ -3,8 +3,8 @@ source: tests/integration/snapshot_tests.rs
 expression: result
 ---
 # fixture: docker_logs.txt
-# tokens: 782 -> 779
-# lines_removed: 0
+# tokens: 671 -> 668
+# lines_removed: 4
 ---
 2024-03-15T10:00:00.000Z INFO  [server] Starting NTK daemon on 127.0.0.1:8765
 2024-03-15T10:00:00.123Z INFO  [server] Loading config from .ntk/config.json
@@ -20,11 +20,7 @@ expression: result
 2024-03-15T10:00:02.516Z INFO  [compress] Layer 2: 1204 tokens > threshold(300), L3 required
 2024-03-15T10:00:02.518Z WARN  [compress] Layer 3 unavailable, falling back to L2 output
 2024-03-15T10:00:02.519Z INFO  [compress] ratio=0.72 layer=2 latency=8ms
-2024-03-15T10:00:05.001Z ERROR [db] Failed to write metrics record: database is locked
-2024-03-15T10:00:05.002Z ERROR [db] Failed to write metrics record: database is locked
-2024-03-15T10:00:05.003Z ERROR [db] Failed to write metrics record: database is locked
-2024-03-15T10:00:05.004Z ERROR [db] Failed to write metrics record: database is locked
-2024-03-15T10:00:05.005Z ERROR [db] Failed to write metrics record: database is locked
+[×5] 2024-03-15T10:00:05.001Z ERROR [db] Failed to write metrics record: database is locked
 2024-03-15T10:00:10.000Z INFO  [db] Database lock released, retrying pending writes
 2024-03-15T10:00:10.012Z INFO  [db] 5 records written successfully
 2024-03-15T10:00:15.200Z INFO  [compress] POST /compress 412 chars → 89 tokens

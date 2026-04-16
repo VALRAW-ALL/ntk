@@ -13,23 +13,23 @@ expression: result
  ✓ store/userSlice.test.ts (11 tests) 28ms
  × auth/LoginForm.test.tsx (3 tests | 2 failed) 156ms
    × LoginForm > renders email and password fields
-     AssertionError: expected wrapper.find('input[type="email"]').length to equal 1
-     Expected: 1
-     Received: 0
-       at Object.<anonymous> (auth/LoginForm.test.tsx:23:45)
+    AssertionError: expected wrapper.find('input[type="email"]').length to equal 1
+    Expected: 1
+    Received: 0
+    at Object.<anonymous> (auth/LoginForm.test.tsx:23:45)
    × LoginForm > shows error on invalid credentials
-     Error: Unable to find an element with the text: "Invalid credentials"
-       at getByText (auth/LoginForm.test.tsx:67:18)
+    Error: Unable to find an element with the text: "Invalid credentials"
+    at getByText (auth/LoginForm.test.tsx:67:18)
  × api/client.test.ts (6 tests | 1 failed) 89ms
    × ApiClient > retries on 503 status
-     AssertionError: expected fetchMock to have been called 3 times, but was called 1 time
-     Expected: 3
-     Received: 1
-       at Object.<anonymous> (api/client.test.ts:112:30)
+    AssertionError: expected fetchMock to have been called 3 times, but was called 1 time
+    Expected: 3
+    Received: 1
+    at Object.<anonymous> (api/client.test.ts:112:30)
  ✓ dashboard/index.test.tsx (9 tests) 203ms
  ✓ settings/index.test.tsx (4 tests) 67ms
 
  Test Files  5 failed | 3 passed (8)
-      Tests  3 failed | 38 passed (41)
+    Tests  3 failed | 38 passed (41)
    Start at  14:23:10
    Duration  589ms (transform 94ms, setup 12ms, collect 187ms, tests 296ms)

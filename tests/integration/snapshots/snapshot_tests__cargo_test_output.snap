@@ -8,7 +8,7 @@ expression: result
 ---
    Compiling ntk v0.1.0 (user/project)
     Finished test [unoptimized + debuginfo] target(s) in 4.23s
-     Running unittests src/lib.rs (deps/ntk-a1b2c3d4e5f6)
+    Running unittests src/lib.rs (deps/ntk-a1b2c3d4e5f6)
 
 running 47 tests
 test detector::tests::test_detects_git_diff ... FAILED

@@ -27,10 +27,10 @@ store/userSlice.ts(44,7): error TS2345: Argument of type 'PayloadAction<undefine
 Found 16 errors in 7 files.
 
 Errors  Files
-     2  auth/LoginForm.tsx
-     3  hooks/useAuth.ts
-     3  api/client.ts
-     2  utils/format.ts
-     3  dashboard/index.tsx
-     1  settings/index.tsx
-     2  store/userSlice.ts
+    2  auth/LoginForm.tsx
+    3  hooks/useAuth.ts
+    3  api/client.ts
+    2  utils/format.ts
+    3  dashboard/index.tsx
+    1  settings/index.tsx
+    2  store/userSlice.ts
