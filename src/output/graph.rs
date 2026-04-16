@@ -127,7 +127,7 @@ pub fn print_bar_chart(records: &[CompressionRecord]) {
 
     // ── Sort + top 8 ─────────────────────────────────────────────────
     let mut entries: Vec<(String, u64)> = savings_map.into_iter().collect();
-    entries.sort_by(|a, b| b.1.cmp(&a.1));
+    entries.sort_by_key(|e| std::cmp::Reverse(e.1));
     entries.truncate(8);
     if entries.is_empty() {
         println!("[ntk graph] Zero token savings recorded.");

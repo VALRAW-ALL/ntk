@@ -60,3 +60,25 @@ docker run --rm -v "$(pwd -W)":/src -w /src rust:1-bookworm bash -ec '
     -W clippy::panic -W clippy::arithmetic_side_effects -D warnings
 '
 ```
+
+## Toolchain drift — run `rustup update stable` before clippy
+
+CI uses `dtolnay/rust-toolchain@stable` which always resolves to the
+**latest** stable. If your local stable is a release behind, clippy will
+miss lints introduced in the interim and you'll learn about them only
+after pushing.
+
+Before committing Rust changes:
+```bash
+rustup update stable
+cargo clippy -- <the security flags above>
+```
+
+### Known lints introduced per release
+
+| Release | Lint added | Fix pattern |
+|---|---|---|
+| 1.95.0 | `clippy::unnecessary_sort_by` | `sort_by(|a,b| b.1.cmp(&a.1))` → `sort_by_key(|e| std::cmp::Reverse(e.1))` |
+
+Append rows when CI catches a new lint so future contributors get the
+fix recipe without re-diagnosing.

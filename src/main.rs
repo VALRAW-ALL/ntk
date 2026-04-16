@@ -3760,7 +3760,7 @@ fn run_discover() -> Result<()> {
 
     println!("Missed compressions in last session:");
     // Sort by estimated savings descending.
-    opportunities.sort_by(|a, b| b.1.cmp(&a.1));
+    opportunities.sort_by_key(|o| std::cmp::Reverse(o.1));
     for (cmd, estimated) in opportunities.iter().take(10) {
         let display_cmd = if cmd.len() > 40 { &cmd[..40] } else { cmd };
         println!(
