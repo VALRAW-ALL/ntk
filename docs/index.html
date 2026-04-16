@@ -10,6 +10,7 @@
   <meta property="og:type" content="website" />
   <meta name="theme-color" content="#2979FF" />
   <link rel="stylesheet" href="style.css" />
+  <script src="https://unpkg.com/@phosphor-icons/web@2.1.1"></script>
   <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='8' fill='%232979FF'/><text x='50%' y='54%' dominant-baseline='middle' text-anchor='middle' font-family='Ubuntu Mono,monospace' font-weight='700' font-size='16' fill='white'>N</text></svg>" />
 </head>
 <body>
@@ -31,7 +32,7 @@
       <div class="header-cta">
         <button class="lang-btn" id="langToggle" onclick="toggleLang()" title="Switch language">EN</button>
         <button class="btn btn-blue btn-sm" onclick="navigateTo('getstart')" data-i18n="nav.getstarted">Get Started</button>
-        <button class="mobile-menu-btn" id="mobileMenuBtn" onclick="toggleMobileMenu()" aria-label="Menu">☰</button>
+        <button class="mobile-menu-btn" id="mobileMenuBtn" onclick="toggleMobileMenu()" aria-label="Menu"><i class="ph-bold ph-list"></i></button>
       </div>
     </div>
   </div>
@@ -70,10 +71,10 @@
 
       <div class="hero-actions">
         <button class="btn btn-blue" onclick="navigateTo('getstart')" data-i18n="hero.cta_primary">
-          ⚡ Get Started
+          <i class="ph-fill ph-lightning"></i> Get Started
         </button>
         <a class="btn btn-secondary" href="https://github.com/VALRAW-ALL/ntk" target="_blank" rel="noopener" data-i18n="hero.cta_github">
-          ☆ GitHub
+          <i class="ph-fill ph-github-logo"></i> GitHub
         </a>
       </div>
 
@@ -81,7 +82,7 @@
         <div class="install-strip" onclick="copyInstall(this)" title="Click to copy">
           <span class="install-strip-label" data-i18n="hero.install_label">install</span>
           <code>curl -fsSL https://ntk.valraw.com/install.sh | sh</code>
-          <span class="copy-icon">⎘</span>
+          <span class="copy-icon"><i class="ph-bold ph-copy"></i></span>
         </div>
       </div>
 
@@ -236,63 +237,63 @@
       </div>
       <div class="features-grid fade-in">
         <div class="feature-card">
-          <div class="feature-icon">⚡</div>
+          <div class="feature-icon"><i class="ph-duotone ph-lightning"></i></div>
           <div>
             <div class="feature-title" data-i18n="feat.fast_title">Sub-millisecond L1+L2</div>
             <div class="feature-desc" data-i18n="feat.fast_desc">Regex + tokenizer layers add &lt;5ms overhead to every Bash tool call.</div>
           </div>
         </div>
         <div class="feature-card">
-          <div class="feature-icon">🧠</div>
+          <div class="feature-icon"><i class="ph-duotone ph-brain"></i></div>
           <div>
             <div class="feature-title" data-i18n="feat.ai_title">Local AI, zero cloud</div>
             <div class="feature-desc" data-i18n="feat.ai_desc">Phi-3 Mini runs 100% on your machine. No API keys, no data sent to the cloud.</div>
           </div>
         </div>
         <div class="feature-card">
-          <div class="feature-icon">🔌</div>
+          <div class="feature-icon"><i class="ph-duotone ph-plugs-connected"></i></div>
           <div>
             <div class="feature-title" data-i18n="feat.rtk_title">RTK compatible</div>
             <div class="feature-desc" data-i18n="feat.rtk_desc">Works alongside RTK. RTK filters first, NTK semantically summarizes the result.</div>
           </div>
         </div>
         <div class="feature-card">
-          <div class="feature-icon">🎯</div>
+          <div class="feature-icon"><i class="ph-duotone ph-target"></i></div>
           <div>
             <div class="feature-title" data-i18n="feat.type_title">Type-aware compression</div>
             <div class="feature-desc" data-i18n="feat.type_desc">Different prompts for test output, build errors, logs, diffs. Extracts exactly what matters.</div>
           </div>
         </div>
         <div class="feature-card">
-          <div class="feature-icon">🖥</div>
+          <div class="feature-icon"><i class="ph-duotone ph-graphics-card"></i></div>
           <div>
             <div class="feature-title" data-i18n="feat.gpu_title">GPU acceleration</div>
             <div class="feature-desc" data-i18n="feat.gpu_desc">Enumerates every discrete GPU — NVIDIA via <code style="font-family:var(--font-mono)">nvidia-smi</code>, AMD via ROCm / Windows driver registry / Linux sysfs (Polaris &amp; Vega included), plus Metal, AMX, AVX-512. Multi-vendor selection in <code style="font-family:var(--font-mono)">ntk model setup</code> — pick NVIDIA or AMD explicitly; the daemon scopes <code style="font-family:var(--font-mono)">CUDA_VISIBLE_DEVICES</code> / <code style="font-family:var(--font-mono)">HIP_VISIBLE_DEVICES</code> accordingly and never silently prefers NVIDIA. L3 drops from ~800ms to &lt;100ms on GPU.</div>
           </div>
         </div>
         <div class="feature-card">
-          <div class="feature-icon">📊</div>
+          <div class="feature-icon"><i class="ph-duotone ph-chart-bar"></i></div>
           <div>
             <div class="feature-title" data-i18n="feat.dash_title">Live TUI dashboard</div>
             <div class="feature-desc" data-i18n="feat.dash_desc"><code style="font-family:var(--font-mono);color:var(--color-primaria-clara)">ntk start</code> opens a full-screen dashboard with real-time metrics, per-layer stats, recent commands, and the active model with GPU/CPU mode. Updates every 500ms. Ctrl+C stops the daemon gracefully.</div>
           </div>
         </div>
         <div class="feature-card">
-          <div class="feature-icon">🌐</div>
+          <div class="feature-icon"><i class="ph-duotone ph-globe"></i></div>
           <div>
             <div class="feature-title" data-i18n="feat.cross_title">Cross-platform</div>
             <div class="feature-desc" data-i18n="feat.cross_desc">Single Rust binary. Works on Windows, macOS, and Linux without any runtime dependencies.</div>
           </div>
         </div>
         <div class="feature-card">
-          <div class="feature-icon">📏</div>
+          <div class="feature-icon"><i class="ph-duotone ph-ruler"></i></div>
           <div>
             <div class="feature-title" data-i18n="feat.bench_title">Built-in benchmark harness</div>
             <div class="feature-desc" data-i18n="feat.bench_desc">Every <code style="font-family:var(--font-mono)">/compress</code> response exposes per-layer token counts and latency. Set <code style="font-family:var(--font-mono)">NTK_LOG_COMPRESSIONS=1</code> to persist every compression (input, L1/L2/L3 outputs) to <code style="font-family:var(--font-mono)">~/.ntk/logs/</code> for auditing. Included scripts in <code style="font-family:var(--font-mono)">bench/</code> replay 12 fixture outputs (including Python Django / Node Express / Go panic / PHP Symfony stack traces), parse Claude Code transcripts, and produce a markdown report with token savings and estimated cost delta.</div>
           </div>
         </div>
         <div class="feature-card">
-          <div class="feature-icon">🎯</div>
+          <div class="feature-icon"><i class="ph-duotone ph-crosshair"></i></div>
           <div>
             <div class="feature-title" data-i18n="feat.l4_title">Layer 4: context injection</div>
             <div class="feature-desc" data-i18n="feat.l4_desc">NTK reads the Claude Code session transcript to grab your most recent request, then prepends it to the L3 summarizer prompt so the compressed output prioritizes information relevant to your actual goal. Four prompt formats supported (Prefix / XmlWrap / Goal / Json), runtime-overridable via <code style="font-family:var(--font-mono)">NTK_L4_FORMAT</code>. Works with any LLM — plain-string prefix, zero model coupling.</div>
@@ -341,7 +342,7 @@
         <div class="code-block">
           <div class="code-block-header">
             <span>bash</span>
-            <button class="copy-btn" onclick="copyCode(this)">⎘ copy</button>
+            <button class="copy-btn" onclick="copyCode(this)"><i class="ph-bold ph-copy"></i> copy</button>
           </div>
           <pre><span style="color:var(--color-texto-mutado)"># Check Claude Code is installed</span>
 claude --version</pre>
@@ -356,16 +357,16 @@ claude --version</pre>
         </div>
         <p data-i18n="gs.step2_desc">The installer enumerates every discrete GPU on the machine (NVIDIA + AMD, any number and mix), lists them, and asks which release variant to install: <strong>NVIDIA</strong> (<code style="font-family:var(--font-mono)">-gpu</code> CUDA / Metal build), <strong>AMD</strong> (<code style="font-family:var(--font-mono)">-cpu</code> build with post-install Vulkan guidance), or <strong>CPU only</strong>. When piped non-interactively, the choice is auto-selected from detection; override with <code style="font-family:var(--font-mono)">NTK_INSTALL_PLATFORM=nvidia|amd|cpu</code>.</p>
         <div class="code-block">
-          <div class="code-block-header"><span>bash - Linux / macOS</span><button class="copy-btn" onclick="copyCode(this)">⎘ copy</button></div>
+          <div class="code-block-header"><span>bash - Linux / macOS</span><button class="copy-btn" onclick="copyCode(this)"><i class="ph-bold ph-copy"></i> copy</button></div>
           <pre>curl -fsSL https://ntk.valraw.com/install.sh | sh</pre>
         </div>
         <div class="code-block">
-          <div class="code-block-header"><span>PowerShell - Windows</span><button class="copy-btn" onclick="copyCode(this)">⎘ copy</button></div>
+          <div class="code-block-header"><span>PowerShell - Windows</span><button class="copy-btn" onclick="copyCode(this)"><i class="ph-bold ph-copy"></i> copy</button></div>
           <pre>irm https://ntk.valraw.com/install.ps1 | iex</pre>
         </div>
         <p data-i18n="gs.step2_alt">Or install from source:</p>
         <div class="code-block">
-          <div class="code-block-header"><span>bash - from source</span><button class="copy-btn" onclick="copyCode(this)">⎘ copy</button></div>
+          <div class="code-block-header"><span>bash - from source</span><button class="copy-btn" onclick="copyCode(this)"><i class="ph-bold ph-copy"></i> copy</button></div>
           <pre><span style="color:var(--color-texto-mutado)"># Auto-picks the right --features flag for your hardware:</span>
 ./scripts/build.sh        <span style="color:var(--color-texto-mutado)"># Linux / macOS</span>
 .\scripts\build.ps1       <span style="color:var(--color-texto-mutado)"># Windows</span>
@@ -388,7 +389,7 @@ cargo build --release --features metal     <span style="color:var(--color-texto-
         </div>
         <p data-i18n="gs.step3_desc">This patches <code style="font-family:var(--font-mono);color:var(--color-primaria-clara)">~/.claude/settings.json</code> to add the PostToolUse hook, copies the hook script, and creates <code style="font-family:var(--font-mono);color:var(--color-primaria-clara)">~/.ntk/config.json</code> with sensible defaults. That's the full scope of <code style="font-family:var(--font-mono);color:var(--color-primaria-clara)">ntk init</code> — model backend and GPU choice are handled in Step 4.</p>
         <div class="code-block">
-          <div class="code-block-header"><span>bash</span><button class="copy-btn" onclick="copyCode(this)">⎘ copy</button></div>
+          <div class="code-block-header"><span>bash</span><button class="copy-btn" onclick="copyCode(this)"><i class="ph-bold ph-copy"></i> copy</button></div>
           <pre>ntk init -g</pre>
         </div>
         <p data-i18n="gs.step3_note">The <code style="font-family:var(--font-mono);color:var(--color-primaria-clara)">-g</code> flag patches the global settings. Use without it for per-project setup. Safe to re-run (idempotent).</p>
@@ -402,7 +403,7 @@ cargo build --release --features metal     <span style="color:var(--color-texto-
         </div>
         <p data-i18n="gs.step4_desc">The model setup wizard detects every NVIDIA and AMD GPU on the system (multi-GPU is fully supported — 2× NVIDIA, 1× NVIDIA + 1× AMD, etc.), lets you pick one, and installs / configures the backend. The chosen vendor is saved to <code style="font-family:var(--font-mono)">config.model.gpu_vendor</code> and enforced at runtime — picking AMD on a machine that also has NVIDIA actually routes inference to AMD. It also installs Ollama on demand when you pick that backend — so there is no separate Ollama step.</p>
         <div class="code-block">
-          <div class="code-block-header"><span>bash</span><button class="copy-btn" onclick="copyCode(this)">⎘ copy</button></div>
+          <div class="code-block-header"><span>bash</span><button class="copy-btn" onclick="copyCode(this)"><i class="ph-bold ph-copy"></i> copy</button></div>
           <pre>ntk model setup         <span style="color:var(--color-texto-mutado)"># backend + GPU wizard</span>
 
 <span style="color:var(--color-texto-mutado)"># Once the backend is set, pull the default model:</span>
@@ -425,7 +426,7 @@ ntk model pull --quant q6_k    <span style="color:var(--color-texto-mutado)"># h
           <div class="step-block-title" data-i18n="gs.step5_title">Start daemon</div>
         </div>
         <div class="code-block">
-          <div class="code-block-header"><span>bash</span><button class="copy-btn" onclick="copyCode(this)">⎘ copy</button></div>
+          <div class="code-block-header"><span>bash</span><button class="copy-btn" onclick="copyCode(this)"><i class="ph-bold ph-copy"></i> copy</button></div>
           <pre>ntk start               <span style="color:var(--color-texto-mutado)"># CPU mode - opens live TUI dashboard</span>
 ntk start --gpu         <span style="color:var(--color-texto-mutado)"># GPU acceleration (CUDA/Metal auto-detected)</span>
 
@@ -444,7 +445,7 @@ ntk dashboard           <span style="color:var(--color-texto-mutado)"># status +
           <div class="step-block-title" data-i18n="gs.step6_title">Verify installation</div>
         </div>
         <div class="code-block">
-          <div class="code-block-header"><span>bash</span><button class="copy-btn" onclick="copyCode(this)">⎘ copy</button></div>
+          <div class="code-block-header"><span>bash</span><button class="copy-btn" onclick="copyCode(this)"><i class="ph-bold ph-copy"></i> copy</button></div>
           <pre>ntk status              <span style="color:var(--color-texto-mutado)"># daemon status + model info</span>
 ntk test-compress file  <span style="color:var(--color-texto-mutado)"># test on a captured output</span>
 ntk gain                <span style="color:var(--color-texto-mutado)"># view token savings</span></pre>
@@ -454,12 +455,12 @@ ntk gain                <span style="color:var(--color-texto-mutado)"># view tok
       <!-- Step 7: Config -->
       <div class="step-block" id="step7">
         <div class="step-block-header">
-          <div class="step-num-circle" style="background:linear-gradient(135deg,#7C4DFF,#2979FF)">⚙</div>
+          <div class="step-num-circle" style="background:linear-gradient(135deg,#7C4DFF,#2979FF)"><i class="ph-bold ph-gear"></i></div>
           <div class="step-block-title" data-i18n="gs.step7_title">Configuration</div>
         </div>
         <p data-i18n="gs.step7_desc">Edit <code style="font-family:var(--font-mono);color:var(--color-primaria-clara)">~/.ntk/config.json</code> or place a <code style="font-family:var(--font-mono);color:var(--color-primaria-clara)">.ntk.json</code> in your project root for per-project overrides:</p>
         <div class="code-block">
-          <div class="code-block-header"><span>~/.ntk/config.json</span><button class="copy-btn" onclick="copyCode(this)">⎘ copy</button></div>
+          <div class="code-block-header"><span>~/.ntk/config.json</span><button class="copy-btn" onclick="copyCode(this)"><i class="ph-bold ph-copy"></i> copy</button></div>
           <pre>{
   <span style="color:var(--color-primaria-clara)">"compression"</span>: {
     <span style="color:var(--color-primaria-clara)">"inference_threshold_tokens"</span>: <span style="color:var(--color-acento-verde-claro)">300</span>
@@ -481,11 +482,11 @@ ntk gain                <span style="color:var(--color-texto-mutado)"># view tok
       <!-- Step 8: Uninstall -->
       <div class="step-block" id="step8">
         <div class="step-block-header">
-          <div class="step-num-circle" style="background:rgba(255,23,68,0.6)">✕</div>
+          <div class="step-num-circle" style="background:rgba(255,23,68,0.6)"><i class="ph-bold ph-x"></i></div>
           <div class="step-block-title" data-i18n="gs.step8_title">Uninstall</div>
         </div>
         <div class="code-block">
-          <div class="code-block-header"><span>bash</span><button class="copy-btn" onclick="copyCode(this)">⎘ copy</button></div>
+          <div class="code-block-header"><span>bash</span><button class="copy-btn" onclick="copyCode(this)"><i class="ph-bold ph-copy"></i> copy</button></div>
           <pre>ntk stop
 ntk init --uninstall    <span style="color:var(--color-texto-mutado)"># removes hook from settings.json</span>
 rm -rf ~/.ntk           <span style="color:var(--color-texto-mutado)"># remove config &amp; data</span></pre>
@@ -561,7 +562,7 @@ rm -rf ~/.ntk           <span style="color:var(--color-texto-mutado)"># remove c
     </div>
 
     <p style="margin-top:2rem;font-size:0.8125rem;color:var(--color-texto-mutado)" data-i18n="cmd.rtk_note">
-      💡 RTK users: prefix with <code style="font-family:var(--font-mono)">rtk ntk &lt;cmd&gt;</code> to also compress NTK's own output.
+      <i class="ph-fill ph-lightbulb"></i> RTK users: prefix with <code style="font-family:var(--font-mono)">rtk ntk &lt;cmd&gt;</code> to also compress NTK's own output.
     </p>
   </div>
 </div><!-- /page-commands -->
@@ -578,25 +579,25 @@ rm -rf ~/.ntk           <span style="color:var(--color-texto-mutado)"># remove c
     <!-- KPI row — real numbers from bench/microbench.csv (v0.2.28 run) -->
     <div class="kpi-grid" style="margin-bottom:3rem">
       <div class="kpi-card fade-in">
-        <div class="kpi-icon kpi-icon-green">⚡</div>
+        <div class="kpi-icon kpi-icon-green"><i class="ph-duotone ph-lightning"></i></div>
         <div class="kpi-value gradient-text-green">92%</div>
         <div class="kpi-label" data-i18n="met.kpi1">Max savings (docker logs)</div>
         <div class="kpi-sublabel" data-i18n="met.kpi1_sub">L1+L2 only, no L3</div>
       </div>
       <div class="kpi-card fade-in">
-        <div class="kpi-icon kpi-icon-blue">🧠</div>
+        <div class="kpi-icon kpi-icon-blue"><i class="ph-duotone ph-brain"></i></div>
         <div class="kpi-value gradient-text-blue">~55%</div>
         <div class="kpi-label" data-i18n="met.kpi2">Avg stack-trace compression</div>
         <div class="kpi-sublabel" data-i18n="met.kpi2_sub">Java / Python / Go / Node / PHP</div>
       </div>
       <div class="kpi-card fade-in">
-        <div class="kpi-icon kpi-icon-blue" style="background:var(--color-secundaria-dim);border-color:var(--color-secundaria-border);color:var(--color-secundaria-clara)">⏱</div>
+        <div class="kpi-icon kpi-icon-blue" style="background:var(--color-secundaria-dim);border-color:var(--color-secundaria-border);color:var(--color-secundaria-clara)"><i class="ph-duotone ph-timer"></i></div>
         <div class="kpi-value" style="background:linear-gradient(135deg,#448AFF,#B388FF);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text">&lt;20ms</div>
         <div class="kpi-label" data-i18n="met.kpi3">L1+L2 overhead</div>
         <div class="kpi-sublabel" data-i18n="met.kpi3_sub">always on, zero impact</div>
       </div>
       <div class="kpi-card fade-in">
-        <div class="kpi-icon kpi-icon-green" style="background:rgba(0,230,118,0.1)">📉</div>
+        <div class="kpi-icon kpi-icon-green" style="background:rgba(0,230,118,0.1)"><i class="ph-duotone ph-trend-down"></i></div>
         <div class="kpi-value gradient-text-green">12</div>
         <div class="kpi-label" data-i18n="met.kpi4">Fixture scenarios</div>
         <div class="kpi-sublabel" data-i18n="met.kpi4_sub">multi-language coverage</div>
@@ -889,7 +890,7 @@ rm -rf ~/.ntk           <span style="color:var(--color-texto-mutado)"># remove c
       <span data-i18n="footer.copy">© 2025 VALRAW. MIT License.</span>
       <span>
         <span data-i18n="footer.made">Made with</span>
-        <span style="color:var(--color-acento-verde)">♥</span>
+        <span style="color:var(--color-acento-verde)"><i class="ph-fill ph-heart"></i></span>
         <span data-i18n="footer.rust">in Rust</span>
       </span>
     </div>

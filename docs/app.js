@@ -20,8 +20,8 @@ const TRANSLATIONS = {
     'hero.title1':        'Neural',
     'hero.title2':        'Token Killer',
     'hero.subtitle':      'Semantic compression proxy daemon for Claude Code. Reduces tool output by up to <strong>92%</strong> (measured on docker logs; stack traces 56–83%) before it reaches the LLM context. Four progressive compression layers, optional local neural inference, model-agnostic context injection.',
-    'hero.cta_primary':   '⚡ Get Started',
-    'hero.cta_github':    '☆ GitHub',
+    'hero.cta_primary':   '<i class="ph-fill ph-lightning"></i> Get Started',
+    'hero.cta_github':    '<i class="ph-fill ph-github-logo"></i> GitHub',
     'hero.install_label': 'install',
     'hero.stat1':         '% max savings (docker logs)',
     'hero.stat2_val':     '<20ms',
@@ -141,7 +141,7 @@ const TRANSLATIONS = {
     'cmd.gain':           'Token savings summary (RTK-compatible output format).',
     'cmd.history':        'Last 50 compressed commands with token counts and layer used.',
     'cmd.discover':       'Analyze Claude Code session for missed compression opportunities.',
-    'cmd.rtk_note':       '💡 RTK users: prefix with <code style="font-family:var(--font-mono)">rtk ntk &lt;cmd&gt;</code> to also compress NTK\'s own output.',
+    'cmd.rtk_note':       '<i class="ph-fill ph-lightbulb"></i> RTK users: prefix with <code style="font-family:var(--font-mono)">rtk ntk &lt;cmd&gt;</code> to also compress NTK\'s own output.',
 
     // Metrics
     'met.badge':    'Token savings',
@@ -221,8 +221,8 @@ const TRANSLATIONS = {
     'hero.title1':        'Neural',
     'hero.title2':        'Token Killer',
     'hero.subtitle':      'Proxy de compressão semântica para o Claude Code. Reduz a saída das ferramentas em até <strong>92%</strong> (medido em docker logs; stack traces 56–83%) antes de chegar ao contexto do LLM. Quatro camadas progressivas, inferência neural local opcional, injeção de contexto agnóstica ao modelo.',
-    'hero.cta_primary':   '⚡ Começar',
-    'hero.cta_github':    '☆ GitHub',
+    'hero.cta_primary':   '<i class="ph-fill ph-lightning"></i> Começar',
+    'hero.cta_github':    '<i class="ph-fill ph-github-logo"></i> GitHub',
     'hero.install_label': 'instalar',
     'hero.stat1':         '% economia máxima (docker logs)',
     'hero.stat2_val':     '<20ms',
@@ -342,7 +342,7 @@ const TRANSLATIONS = {
     'cmd.gain':           'Resumo de economia de tokens (formato compatível com RTK).',
     'cmd.history':        'Últimos 50 comandos comprimidos com contagem de tokens e camada utilizada.',
     'cmd.discover':       'Analisa a sessão do Claude Code em busca de oportunidades de compressão perdidas.',
-    'cmd.rtk_note':       '💡 Usuários RTK: prefixe com <code style="font-family:var(--font-mono)">rtk ntk &lt;cmd&gt;</code> para também comprimir a saída do próprio NTK.',
+    'cmd.rtk_note':       '<i class="ph-fill ph-lightbulb"></i> Usuários RTK: prefixe com <code style="font-family:var(--font-mono)">rtk ntk &lt;cmd&gt;</code> para também comprimir a saída do próprio NTK.',
 
     // Metrics
     'met.badge':    'Economia de tokens',
@@ -498,7 +498,7 @@ function copyCode(btn) {
   if (!pre) return;
   navigator.clipboard.writeText(pre.innerText).then(() => {
     const orig = btn.innerHTML;
-    btn.innerHTML = '✓ copied';
+    btn.innerHTML = '<i class="ph-bold ph-check"></i> copied';
     btn.style.color = 'var(--color-acento-verde)';
     setTimeout(() => { btn.innerHTML = orig; btn.style.color = ''; }, 1500);
   });
@@ -509,7 +509,7 @@ function copyInstall(el) {
   if (!code) return;
   navigator.clipboard.writeText(code.innerText).then(() => {
     const icon = el.querySelector('.copy-icon');
-    if (icon) { icon.textContent = '✓'; setTimeout(() => { icon.textContent = '⎘'; }, 1500); }
+    if (icon) { icon.innerHTML = '<i class="ph-bold ph-check"></i>'; setTimeout(() => { icon.innerHTML = '<i class="ph-bold ph-copy"></i>'; }, 1500); }
   });
 }
 
