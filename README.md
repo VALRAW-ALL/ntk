@@ -1,11 +1,27 @@
-# NTK - Neural Token Killer
+<div align="center">
 
-> **v0.2.28** — Semantic compression proxy for Claude Code. Reduces tool output token count by 60–90% before it reaches the model context - without losing the information that matters.
+<img src="assets/rtk.webp" alt="NTK - Neural Token Killer" width="220" />
+
+# NTK · Neural Token Killer
+
+**Semantic compression proxy for Claude Code — reduces tool output by 60–90 % before it reaches the model.**
+
+[![CI](https://github.com/VALRAW-ALL/ntk/actions/workflows/ci.yml/badge.svg)](https://github.com/VALRAW-ALL/ntk/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/github/v/release/VALRAW-ALL/ntk)](https://github.com/VALRAW-ALL/ntk/releases)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Rust](https://img.shields.io/badge/rust-1.90%2B-orange?logo=rust)](https://www.rust-lang.org)
+[![Issues](https://img.shields.io/github/issues/VALRAW-ALL/ntk)](https://github.com/VALRAW-ALL/ntk/issues)
+
+[Website](https://ntk.valraw.com) • [Install](#installation) • [Usage](#usage) • [Contributing](CONTRIBUTING.md) • [Report an issue](https://github.com/VALRAW-ALL/ntk/issues/new/choose)
+
+</div>
+
+> **v0.2.29** — Four-layer compression pipeline. Local neural inference via Ollama / Candle / llama.cpp (optional, GPU-accelerated). Claude-compatible `cl100k_base` tokenizer. No cloud dependency.
 
 > ⚠ **This project is an open initiative — it needs your help to evolve.**
 > NTK started as a one-person effort and the surface area (languages,
 > frameworks, GPUs, editors) has outgrown solo maintenance. If you've
-> ever stared at a 10,000-line log and wished your LLM didn't burn
+> ever stared at a 10 000-line log and wished your LLM didn't burn
 > context on it, the quickest way to make this tool better is to
 > contribute a fixture, translate the docs, port the hook to another
 > editor, or benchmark on hardware we don't own. See

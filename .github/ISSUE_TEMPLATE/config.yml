@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Contributing guide
+    url: https://github.com/VALRAW-ALL/ntk/blob/master/CONTRIBUTING.md
+    about: Pre-scoped starter tasks — most land as a single PR in under an hour.
+  - name: Ask a question / share a use case
+    url: https://github.com/VALRAW-ALL/ntk/discussions
+    about: For open-ended questions, "does NTK work with X?", or showing off your session savings.
