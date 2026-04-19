@@ -39,6 +39,7 @@
 - [Usage](#usage)
 - [Configuration](#configuration)
 - [GPU Acceleration](#gpu-acceleration)
+- [Security Model](#security-model)
 - [RTK + NTK Coexistence](#rtk--ntk-coexistence)
 - [Development](#development)
 - [Contributing](#contributing)
@@ -169,11 +170,20 @@ and can be re-run at any time.
 }
 ```
 
-**For OpenCode instead of Claude Code:**
+**Other editors:**
 
 ```bash
-ntk init -g --opencode
+ntk init -g --opencode     # OpenCode (same PostToolUse hook spec as Claude Code)
+ntk init -g --cursor       # Cursor — MCP integration via ~/.cursor/mcp.json
+ntk init -g --zed          # Zed — MCP via context_servers in Zed settings.json
+ntk init -g --continue     # Continue — MCP via mcpServers array in ~/.continue/config.json
 ```
+
+Cursor, Zed, and Continue register NTK as a **Model Context Protocol
+server** (`ntk mcp-server`) that the agent calls on-demand via the
+`compress_output` tool. MCP mode is self-contained — no `ntk start`
+daemon required. For the full matrix and integration details see
+[`docs/editor-integrations.md`](docs/editor-integrations.md).
 
 **Verify the installation:**
 
@@ -251,8 +261,19 @@ ntk gain            # Token savings summary (RTK-compatible format)
 ntk metrics         # Per-command savings table (requires daemon running)
 ntk graph           # ASCII bar chart of savings over time
 ntk history         # Last 50 compressed commands with token counts
+ntk tail            # Show the last 10 compressions and exit
+ntk tail -f         # Stream compression events live (polls ~/.ntk/metrics.db)
+ntk tail -f --command cargo   # Filter: only commands that start with 'cargo'
+ntk prune --older-than 30     # Delete records older than 30 days + VACUUM
+ntk prune --dry-run           # Show what would be deleted without deleting
 ntk discover        # Scan latest Claude transcript for missed compression opportunities
 ```
+
+**HTTP dashboard** — when the daemon is running, navigate to
+`http://127.0.0.1:8765/dashboard` for a zero-dependency HTML page
+that polls `/metrics` every 5 s. First load prompts for the
+`X-NTK-Token` (from `~/.ntk/.token`); the value is kept in
+sessionStorage only.
 
 **Example `ntk gain` output:**
 
@@ -275,9 +296,18 @@ docker logs api         log         3200       412   87%   L2     2026-04-11 10:
 ```bash
 # Test compression on any file without the daemon
 ntk test-compress tests/fixtures/cargo_test_output.txt
+
+# Full per-layer breakdown (applied rules + tokens + latency + preview
+# per stage). Useful for debugging "why did L1 drop/keep this line?".
+ntk test-compress tests/fixtures/cargo_test_output.txt --verbose
+
+# Unified diff between the raw input and a specific layer's output.
+# Shows exactly which lines each stage removed or rewrote.
+ntk diff tests/fixtures/cargo_test_output.txt --layer l1
+ntk diff tests/fixtures/cargo_test_output.txt --layer l2 --context 3
 ```
 
-Output:
+Non-verbose output:
 
 ```
 File:             tests/fixtures/cargo_test_output.txt
@@ -289,6 +319,10 @@ Compression:      85.2%
 --- Compressed output ---
 ...
 ```
+
+Verbose output adds `Applied: ansi_strip(65 chars), template_dedup(3 groups),
+stack_trace_collapse(1 run)` + latency per layer + a 20-line preview of
+the intermediate output after each stage.
 
 ### Terminal output
 
@@ -354,7 +388,41 @@ ntk bench --runs 20
 
 # Include Layer 3 in benchmark
 ntk bench --l3
+
+# Emit a structured JSON report — attach to a GitHub issue so
+# maintainers can compare numbers across hardware.
+ntk bench --submit
+ntk bench --submit --output bench-report.json
 ```
+
+### Model backend install (llama.cpp + GPU)
+
+```bash
+# Re-install only the llama-server binary for the current OS + vendor.
+# Picks the right asset automatically from the latest llama.cpp release:
+#   nvidia → CUDA 13.1 > 12.4 > vulkan
+#   amd    → vulkan > hip-radeon
+#   intel  → sycl > vulkan
+#   apple  → macos (Metal bundled)
+#   none   → vulkan > avx2 (safe default)
+ntk model install-server
+```
+
+Set `config.model.gpu_vendor` first (or via `ntk model setup`) so the
+selector picks the right build. Then restart the daemon to pick up
+the new binary.
+
+### MCP server (Cursor / Zed / Continue)
+
+```bash
+# Launched automatically by the MCP client (Cursor/Zed/Continue) as
+# a stdio JSON-RPC subprocess. Do NOT run this manually — it reads
+# JSON-RPC from stdin and prints responses to stdout.
+ntk mcp-server
+```
+
+Exposes a single tool: `compress_output(output, command?)`. Runs
+L1+L2 in-process, no daemon required.
 
 ### Configuration
 
@@ -394,7 +462,9 @@ NTK merges configuration from two sources, in order:
     "context_aware": true,
     "max_output_tokens": 500,
     "preserve_first_stacktrace": true,
-    "preserve_error_counts": true
+    "preserve_error_counts": true,
+    "context_max_messages": 3,
+    "tokenizer": "cl100k_base"
   },
   "model": {
     "provider": "ollama",
@@ -406,7 +476,8 @@ NTK merges configuration from two sources, in order:
     "gpu_layers": -1,
     "gpu_auto_detect": true,
     "gpu_vendor": null,
-    "cuda_device": 0
+    "cuda_device": 0,
+    "backend_chain": []
   },
   "metrics": {
     "enabled": true,
@@ -417,8 +488,13 @@ NTK merges configuration from two sources, in order:
     "commands": ["cat", "echo", "printf"],
     "max_input_chars": 500000
   },
-  "telemetry": {
-    "enabled": true
+  "security": {
+    "audit_log": false,
+    "audit_log_path": "~/.ntk/audit.log"
+  },
+  "l3_cache": {
+    "enabled": true,
+    "ttl_days": 7
   }
 }
 ```
@@ -432,8 +508,15 @@ NTK merges configuration from two sources, in order:
 | `model.timeout_ms` | `300000` (5 min) | Upper bound on a single `/compress` call. L3 inference on CPU can take 60-180 s on large inputs. The daemon falls back to L1+L2 after this window. Lower to 60 000 for GPU setups. |
 | `model.fallback_to_layer1_on_timeout` | `true` | Use L1+L2 output if Ollama is slow or unavailable |
 | `model.gpu_layers` | `-1` | `-1` = all layers on GPU; `0` = CPU only |
-| `model.gpu_vendor` | `null` | `"nvidia"` / `"amd"` / `"apple"` — the card the user picked in `ntk model setup`. `null` = auto-detect. Runtime honours this verbatim instead of silently preferring NVIDIA on multi-vendor systems. |
+| `model.gpu_vendor` | `null` | `"nvidia"` / `"amd"` / `"intel"` / `"apple"` — the card the user picked in `ntk model setup`. `null` = auto-detect. Also drives `ntk model install-server` asset selection (CUDA / Vulkan / SYCL / Metal). |
 | `model.cuda_device` | `0` | Zero-based device index **within** the chosen vendor (e.g. the first AMD card is `0` in the AMD namespace, independent of how many NVIDIAs are present). |
+| `model.backend_chain` | `[]` | Ordered fallback chain of inference backends. E.g. `["ollama", "candle"]` tries Ollama first, falls back to Candle on failure. Empty = single backend from `provider`. |
+| `compression.context_max_messages` | `3` | Layer 4 — how many recent user messages to fold into the intent prefix (decay-weighted: most recent 60%, next 25%, etc). `1` = legacy single-message. |
+| `compression.tokenizer` | `"cl100k_base"` | BPE family for token counting. `"o200k_base"` for Claude 3.5+ / GPT-4o accuracy. Unknown values fall back to `cl100k_base` with a warn log. |
+| `security.audit_log` | `false` | Opt-in: append one JSONL line per `/compress` call to `audit_log_path`. SHA-256 of the output only — raw output never stored. |
+| `security.audit_log_path` | `"~/.ntk/audit.log"` | Destination for the audit JSONL when `audit_log=true`. |
+| `l3_cache.enabled` | `true` | Memoize L3 inference results keyed by `SHA-256(l2_output + context + model + prompt_format)`. Cache hit = <5 ms vs fresh L3 at 50-800 ms. |
+| `l3_cache.ttl_days` | `7` | Drop cache entries older than this many days on lookup (lazy prune). |
 | `exclusions.commands` | `["cat","echo"]` | Commands whose output is never compressed |
 | `exclusions.max_input_chars` | `500000` | Hard limit on input size before processing |
 
@@ -678,6 +761,71 @@ so your GPU shows up in the selection list even without ROCm.
 **TL;DR:** for NVIDIA Turing+ / Apple Silicon → Ollama is simpler. For
 older NVIDIA Kepler or any AMD Polaris → llama.cpp + Vulkan is the
 only path to GPU acceleration.
+
+---
+
+## Security Model
+
+The hook pipes every `Bash` tool output into NTK, including env
+vars, secret paths, and stdout of anything a command happens to
+print. Protecting that channel is a first-class concern.
+
+### Loopback-only bind (enforced)
+
+The daemon refuses to start on any non-loopback host by default.
+Only `127.0.0.1`, `localhost`, and `::1` are accepted. Binding to
+`0.0.0.0` or a LAN address would expose `/compress` to any process
+on the network.
+
+Override with `NTK_ALLOW_NON_LOOPBACK=1` for containerized setups
+— the daemon logs a prominent warning on startup.
+
+### Shared-secret token on privileged routes
+
+On first start the daemon generates a 256-bit token and writes it
+to `~/.ntk/.token` (mode `0600` on Unix; ACL-inherited on Windows).
+Every request to `/compress`, `/metrics`, `/records`, `/state`,
+and `/dashboard-backed /metrics` must carry it as `X-NTK-Token`:
+
+```bash
+# Privileged — requires token
+curl -H "X-NTK-Token: $(cat ~/.ntk/.token)" \
+     -X POST http://127.0.0.1:8765/compress \
+     -d '{"output": "..."}'
+
+# Open — no token required (liveness check only)
+curl http://127.0.0.1:8765/health
+```
+
+The bundled hook scripts (`ntk-hook.sh`, `ntk-hook.ps1`) read the
+token file and send the header automatically. Opt-out for
+debugging: `NTK_DISABLE_AUTH=1` on the daemon (prints a warn log
+on startup).
+
+### Optional audit log
+
+Opt-in via `config.security.audit_log: true`. Appends one JSONL
+record per `/compress` call:
+
+```json
+{"timestamp":"2026-04-19T12:34:56Z","command":"cargo test",
+ "cwd":"/project","tokens_before":1259,"tokens_after":129,
+ "layer":3,"output_sha256":"55e51f4c52b4153c..."}
+```
+
+The raw output is **never** persisted — only its SHA-256. The log
+supports forensics (what compressed when, at what size) without
+becoming a leak channel of its own.
+
+### Dependency supply chain
+
+CI runs `cargo deny check licenses bans sources` on every PR
+against `deny.toml`. Any transitive dep pulling in a license
+outside the allowlist (GPL / LGPL / AGPL are the usual offenders)
+fails the gate. The allowlist is explicit: MIT, Apache-2.0,
+BSD-\*, ISC, Zlib, MPL-2.0, CC0-1.0, CDLA-Permissive-2.0,
+Unicode-3.0, 0BSD, BSL-1.0. Unknown registries and git sources
+are denied.
 
 ---
 

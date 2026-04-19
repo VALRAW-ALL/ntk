@@ -340,7 +340,7 @@
           <div>
             <div class="feature-title" data-i18n="contrib.hook_title">Port the hook to your editor</div>
             <div class="feature-desc" data-i18n="contrib.hook_desc">
-              Claude Code and OpenCode work today. Cursor, Aider, Zed, Continue, Windsurf all use similar tool-output hooks. A fresh copy of the script with their JSON schema is a self-contained PR.
+              Claude Code, OpenCode, Cursor, Zed, and Continue work today via <code style="font-family:var(--font-mono)">ntk init -g [--opencode|--cursor|--zed|--continue]</code>. Aider is blocked on upstream. Windsurf, Cline, and other agents would need a fresh adapter — see <code style="font-family:var(--font-mono)">docs/editor-integrations.md</code>.
             </div>
           </div>
         </div>
@@ -469,9 +469,13 @@ cargo build --release --features metal     <span style="color:var(--color-texto-
         <p data-i18n="gs.step3_desc">This patches <code style="font-family:var(--font-mono);color:var(--color-primaria-clara)">~/.claude/settings.json</code> to add the PostToolUse hook, copies the hook script, and creates <code style="font-family:var(--font-mono);color:var(--color-primaria-clara)">~/.ntk/config.json</code> with sensible defaults. That's the full scope of <code style="font-family:var(--font-mono);color:var(--color-primaria-clara)">ntk init</code> — model backend and GPU choice are handled in Step 4.</p>
         <div class="code-block">
           <div class="code-block-header"><span>bash</span><button class="copy-btn" onclick="copyCode(this)"><i class="ph-bold ph-copy"></i> copy</button></div>
-          <pre>ntk init -g</pre>
+          <pre>ntk init -g                <span style="color:var(--color-texto-mutado)"># Claude Code (default)</span>
+ntk init -g --opencode     <span style="color:var(--color-texto-mutado)"># OpenCode</span>
+ntk init -g --cursor       <span style="color:var(--color-texto-mutado)"># Cursor — MCP via ~/.cursor/mcp.json</span>
+ntk init -g --zed          <span style="color:var(--color-texto-mutado)"># Zed — MCP via context_servers</span>
+ntk init -g --continue     <span style="color:var(--color-texto-mutado)"># Continue — MCP via mcpServers[]</span></pre>
         </div>
-        <p data-i18n="gs.step3_note">The <code style="font-family:var(--font-mono);color:var(--color-primaria-clara)">-g</code> flag patches the global settings. Use without it for per-project setup. Safe to re-run (idempotent).</p>
+        <p data-i18n="gs.step3_note">The <code style="font-family:var(--font-mono);color:var(--color-primaria-clara)">-g</code> flag patches the global settings. Safe to re-run (idempotent). Cursor, Zed, and Continue register NTK as a Model Context Protocol server (<code style="font-family:var(--font-mono)">ntk mcp-server</code>) that the agent calls on-demand — no <code style="font-family:var(--font-mono)">ntk start</code> daemon required for MCP mode.</p>
       </div>
 
       <!-- Step 4 -->
@@ -542,18 +546,23 @@ ntk gain                <span style="color:var(--color-texto-mutado)"># view tok
           <div class="code-block-header"><span>~/.ntk/config.json</span><button class="copy-btn" onclick="copyCode(this)"><i class="ph-bold ph-copy"></i> copy</button></div>
           <pre>{
   <span style="color:var(--color-primaria-clara)">"compression"</span>: {
-    <span style="color:var(--color-primaria-clara)">"inference_threshold_tokens"</span>: <span style="color:var(--color-acento-verde-claro)">300</span>
+    <span style="color:var(--color-primaria-clara)">"inference_threshold_tokens"</span>: <span style="color:var(--color-acento-verde-claro)">300</span>,
+    <span style="color:var(--color-primaria-clara)">"context_max_messages"</span>: <span style="color:var(--color-acento-verde-claro)">3</span>,
+    <span style="color:var(--color-primaria-clara)">"tokenizer"</span>: <span style="color:var(--color-secundaria-clara)">"cl100k_base"</span>
   },
   <span style="color:var(--color-primaria-clara)">"model"</span>: {
     <span style="color:var(--color-primaria-clara)">"provider"</span>: <span style="color:var(--color-secundaria-clara)">"ollama"</span>,
     <span style="color:var(--color-primaria-clara)">"quantization"</span>: <span style="color:var(--color-secundaria-clara)">"q5_k_m"</span>,
     <span style="color:var(--color-primaria-clara)">"gpu_layers"</span>: <span style="color:var(--color-acento-verde-claro)">-1</span>,
+    <span style="color:var(--color-primaria-clara)">"gpu_vendor"</span>: <span style="color:var(--color-acento-verde-claro)">null</span>,
+    <span style="color:var(--color-primaria-clara)">"backend_chain"</span>: [],
     <span style="color:var(--color-primaria-clara)">"fallback_to_layer1_on_timeout"</span>: <span style="color:var(--color-acento-verde-claro)">true</span>
   },
   <span style="color:var(--color-primaria-clara)">"exclusions"</span>: {
     <span style="color:var(--color-primaria-clara)">"commands"</span>: [<span style="color:var(--color-secundaria-clara)">"cat"</span>, <span style="color:var(--color-secundaria-clara)">"echo"</span>]
   },
-  <span style="color:var(--color-primaria-clara)">"telemetry"</span>: { <span style="color:var(--color-primaria-clara)">"enabled"</span>: <span style="color:var(--color-acento-verde-claro)">true</span> }
+  <span style="color:var(--color-primaria-clara)">"security"</span>: { <span style="color:var(--color-primaria-clara)">"audit_log"</span>: <span style="color:var(--color-acento-verde-claro)">false</span> },
+  <span style="color:var(--color-primaria-clara)">"l3_cache"</span>: { <span style="color:var(--color-primaria-clara)">"enabled"</span>: <span style="color:var(--color-acento-verde-claro)">true</span>, <span style="color:var(--color-primaria-clara)">"ttl_days"</span>: <span style="color:var(--color-acento-verde-claro)">7</span> }
 }</pre>
         </div>
 
@@ -629,6 +638,11 @@ rm -rf ~/.ntk           <span style="color:var(--color-texto-mutado)"># remove c
         <div class="cmd-row" data-cmd="init --uninstall"><div class="cmd-name">init <span class="cmd-arg">--uninstall</span></div><div class="cmd-desc" data-i18n="cmd.init_uninstall">Remove the PostToolUse hook from settings.json.</div></div>
         <div class="cmd-row" data-cmd="init --auto-patch"><div class="cmd-name">init <span class="cmd-arg">--auto-patch</span></div><div class="cmd-desc" data-i18n="cmd.init_auto">Non-interactive mode for CI/CD pipelines.</div></div>
         <div class="cmd-row" data-cmd="init --hook-only"><div class="cmd-name">init <span class="cmd-arg">--hook-only</span></div><div class="cmd-desc" data-i18n="cmd.init_hook_only">Install hook script only - skip config.json creation and model setup wizard.</div></div>
+        <div class="cmd-row" data-cmd="init --opencode"><div class="cmd-name">init <span class="cmd-arg">-g --opencode</span></div><div class="cmd-desc" data-i18n="cmd.init_opencode">Install PostToolUse hook in OpenCode's settings.json instead of Claude Code.</div></div>
+        <div class="cmd-row" data-cmd="init --cursor"><div class="cmd-name">init <span class="cmd-arg">-g --cursor</span></div><div class="cmd-desc" data-i18n="cmd.init_cursor">Register NTK as an MCP server in ~/.cursor/mcp.json. Agent calls it on-demand via the compress_output tool.</div></div>
+        <div class="cmd-row" data-cmd="init --zed"><div class="cmd-name">init <span class="cmd-arg">-g --zed</span></div><div class="cmd-desc" data-i18n="cmd.init_zed">Register NTK in Zed's context_servers (MCP). Same binary as Cursor, different config shape.</div></div>
+        <div class="cmd-row" data-cmd="init --continue"><div class="cmd-name">init <span class="cmd-arg">-g --continue</span></div><div class="cmd-desc" data-i18n="cmd.init_continue">Register NTK in Continue's mcpServers array (~/.continue/config.json).</div></div>
+        <div class="cmd-row" data-cmd="mcp-server"><div class="cmd-name">mcp-server</div><div class="cmd-desc" data-i18n="cmd.mcp_server">JSON-RPC over stdio. Launched by MCP clients (Cursor / Zed / Continue); not a standalone command.</div></div>
       </div>
 
       <!-- Model -->
@@ -641,6 +655,7 @@ rm -rf ~/.ntk           <span style="color:var(--color-texto-mutado)"># remove c
         <div class="cmd-row" data-cmd="model test --debug"><div class="cmd-name">model <span class="cmd-arg">test --debug</span></div><div class="cmd-desc" data-i18n="cmd.model_test_debug">Verbose test: shows thread config, mlock status, system prompt preview, timing breakdown, and performance analysis with CPU-tier-aware targets (mobile ≥5 tok/s, desktop ≥10, high-end ≥15, GPU ≥40).</div></div>
         <div class="cmd-row" data-cmd="model bench"><div class="cmd-name">model <span class="cmd-arg">bench</span></div><div class="cmd-desc" data-i18n="cmd.model_bench">Benchmark CPU vs GPU inference latency.</div></div>
         <div class="cmd-row" data-cmd="model list"><div class="cmd-name">model <span class="cmd-arg">list</span></div><div class="cmd-desc" data-i18n="cmd.model_list">List available models in the configured backend.</div></div>
+        <div class="cmd-row" data-cmd="model install-server"><div class="cmd-name">model <span class="cmd-arg">install-server</span></div><div class="cmd-desc" data-i18n="cmd.model_install_server">Re-download the llama-server binary for the current OS × gpu_vendor (picks CUDA / Vulkan / SYCL / Metal automatically). Does not re-download the GGUF model.</div></div>
       </div>
 
       <!-- Compression -->
@@ -651,6 +666,9 @@ rm -rf ~/.ntk           <span style="color:var(--color-texto-mutado)"># remove c
         <div class="cmd-row" data-cmd="test --l3"><div class="cmd-name">test <span class="cmd-arg">--l3</span></div><div class="cmd-desc" data-i18n="cmd.test_l3">Include Layer 3 inference in the test run.</div></div>
         <div class="cmd-row" data-cmd="bench"><div class="cmd-name">bench</div><div class="cmd-desc" data-i18n="cmd.bench">Benchmark all compression layers (default: 5 runs per payload).</div></div>
         <div class="cmd-row" data-cmd="bench --runs"><div class="cmd-name">bench <span class="cmd-arg">--runs &lt;N&gt;</span></div><div class="cmd-desc" data-i18n="cmd.bench_runs">Set number of benchmark runs per payload for stable measurements.</div></div>
+        <div class="cmd-row" data-cmd="bench --submit"><div class="cmd-name">bench <span class="cmd-arg">--submit</span></div><div class="cmd-desc" data-i18n="cmd.bench_submit">Emit a structured JSON report (hardware + per-payload numbers). Attach to a GitHub bench issue.</div></div>
+        <div class="cmd-row" data-cmd="test-compress --verbose"><div class="cmd-name">test-compress <span class="cmd-arg">--verbose</span></div><div class="cmd-desc" data-i18n="cmd.tc_verbose">Per-layer breakdown — applied rules, tokens, latency, and 20-line preview for each stage.</div></div>
+        <div class="cmd-row" data-cmd="diff"><div class="cmd-name">diff <span class="cmd-arg">&lt;file&gt; --layer l1|l2</span></div><div class="cmd-desc" data-i18n="cmd.diff">Unified diff between raw input and a specific layer's output. Use when a PR changes the compression ratio.</div></div>
         <div class="cmd-row" data-cmd="config"><div class="cmd-name">config</div><div class="cmd-desc" data-i18n="cmd.config">Show the active merged configuration (global + project overrides).</div></div>
         <div class="cmd-row" data-cmd="config --file"><div class="cmd-name">config <span class="cmd-arg">--file &lt;path&gt;</span></div><div class="cmd-desc" data-i18n="cmd.config_file">Show configuration from a specific file path.</div></div>
       </div>
@@ -663,6 +681,9 @@ rm -rf ~/.ntk           <span style="color:var(--color-texto-mutado)"># remove c
         <div class="cmd-row" data-cmd="gain"><div class="cmd-name">gain</div><div class="cmd-desc" data-i18n="cmd.gain">Token savings summary (RTK-compatible output format).</div></div>
         <div class="cmd-row" data-cmd="history"><div class="cmd-name">history</div><div class="cmd-desc" data-i18n="cmd.history">Last 50 compressed commands with token counts and layer used.</div></div>
         <div class="cmd-row" data-cmd="discover"><div class="cmd-name">discover</div><div class="cmd-desc" data-i18n="cmd.discover">Analyze Claude Code session for missed compression opportunities.</div></div>
+        <div class="cmd-row" data-cmd="tail"><div class="cmd-name">tail</div><div class="cmd-desc" data-i18n="cmd.tail">Show the last 10 compression events and exit. Reads ~/.ntk/metrics.db directly — works even when the daemon is offline.</div></div>
+        <div class="cmd-row" data-cmd="tail -f"><div class="cmd-name">tail <span class="cmd-arg">-f</span></div><div class="cmd-desc" data-i18n="cmd.tail_follow">Stream events live (polls SQLite every 2 s). Use <code style="font-family:var(--font-mono)">--command NAME</code> to filter by command prefix.</div></div>
+        <div class="cmd-row" data-cmd="prune"><div class="cmd-name">prune <span class="cmd-arg">--older-than 30</span></div><div class="cmd-desc" data-i18n="cmd.prune">Delete records older than N days from both compression_records and l3_cache, then VACUUM to reclaim disk.</div></div>
       </div>
     </div>
 
