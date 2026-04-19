@@ -123,6 +123,43 @@ jobs:
         run: cargo audit
 
   # ---------------------------------------------------------------------------
+  # License check (cargo-deny) — fails if any transitive dep brings in a
+  # license outside the allow-list in deny.toml. Keeps NTK MIT-compatible.
+  # Runs once on Linux — licenses do not depend on OS.
+  # ---------------------------------------------------------------------------
+
+  license-check:
+    name: License check (cargo-deny)
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            ~/.cargo/bin
+          key: ubuntu-deny-${{ hashFiles('**/Cargo.lock', 'deny.toml') }}
+
+      - name: Install cargo-deny
+        run: cargo install cargo-deny --locked --quiet
+
+      - name: cargo deny check licenses
+        run: cargo deny --all-features check licenses
+
+      - name: cargo deny check bans
+        run: cargo deny --all-features check bans
+
+      - name: cargo deny check sources
+        run: cargo deny --all-features check sources
+
+  # ---------------------------------------------------------------------------
   # Benchmark smoke test (does not compare numbers, just ensures no panic)
   # ---------------------------------------------------------------------------
 

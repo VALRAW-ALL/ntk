@@ -101,8 +101,8 @@ cargo clippy -- \
   -W clippy::panic -W clippy::arithmetic_side_effects \
   -D warnings
 cargo test
-cargo audit         # se Cargo.toml mudou
-# cargo deny check licenses   # quando #3 entregar
+cargo audit                           # se Cargo.toml mudou
+cargo deny check licenses bans sources  # se Cargo.toml mudou
 ```
 
 Se a mudança toca hot path (L1, L2, handlers do daemon):

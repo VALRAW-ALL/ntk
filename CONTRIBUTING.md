@@ -92,6 +92,12 @@ on it and try again the next day.
 NTK is released under the MIT License. By submitting a PR you agree
 that your contribution is offered under the same license.
 
+**Transitive deps:** CI runs `cargo deny check licenses` against the
+allowlist in `deny.toml`. If a new dependency pulls in a license outside
+the allowlist (GPL / LGPL / AGPL are the usual offenders), the PR fails
+CI. Either pick a compatible alternative or open an issue proposing the
+new license for review.
+
 ---
 
 **TL;DR** — if any of the above speaks to you, pick the smallest task
