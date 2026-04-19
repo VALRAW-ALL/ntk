@@ -96,6 +96,10 @@ enum Command {
         /// Daemon URL (used when --with-l3 or --context is set).
         #[arg(long, default_value = "http://127.0.0.1:8765")]
         daemon_url: String,
+        /// Print per-layer latency, delta tokens, and a preview of each
+        /// intermediate output (L1, L2, and — when --with-l3 — L3).
+        #[arg(long)]
+        verbose: bool,
     },
 
     /// Manage the local inference model.
@@ -197,7 +201,8 @@ fn main() -> Result<()> {
             context,
             l4_format,
             daemon_url,
-        }) => run_test_compress(&file, with_l3, context, &l4_format, &daemon_url),
+            verbose,
+        }) => run_test_compress(&file, with_l3, context, &l4_format, &daemon_url, verbose),
 
         Some(Command::Model { action }) => run_model(action),
 
@@ -999,14 +1004,61 @@ fn run_config(file: Option<PathBuf>) -> Result<()> {
     Ok(())
 }
 
+/// Maximum preview lines shown per layer in `--verbose` mode.
+/// Bounded to keep output readable on large fixtures.
+const VERBOSE_PREVIEW_LINES: usize = 20;
+
+fn print_verbose_section(
+    title: &str,
+    content: &str,
+    tokens: usize,
+    prev_tokens: Option<usize>,
+    lines: usize,
+    latency: Option<std::time::Duration>,
+    note: Option<String>,
+) {
+    let latency_str = latency.map_or_else(|| "—".to_string(), |d| format!("{} ms", d.as_millis()));
+    let delta_str = match prev_tokens {
+        Some(prev) if prev > 0 => {
+            let saved = prev.saturating_sub(tokens);
+            let pct = (saved as f64 / prev as f64) * 100.0;
+            format!("{tokens} tokens ({pct:+.1}% vs prev)")
+        }
+        _ => format!("{tokens} tokens"),
+    };
+
+    println!();
+    println!("┌─ {title} ──────────────────────");
+    println!("│ {delta_str}, {lines} lines, {latency_str}");
+    if let Some(n) = note {
+        println!("│ {n}");
+    }
+    println!("│ ── preview (first {VERBOSE_PREVIEW_LINES} lines) ──");
+    for line in content.lines().take(VERBOSE_PREVIEW_LINES) {
+        println!("│ {line}");
+    }
+    if content.lines().count() > VERBOSE_PREVIEW_LINES {
+        println!(
+            "│ … ({} more lines)",
+            content
+                .lines()
+                .count()
+                .saturating_sub(VERBOSE_PREVIEW_LINES)
+        );
+    }
+    println!("└─────────────────────────────────");
+}
+
 fn run_test_compress(
     file: &std::path::Path,
     with_l3: bool,
     context: Option<String>,
     l4_format: &str,
     daemon_url: &str,
+    verbose: bool,
 ) -> Result<()> {
     use ntk::compressor::{layer1_filter, layer2_tokenizer};
+    use std::time::Instant;
 
     let canonical = file
         .canonicalize()
@@ -1016,8 +1068,16 @@ fn run_test_compress(
         .map_err(|e| anyhow!("reading {}: {e}", canonical.display()))?;
 
     let original_tokens = layer2_tokenizer::count_tokens(&input)?;
+    let input_lines = input.lines().count();
+
+    let t_l1 = Instant::now();
     let l1 = layer1_filter::filter(&input);
+    let l1_elapsed = t_l1.elapsed();
+    let l1_tokens = layer2_tokenizer::count_tokens(&l1.output)?;
+
+    let t_l2 = Instant::now();
     let l2 = layer2_tokenizer::process(&l1.output)?;
+    let l2_elapsed = t_l2.elapsed();
 
     let ratio_l2 = if original_tokens > 0 {
         let saved = original_tokens.saturating_sub(l2.compressed_tokens);
@@ -1026,11 +1086,51 @@ fn run_test_compress(
         0.0
     };
 
-    println!("File:              {}", canonical.display());
-    println!("Original tokens:   {original_tokens}");
-    println!("L1 lines removed:  {}", l1.lines_removed);
-    println!("After L2 tokens:   {}", l2.compressed_tokens);
-    println!("L1+L2 compression: {ratio_l2:.1}%");
+    if verbose {
+        print_verbose_section(
+            "Input",
+            &input,
+            original_tokens,
+            None,
+            input_lines,
+            None,
+            None,
+        );
+        let l1_lines = l1.output.lines().count();
+        let l1_note = if l1.rtk_pre_filtered {
+            Some(format!(
+                "RTK pre-filtered; {} lines removed",
+                l1.lines_removed
+            ))
+        } else {
+            Some(format!("{} lines removed", l1.lines_removed))
+        };
+        print_verbose_section(
+            "L1 output (regex/filter)",
+            &l1.output,
+            l1_tokens,
+            Some(original_tokens),
+            l1_lines,
+            Some(l1_elapsed),
+            l1_note,
+        );
+        let l2_lines = l2.output.lines().count();
+        print_verbose_section(
+            "L2 output (tokenizer)",
+            &l2.output,
+            l2.compressed_tokens,
+            Some(l1_tokens),
+            l2_lines,
+            Some(l2_elapsed),
+            None,
+        );
+    } else {
+        println!("File:              {}", canonical.display());
+        println!("Original tokens:   {original_tokens}");
+        println!("L1 lines removed:  {}", l1.lines_removed);
+        println!("After L2 tokens:   {}", l2.compressed_tokens);
+        println!("L1+L2 compression: {ratio_l2:.1}%");
+    }
 
     // Fire a full-pipeline request through the daemon when requested.
     let want_full_pipeline = with_l3 || context.is_some();
@@ -1092,12 +1192,42 @@ fn run_test_compress(
             .and_then(|v| v.as_str())
             .unwrap_or("");
 
-        println!("Layer reached:     L{layer}");
-        println!("Final tokens:      {tokens_after}");
-        println!("Total compression: {ratio:.1}%");
-        println!();
-        println!("--- Compressed output ---");
-        println!("{compressed}");
+        if verbose {
+            let l3_latency_ms = body.pointer("/latency_ms/l3").and_then(|v| v.as_u64());
+            let tokens_after_l2 = body
+                .get("tokens_after_l2")
+                .and_then(|v| v.as_u64())
+                .map(|n| n as usize);
+            let note = if let Some(ctx) = &context {
+                let preview: String = ctx.chars().take(80).collect();
+                let suffix = if ctx.chars().count() > 80 { "…" } else { "" };
+                Some(format!(
+                    "L4 context injected: \"{preview}{suffix}\" (format: {l4_format})"
+                ))
+            } else {
+                Some(format!(
+                    "L4 context: none; L3 invoked: layer reached L{layer}"
+                ))
+            };
+            print_verbose_section(
+                "L3 output (local inference via daemon)",
+                compressed,
+                tokens_after as usize,
+                tokens_after_l2,
+                compressed.lines().count(),
+                l3_latency_ms.map(std::time::Duration::from_millis),
+                note,
+            );
+            println!();
+            println!("Total: {original_tokens} → {tokens_after} tokens ({ratio:.1}%)");
+        } else {
+            println!("Layer reached:     L{layer}");
+            println!("Final tokens:      {tokens_after}");
+            println!("Total compression: {ratio:.1}%");
+            println!();
+            println!("--- Compressed output ---");
+            println!("{compressed}");
+        }
     } else {
         println!();
         println!("--- Compressed output (L1+L2) ---");

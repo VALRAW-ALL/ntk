@@ -207,6 +207,52 @@ fn test_ntk_test_compress_file() {
     );
 }
 
+/// `ntk test-compress --verbose` must emit sectioned breakdown headers
+/// for the Input, L1, and L2 stages. L3 section only appears with --with-l3.
+#[test]
+fn test_ntk_test_compress_verbose_emits_sections() {
+    let fixture = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("tests/fixtures/cargo_test_output.txt");
+
+    assert!(fixture.exists(), "fixture not found: {}", fixture.display());
+
+    let output = ntk()
+        .args([
+            "test-compress",
+            fixture.to_str().expect("fixture path"),
+            "--verbose",
+        ])
+        .output()
+        .expect("test-compress --verbose failed");
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let stderr = String::from_utf8_lossy(&output.stderr);
+
+    assert!(
+        output.status.success(),
+        "test-compress --verbose failed:\nstdout: {stdout}\nstderr: {stderr}"
+    );
+
+    // Sectioned headers produced by print_verbose_section.
+    for expected in &["┌─ Input", "┌─ L1 output", "┌─ L2 output", "preview (first"] {
+        assert!(
+            stdout.contains(expected),
+            "verbose output missing marker {expected:?}:\n{stdout}"
+        );
+    }
+
+    // Non-verbose summary lines must NOT appear when --verbose is set.
+    assert!(
+        !stdout.contains("L1 lines removed:"),
+        "non-verbose summary leaked into --verbose output:\n{stdout}"
+    );
+
+    assert!(
+        !stdout.contains("thread 'main' panicked"),
+        "test-compress --verbose panicked: {stdout}"
+    );
+}
+
 /// `ntk gain` without a daemon should print a readable message (not panic).
 #[test]
 fn test_ntk_gain_format_rtk_compatible() {
