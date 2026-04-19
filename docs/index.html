@@ -556,6 +556,32 @@ ntk gain                <span style="color:var(--color-texto-mutado)"># view tok
   <span style="color:var(--color-primaria-clara)">"telemetry"</span>: { <span style="color:var(--color-primaria-clara)">"enabled"</span>: <span style="color:var(--color-acento-verde-claro)">true</span> }
 }</pre>
         </div>
+
+        <!-- Hardware-tier tuning guidance -->
+        <h4 style="margin-top:1.8rem;font-size:1rem;color:var(--color-texto-titulo)" data-i18n="gs.tune_title">
+          <i class="ph-bold ph-sliders-horizontal" style="margin-right:0.4rem;color:var(--color-primaria)"></i>
+          Tuning <code style="font-family:var(--font-mono);color:var(--color-primaria-clara)">inference_threshold_tokens</code> for your hardware
+        </h4>
+        <p data-i18n="gs.tune_desc" style="font-size:0.9rem">L3 first-call latency scales with GPU class. The L3 cache absorbs repeats (&lt; 150 ms), so the threshold is set by how much interactivity you tolerate on a cold call:</p>
+        <div style="overflow-x:auto;margin-top:0.8rem">
+          <table style="width:100%;border-collapse:collapse;font-size:0.88rem">
+            <thead>
+              <tr style="background:rgba(124,77,255,0.08);text-align:left">
+                <th style="padding:0.5rem 0.8rem;border-bottom:1px solid var(--color-borda)" data-i18n="gs.tune_col_hw">Hardware</th>
+                <th style="padding:0.5rem 0.8rem;border-bottom:1px solid var(--color-borda)" data-i18n="gs.tune_col_lat">Cold L3 latency</th>
+                <th style="padding:0.5rem 0.8rem;border-bottom:1px solid var(--color-borda)" data-i18n="gs.tune_col_thr">Threshold</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr><td style="padding:0.4rem 0.8rem;border-bottom:1px solid var(--color-borda)" data-i18n="gs.tune_cpu">CPU-only (AVX2)</td><td style="padding:0.4rem 0.8rem;border-bottom:1px solid var(--color-borda)">30–60 s</td><td style="padding:0.4rem 0.8rem;border-bottom:1px solid var(--color-borda)"><code>2000</code> <span style="color:var(--color-texto-secundario)" data-i18n="gs.tune_cpu_note">or disable L3</span></td></tr>
+              <tr><td style="padding:0.4rem 0.8rem;border-bottom:1px solid var(--color-borda)" data-i18n="gs.tune_entry">Entry GPU (RX 580, GTX 1060)</td><td style="padding:0.4rem 0.8rem;border-bottom:1px solid var(--color-borda)">10–15 s (Vulkan)</td><td style="padding:0.4rem 0.8rem;border-bottom:1px solid var(--color-borda)"><code>600</code></td></tr>
+              <tr style="background:rgba(124,77,255,0.04)"><td style="padding:0.4rem 0.8rem;border-bottom:1px solid var(--color-borda)" data-i18n="gs.tune_mid">Mid (RTX 3060, RX 6700 XT, M1)</td><td style="padding:0.4rem 0.8rem;border-bottom:1px solid var(--color-borda)">2–5 s</td><td style="padding:0.4rem 0.8rem;border-bottom:1px solid var(--color-borda)"><code>300</code> <span style="color:var(--color-texto-secundario)" data-i18n="gs.tune_mid_note">(default)</span></td></tr>
+              <tr><td style="padding:0.4rem 0.8rem;border-bottom:1px solid var(--color-borda)" data-i18n="gs.tune_high">High (RTX 4070+, M2 Pro+)</td><td style="padding:0.4rem 0.8rem;border-bottom:1px solid var(--color-borda)">&lt; 1.5 s</td><td style="padding:0.4rem 0.8rem;border-bottom:1px solid var(--color-borda)"><code>200</code></td></tr>
+              <tr><td style="padding:0.4rem 0.8rem" data-i18n="gs.tune_flag">Flagship (RTX 4090, M4 Pro+)</td><td style="padding:0.4rem 0.8rem">&lt; 700 ms</td><td style="padding:0.4rem 0.8rem"><code>100</code></td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p style="margin-top:0.8rem;font-size:0.88rem" data-i18n="gs.tune_empirical">Measure yours: <code style="font-family:var(--font-mono);color:var(--color-primaria-clara)">ntk bench --l3 --runs 3</code>. Pick a threshold where p95 ≤ 2 s for interactive comfort.</p>
       </div>
 
       <!-- Step 8: Uninstall -->

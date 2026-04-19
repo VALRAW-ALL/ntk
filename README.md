@@ -450,6 +450,36 @@ NTK merges configuration from two sources, in order:
 }
 ```
 
+### Tuning `inference_threshold_tokens` for your hardware
+
+L3 inference latency scales with model size × tokens × hardware. The
+threshold sets the minimum output size that justifies the round trip to
+the model. Too low and every `git status` pays the L3 tax; too high and
+L3 never fires on the outputs that would benefit most.
+
+The L3 cache (`config.l3_cache`) absorbs most of the pain on repeat
+calls (identical input → <150 ms), so "first-call latency" is the metric
+that matters for the tier choice:
+
+| Hardware | Cold L3 (Phi-3 Mini Q5_K_M) | Recommended threshold | Why |
+|---|---|---|---|
+| CPU-only (AVX2 modern) | 30-60 s | `2000` or disable L3 | only L1+L2 worth the latency; reserve L3 for heavy batch |
+| Polaris / Pascal GPUs (RX 580, GTX 1060) | 10-15 s via Vulkan | `600` | cache warms quickly in long sessions; first hit still noticeable |
+| Mid-tier (RTX 3060, RX 6700 XT, M1) | 2-5 s | `300` (**default**) | sweet spot — interactive responsiveness with useful coverage |
+| High-tier (RTX 4070+, M2 Pro+) | < 1.5 s | `200` | L3 becomes invisible to the human eye |
+| RTX 4090 / M4 Pro+ | < 700 ms | `100` | L3 on nearly every Bash call is realistic |
+
+Find yours empirically:
+
+```bash
+ntk bench --l3 --runs 3             # measures avg ms per payload
+# Then pick a threshold where p95 ≤ 2 s for interactive feel.
+```
+
+The `ntk bench --submit` JSON (#15) includes per-payload latencies you
+can cross-reference against the table above when someone shares their
+numbers in an issue.
+
 ---
 
 ## GPU Acceleration
