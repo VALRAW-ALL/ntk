@@ -210,6 +210,28 @@ impl Default for TelemetryConfig {
     }
 }
 
+/// Optional security features (opt-in).
+///
+/// `audit_log` appends a single JSONL record per /compress call to
+/// `audit_log_path`. Records carry a timestamp, the originating command
+/// name (no args, no output), and SHA-256 of the output — never the
+/// output itself. Useful for forensics after suspicious activity.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(default)]
+pub struct SecurityConfig {
+    pub audit_log: bool,
+    pub audit_log_path: String,
+}
+
+impl Default for SecurityConfig {
+    fn default() -> Self {
+        Self {
+            audit_log: false,
+            audit_log_path: "~/.ntk/audit.log".to_string(),
+        }
+    }
+}
+
 // ---------------------------------------------------------------------------
 // Root config
 // ---------------------------------------------------------------------------
@@ -224,6 +246,7 @@ pub struct NtkConfig {
     pub exclusions: ExclusionsConfig,
     pub display: DisplayConfig,
     pub telemetry: TelemetryConfig,
+    pub security: SecurityConfig,
 }
 
 // ---------------------------------------------------------------------------

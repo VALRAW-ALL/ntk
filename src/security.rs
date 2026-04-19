@@ -169,6 +169,87 @@ pub fn auth_disabled() -> bool {
         .unwrap_or(false)
 }
 
+// ---------------------------------------------------------------------------
+// Audit log
+// ---------------------------------------------------------------------------
+
+/// One audit record emitted per `/compress` call when
+/// `config.security.audit_log` is enabled. The output itself is never
+/// persisted — only a SHA-256 hash, so the log reveals *that* a
+/// compression happened but not *what* was compressed.
+#[derive(serde::Serialize)]
+pub struct AuditRecord<'a> {
+    pub timestamp: String,
+    pub command: &'a str,
+    pub cwd: &'a str,
+    pub tokens_before: usize,
+    pub tokens_after: usize,
+    pub layer: u8,
+    pub output_sha256: String,
+}
+
+impl<'a> AuditRecord<'a> {
+    pub fn new(
+        command: &'a str,
+        cwd: &'a str,
+        tokens_before: usize,
+        tokens_after: usize,
+        layer: u8,
+        output: &str,
+    ) -> Self {
+        use sha2::{Digest, Sha256};
+        let mut hasher = Sha256::new();
+        hasher.update(output.as_bytes());
+        let digest = hasher.finalize();
+        let mut hex = String::with_capacity(64);
+        for b in digest {
+            use std::fmt::Write;
+            let _ = write!(hex, "{b:02x}");
+        }
+        Self {
+            timestamp: chrono::Utc::now().to_rfc3339(),
+            command,
+            cwd,
+            tokens_before,
+            tokens_after,
+            layer,
+            output_sha256: hex,
+        }
+    }
+}
+
+/// Append an audit record as a single JSON line to `path`. Best-effort:
+/// any I/O error is logged to tracing and swallowed — never fails the
+/// /compress request because auditing is a side channel.
+pub fn append_audit_record(path: &Path, record: &AuditRecord<'_>) {
+    use std::io::Write;
+    let line = match serde_json::to_string(record) {
+        Ok(s) => s,
+        Err(e) => {
+            tracing::warn!("audit: serialize failed: {e}");
+            return;
+        }
+    };
+    if let Some(parent) = path.parent() {
+        if let Err(e) = std::fs::create_dir_all(parent) {
+            tracing::warn!("audit: mkdir {}: {e}", parent.display());
+            return;
+        }
+    }
+    let file = std::fs::OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(path);
+    match file {
+        Ok(mut f) => {
+            if let Err(e) = writeln!(f, "{line}") {
+                tracing::warn!("audit: write {}: {e}", path.display());
+            }
+        }
+        Err(e) => tracing::warn!("audit: open {}: {e}", path.display()),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -176,6 +176,92 @@ async fn test_health_endpoint_open_without_token() {
     resp.assert_status_ok();
 }
 
+// --- Audit log ------------------------------------------------------------
+
+#[tokio::test]
+async fn test_audit_log_appends_record_when_enabled() {
+    use ntk::config::{NtkConfig, SecurityConfig};
+    let tmp = tempfile::tempdir().expect("tempdir");
+    let audit_path = tmp.path().join("audit.log");
+
+    let mut config = NtkConfig::default();
+    config.security = SecurityConfig {
+        audit_log: true,
+        audit_log_path: audit_path.to_string_lossy().into_owned(),
+    };
+
+    let state = AppState {
+        config: Arc::new(config),
+        metrics: Arc::new(Mutex::new(MetricsStore::new())),
+        db: None,
+        backend: default_backend(),
+        started_at: std::time::Instant::now(),
+        warn_log: empty_warn_log(),
+        addr: "127.0.0.1:8765".to_string(),
+        backend_name: "test".to_string(),
+        model_info: String::new(),
+        auth_token: Arc::new(String::new()),
+    };
+    let server = TestServer::new(build_router(state)).expect("test server");
+
+    let output = "cargo:warning=noise\n".repeat(40);
+    let resp = server
+        .post("/compress")
+        .json(&serde_json::json!({ "output": output, "command": "cargo build" }))
+        .await;
+    resp.assert_status_ok();
+
+    let contents = std::fs::read_to_string(&audit_path).expect("audit log file");
+    assert!(
+        contents.trim().lines().count() >= 1,
+        "expected at least one audit record, got:\n{contents}"
+    );
+    let line = contents.lines().next().expect("at least one line");
+    let parsed: serde_json::Value = serde_json::from_str(line).expect("valid JSON");
+    assert_eq!(parsed["command"], "cargo build");
+    assert!(parsed["output_sha256"].as_str().expect("hash").len() == 64);
+    // The raw output must never appear in the audit log.
+    assert!(
+        !contents.contains("cargo:warning=noise"),
+        "audit log leaked raw output: {contents}"
+    );
+}
+
+#[tokio::test]
+async fn test_audit_log_silent_when_disabled() {
+    // With audit_log=false (default), no file should be created.
+    let tmp = tempfile::tempdir().expect("tempdir");
+    let audit_path = tmp.path().join("audit.log");
+    let mut config = ntk::config::NtkConfig::default();
+    config.security.audit_log = false;
+    config.security.audit_log_path = audit_path.to_string_lossy().into_owned();
+
+    let state = AppState {
+        config: Arc::new(config),
+        metrics: Arc::new(Mutex::new(MetricsStore::new())),
+        db: None,
+        backend: default_backend(),
+        started_at: std::time::Instant::now(),
+        warn_log: empty_warn_log(),
+        addr: "127.0.0.1:8765".to_string(),
+        backend_name: "test".to_string(),
+        model_info: String::new(),
+        auth_token: Arc::new(String::new()),
+    };
+    let server = TestServer::new(build_router(state)).expect("test server");
+
+    server
+        .post("/compress")
+        .json(&serde_json::json!({ "output": "some long output ".repeat(30) }))
+        .await
+        .assert_status_ok();
+
+    assert!(
+        !audit_path.exists(),
+        "audit log file created despite audit_log=false"
+    );
+}
+
 // --- Layer 4 (context injection) — endpoint-level tests ------------------
 
 #[tokio::test]

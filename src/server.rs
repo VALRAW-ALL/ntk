@@ -369,6 +369,24 @@ async fn handle_compress(
         },
     };
 
+    // Opt-in audit log. When enabled, appends one JSONL line per request
+    // with a SHA-256 of the output — never the output itself. Best-effort;
+    // any I/O error is logged to tracing but does not fail the request.
+    if state.config.security.audit_log {
+        let path = crate::config::expand_tilde(&state.config.security.audit_log_path);
+        let cmd = req.command.clone().unwrap_or_default();
+        let cwd = req.cwd.clone().unwrap_or_default();
+        let record = security::AuditRecord::new(
+            &cmd,
+            &cwd,
+            original_tokens,
+            compressed_tokens,
+            layer_used,
+            &output,
+        );
+        security::append_audit_record(&path, &record);
+    }
+
     // Opt-in: persist the full compression trace to ~/.ntk/logs/ for
     // benchmarking / auditing when NTK_LOG_COMPRESSIONS=1 is set.
     if std::env::var("NTK_LOG_COMPRESSIONS").ok().as_deref() == Some("1") {
