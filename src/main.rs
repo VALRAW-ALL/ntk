@@ -384,20 +384,28 @@ async fn async_run_daemon(gpu: bool) -> Result<()> {
         None
     };
 
-    // Build Layer 3 backend.
-    let backend = match ntk::compressor::layer3_backend::BackendKind::from_config(&config) {
-        Ok(b) => {
-            tracing::info!("Layer 3 backend: {}", b.name());
-            Arc::new(b)
+    // Build Layer 3 backend chain. A single-element chain preserves the
+    // pre-#9 behavior; multi-element chains (configured via
+    // `model.backend_chain`) try each backend in order on failure.
+    let backend = match ntk::compressor::layer3_backend::BackendChain::from_config(&config) {
+        Ok(chain) => {
+            tracing::info!("Layer 3 backend chain: {:?}", chain.names());
+            Arc::new(chain)
         }
         Err(e) => {
-            tracing::warn!("Layer 3 backend init failed, falling back to Ollama: {e}");
-            Arc::new(ntk::compressor::layer3_backend::BackendKind::Ollama(
+            tracing::warn!("Layer 3 backend init failed, defaulting to Ollama only: {e}");
+            // Minimal safety net: build a single-backend chain from the
+            // hardcoded Ollama default so the daemon always has something
+            // to call. This only runs when config parsing itself fails.
+            let fallback = ntk::compressor::layer3_backend::BackendKind::Ollama(
                 ntk::compressor::layer3_inference::OllamaClient::new(
                     "http://localhost:11434",
                     2000,
                     "phi3:mini",
                 ),
+            );
+            Arc::new(ntk::compressor::layer3_backend::BackendChain::from_single(
+                fallback,
             ))
         }
     };
@@ -407,11 +415,11 @@ async fn async_run_daemon(gpu: bool) -> Result<()> {
     if config.model.llama_server_auto_start {
         let backend_bg = Arc::clone(&backend);
         tokio::spawn(async move {
-            if let Err(e) = backend_bg.start_if_needed().await {
-                tracing::warn!("llama-server auto-start failed: {e}");
-            } else {
-                tracing::info!("llama-server ready");
-            }
+            // BackendChain.start_if_needed() logs per-backend failures
+            // internally and never errors the whole chain — one llama.cpp
+            // miss shouldn't prevent the Ollama primary from serving.
+            backend_bg.start_if_needed().await;
+            tracing::info!("llama-server ready");
         });
     }
 

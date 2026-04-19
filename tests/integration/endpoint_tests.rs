@@ -1,5 +1,5 @@
 use axum_test::TestServer;
-use ntk::compressor::layer3_backend::BackendKind;
+use ntk::compressor::layer3_backend::{BackendChain, BackendKind};
 use ntk::config::NtkConfig;
 use ntk::metrics::MetricsStore;
 use ntk::output::dashboard::WarnBuffer;
@@ -7,8 +7,8 @@ use ntk::server::{build_router, AppState};
 use std::collections::VecDeque;
 use std::sync::{Arc, Mutex};
 
-fn default_backend() -> Arc<BackendKind> {
-    Arc::new(BackendKind::from_config(&NtkConfig::default()).unwrap())
+fn default_backend() -> Arc<BackendChain> {
+    Arc::new(BackendChain::from_config(&NtkConfig::default()).unwrap())
 }
 
 fn empty_warn_log() -> WarnBuffer {

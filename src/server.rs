@@ -27,8 +27,9 @@ pub struct AppState {
     pub metrics: Arc<Mutex<MetricsStore>>,
     /// Optional SQLite persistence — None when db init fails or is disabled.
     pub db: Option<Arc<MetricsDb>>,
-    /// Layer 3 inference backend (Ollama / Candle / llama.cpp).
-    pub backend: Arc<layer3_backend::BackendKind>,
+    /// Layer 3 inference backend chain. A single-element chain mirrors
+    /// the pre-#9 behavior; multi-element chains give fallback semantics.
+    pub backend: Arc<layer3_backend::BackendChain>,
     /// Daemon start time — used to compute uptime in /health and /state.
     pub started_at: std::time::Instant,
     /// Captured WARN/ERROR log — served via /state for attach-mode TUI.
@@ -285,107 +286,122 @@ async fn handle_compress(
     let mut l3_latency: Option<u64> = None;
     let mut tokens_after_l3: Option<usize> = None;
     let mut l3_cache_hit = false;
-    let (output, layer_used, final_tokens) =
-        if state.config.compression.layer3_enabled && l2.compressed_tokens > threshold {
-            // Prompts dir: NTK_PROMPTS_DIR env var, or ~/.ntk/system-prompts/, or ./system-prompts/
-            let prompts_dir = crate::config::resolve_prompts_dir();
-            // Prepend the context prefix (empty string when L4 is off).
-            let l3_input = if context_prefix.is_empty() {
-                l2.output.clone()
-            } else {
-                format!("{context_prefix}{}", l2.output)
-            };
+    let (output, layer_used, final_tokens) = if state.config.compression.layer3_enabled
+        && l2.compressed_tokens > threshold
+    {
+        // Prompts dir: NTK_PROMPTS_DIR env var, or ~/.ntk/system-prompts/, or ./system-prompts/
+        let prompts_dir = crate::config::resolve_prompts_dir();
+        // Prepend the context prefix (empty string when L4 is off).
+        let l3_input = if context_prefix.is_empty() {
+            l2.output.clone()
+        } else {
+            format!("{context_prefix}{}", l2.output)
+        };
 
-            // L3 cache: identical (l2_output, context, model, format) →
-            // identical output, every time. Checking SQLite (~1 ms) is
-            // strictly cheaper than re-running inference (50–800 ms).
-            let cache_enabled = state.config.l3_cache.enabled;
-            let backend_name = state.backend.name().to_owned();
-            let prompt_format_key = prompt_format_label(prompt_format);
-            let cache_key = MetricsDb::l3_cache_key(
-                &l2.output,
-                &context_prefix,
-                &backend_name,
-                prompt_format_key,
-            );
-            let cached_output = if cache_enabled {
-                if let Some(db) = state.db.as_ref() {
-                    match db
-                        .lookup_l3_cache(&cache_key, state.config.l3_cache.ttl_days)
-                        .await
-                    {
-                        Ok(hit) => hit,
-                        Err(e) => {
-                            tracing::warn!("l3_cache lookup failed: {e}");
-                            None
-                        }
+        // L3 cache: identical (l2_output, context, model, format) →
+        // identical output, every time. Checking SQLite (~1 ms) is
+        // strictly cheaper than re-running inference (50–800 ms).
+        let cache_enabled = state.config.l3_cache.enabled;
+        let backend_name = state.backend.name().to_owned();
+        let prompt_format_key = prompt_format_label(prompt_format);
+        let cache_key = MetricsDb::l3_cache_key(
+            &l2.output,
+            &context_prefix,
+            &backend_name,
+            prompt_format_key,
+        );
+        let cached_output = if cache_enabled {
+            if let Some(db) = state.db.as_ref() {
+                match db
+                    .lookup_l3_cache(&cache_key, state.config.l3_cache.ttl_days)
+                    .await
+                {
+                    Ok(hit) => hit,
+                    Err(e) => {
+                        tracing::warn!("l3_cache lookup failed: {e}");
+                        None
                     }
-                } else {
-                    None
                 }
             } else {
                 None
-            };
+            }
+        } else {
+            None
+        };
 
-            if let Some(hit) = cached_output {
-                l3_cache_hit = true;
-                l3_latency = Some(0);
-                let l3_tokens = layer2_tokenizer::count_tokens(&hit)
-                    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
-                tokens_after_l3 = Some(l3_tokens);
-                (hit, 3u8, l3_tokens)
-            } else {
-                let l3_start = Instant::now();
-                let l3_result = state
-                    .backend
-                    .compress(&l3_input, output_type, &prompts_dir)
-                    .await;
-                l3_latency = Some(l3_start.elapsed().as_millis() as u64);
-                match l3_result {
-                    Ok(l3) => {
-                        let l3_tokens = layer2_tokenizer::count_tokens(&l3.output)
-                            .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
-                        tokens_after_l3 = Some(l3_tokens);
+        if let Some(hit) = cached_output {
+            l3_cache_hit = true;
+            l3_latency = Some(0);
+            let l3_tokens = layer2_tokenizer::count_tokens(&hit)
+                .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+            tokens_after_l3 = Some(l3_tokens);
+            (hit, 3u8, l3_tokens)
+        } else {
+            let l3_start = Instant::now();
+            let l3_result = state
+                .backend
+                .compress(&l3_input, output_type, &prompts_dir)
+                .await;
+            l3_latency = Some(l3_start.elapsed().as_millis() as u64);
+            match l3_result {
+                Ok((l3, backend_used)) => {
+                    let l3_tokens = layer2_tokenizer::count_tokens(&l3.output)
+                        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+                    tokens_after_l3 = Some(l3_tokens);
 
-                        // Cache the successful completion for reuse on
-                        // identical inputs. Best-effort — storage errors
-                        // are logged but don't affect the response.
-                        if cache_enabled {
-                            if let Some(db) = state.db.as_ref() {
-                                if let Err(e) = db
-                                    .store_l3_cache(&cache_key, &l3.output, &backend_name)
-                                    .await
-                                {
-                                    tracing::warn!("l3_cache store failed: {e}");
-                                }
+                    if backend_used != backend_name {
+                        tracing::info!(
+                            "L3 fallback: primary '{backend_name}' failed, used '{backend_used}'"
+                        );
+                    }
+
+                    // Cache the successful completion for reuse on
+                    // identical inputs. Best-effort — storage errors
+                    // are logged but don't affect the response. The
+                    // cache key uses the actually-used backend name so
+                    // a fallback hit does not poison the primary's row.
+                    if cache_enabled {
+                        if let Some(db) = state.db.as_ref() {
+                            let fallback_key = MetricsDb::l3_cache_key(
+                                &l2.output,
+                                &context_prefix,
+                                backend_used,
+                                prompt_format_key,
+                            );
+                            if let Err(e) = db
+                                .store_l3_cache(&fallback_key, &l3.output, backend_used)
+                                .await
+                            {
+                                tracing::warn!("l3_cache store failed: {e}");
                             }
                         }
-
-                        (l3.output, 3u8, l3_tokens)
                     }
-                    Err(e) => {
-                        tracing::warn!(
-                            "Layer 3 inference failed ({name}): {e}",
-                            name = state.backend.name()
-                        );
-                        // Graceful fallback: Layer 3 unavailable → use Layer 2 output.
-                        if state.config.model.fallback_to_layer1_on_timeout {
-                            (l2.output.clone(), 2u8, l2.compressed_tokens)
-                        } else {
-                            return Err((
-                                StatusCode::SERVICE_UNAVAILABLE,
-                                format!(
-                                    "Layer 3 inference unavailable ({}): {e}",
-                                    state.backend.name()
-                                ),
-                            ));
-                        }
+
+                    (l3.output, 3u8, l3_tokens)
+                }
+                Err(e) => {
+                    tracing::warn!(
+                        "Layer 3 inference failed ({name}): {e}",
+                        name = state.backend.name()
+                    );
+                    // Graceful fallback: Layer 3 unavailable → use Layer 2 output.
+                    if state.config.model.fallback_to_layer1_on_timeout {
+                        (l2.output.clone(), 2u8, l2.compressed_tokens)
+                    } else {
+                        return Err((
+                            StatusCode::SERVICE_UNAVAILABLE,
+                            format!(
+                                "Layer 3 inference unavailable ({}): {e}",
+                                state.backend.name()
+                            ),
+                        ));
                     }
                 }
             }
-        } else {
-            (l2.output.clone(), 2u8, l2.compressed_tokens)
-        };
+        }
+    } else {
+        (l2.output.clone(), 2u8, l2.compressed_tokens)
+    };
     // Tracing: signal cache hits so operators can tune ttl_days / size.
     if l3_cache_hit {
         tracing::info!(

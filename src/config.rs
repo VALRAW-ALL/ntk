@@ -114,6 +114,16 @@ pub struct ModelConfig {
     /// Milliseconds to wait for llama-server to become healthy after spawning.
     /// Loading a 2.2 GB GGUF model on CPU can take 30-60 s. Default: 60 000.
     pub llama_server_start_timeout_ms: u64,
+
+    /// Ordered fallback chain of backends. When the primary fails with an
+    /// error (not just a timeout-caught fallback to L1+L2), NTK tries
+    /// each subsequent backend in order before giving up. Empty vec
+    /// (default) means "just use `provider`" — backward compatible.
+    ///
+    /// Example: `["ollama", "candle"]` uses Ollama as primary, Candle as
+    /// fallback when Ollama is unreachable.
+    #[serde(default)]
+    pub backend_chain: Vec<String>,
 }
 
 impl Default for ModelConfig {
@@ -133,6 +143,7 @@ impl Default for ModelConfig {
             llama_cpp_path: None,
             model_path: None,
             tokenizer_path: None,
+            backend_chain: Vec::new(),
             llama_server_port: 8766,
             llama_server_auto_start: true,
             llama_server_start_timeout_ms: 60_000,
