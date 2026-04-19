@@ -130,6 +130,17 @@ enum Command {
         /// Also benchmark Layer 3 inference (requires Ollama running).
         #[arg(long)]
         l3: bool,
+
+        /// Emit a structured JSON report to stdout (and optionally to
+        /// the given path). Intended for hardware-benchmark submissions
+        /// — contributors can attach the JSON to a GitHub issue.
+        #[arg(long)]
+        submit: bool,
+
+        /// When used with --submit, write the report to this path instead
+        /// of stdout. The path is printed so the user can attach it.
+        #[arg(long)]
+        output: Option<PathBuf>,
     },
 
     /// Show a unified diff between the input file and the output of a
@@ -226,7 +237,12 @@ fn main() -> Result<()> {
 
         Some(Command::Test { l3 }) => run_test(l3),
 
-        Some(Command::Bench { runs, l3 }) => run_bench(runs, l3),
+        Some(Command::Bench {
+            runs,
+            l3,
+            submit,
+            output,
+        }) => run_bench(runs, l3, submit, output),
 
         Some(Command::Diff {
             file,
@@ -3831,20 +3847,28 @@ fn run_test(with_l3: bool) -> Result<()> {
     Ok(())
 }
 
-fn run_bench(runs: usize, with_l3: bool) -> Result<()> {
+fn run_bench(runs: usize, with_l3: bool, submit: bool, output: Option<PathBuf>) -> Result<()> {
     use ntk::compressor::{layer1_filter, layer2_tokenizer};
     use std::time::Instant;
 
     let cwd = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
     let config = ntk::config::load(&cwd).unwrap_or_default();
 
-    println!("NTK Compression Benchmark  ({runs} runs per payload)");
-    println!("══════════════════════════════════════════════════════════════════");
-    println!(
-        "{:<28}  {:>7}  {:>8}  {:>8}  {:>8}  {:>7}",
-        "payload", "tokens", "min µs", "avg µs", "max µs", "ratio"
-    );
-    println!("{}", "-".repeat(70));
+    // --submit collects results into a structured report. Human table is
+    // still emitted unless --output is set (which implies piping to file,
+    // where table formatting would be noise).
+    let mut report_payloads: Vec<serde_json::Value> = Vec::new();
+    let mut report_l3: Option<serde_json::Value> = None;
+
+    if !submit {
+        println!("NTK Compression Benchmark  ({runs} runs per payload)");
+        println!("══════════════════════════════════════════════════════════════════");
+        println!(
+            "{:<28}  {:>7}  {:>8}  {:>8}  {:>8}  {:>7}",
+            "payload", "tokens", "min µs", "avg µs", "max µs", "ratio"
+        );
+        println!("{}", "-".repeat(70));
+    }
 
     let cases = test_cases();
 
@@ -3873,32 +3897,48 @@ fn run_bench(runs: usize, with_l3: bool) -> Result<()> {
             0
         };
 
-        println!(
-            "{:<28}  {:>7}  {:>8}  {:>8}  {:>8}  {:>6}%",
-            case.label, original, min, avg, max, ratio_pct
-        );
+        if submit {
+            report_payloads.push(serde_json::json!({
+                "label": case.label,
+                "tokens_in": original,
+                "tokens_out_l2": last_compressed,
+                "ratio_pct": ratio_pct,
+                "latency_us": {
+                    "min": min, "avg": avg, "max": max,
+                },
+            }));
+        } else {
+            println!(
+                "{:<28}  {:>7}  {:>8}  {:>8}  {:>8}  {:>6}%",
+                case.label, original, min, avg, max, ratio_pct
+            );
+        }
     }
 
     if with_l3 {
-        println!();
         let cwd = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
         let config = ntk::config::load(&cwd).unwrap_or_default();
         let backend = ntk::compressor::layer3_backend::BackendKind::from_config(&config)
             .map_err(|e| anyhow::anyhow!("Layer 3 backend init failed ({provider}): {e}\nRun `ntk model setup` to reconfigure.", provider = config.model.provider.as_str()))?;
-        println!(
-            "Layer 3 — {} inference  ({runs} runs per payload)",
-            backend.name()
-        );
-        println!(
-            "{:<28}  {:>8}  {:>8}  {:>8}  {:>7}",
-            "payload", "min ms", "avg ms", "max ms", "ratio"
-        );
-        println!("{}", "-".repeat(65));
+        if !submit {
+            println!();
+            println!(
+                "Layer 3 — {} inference  ({runs} runs per payload)",
+                backend.name()
+            );
+            println!(
+                "{:<28}  {:>8}  {:>8}  {:>8}  {:>7}",
+                "payload", "min ms", "avg ms", "max ms", "ratio"
+            );
+            println!("{}", "-".repeat(65));
+        }
 
         let prompts_dir = ntk::config::resolve_prompts_dir();
         let rt = tokio::runtime::Builder::new_current_thread()
             .enable_all()
             .build()?;
+
+        let mut l3_rows: Vec<serde_json::Value> = Vec::new();
 
         for case in &cases {
             let mut l3_latencies: Vec<u64> = Vec::with_capacity(runs);
@@ -3912,7 +3952,14 @@ fn run_bench(runs: usize, with_l3: bool) -> Result<()> {
                         last_l3 = Some(r);
                     }
                     Err(e) => {
-                        println!("{:<28}  ERROR: {e}", case.label);
+                        if submit {
+                            l3_rows.push(serde_json::json!({
+                                "label": case.label,
+                                "error": e.to_string(),
+                            }));
+                        } else {
+                            println!("{:<28}  ERROR: {e}", case.label);
+                        }
                         break;
                     }
                 }
@@ -3940,26 +3987,80 @@ fn run_bench(runs: usize, with_l3: bool) -> Result<()> {
                     }
                 })
                 .unwrap_or(0);
-            println!(
-                "{:<28}  {:>8}  {:>8}  {:>8}  {:>6}%",
-                case.label, min, avg, max, ratio
-            );
+            if submit {
+                l3_rows.push(serde_json::json!({
+                    "label": case.label,
+                    "ratio_pct": ratio,
+                    "latency_ms": { "min": min, "avg": avg, "max": max },
+                }));
+            } else {
+                println!(
+                    "{:<28}  {:>8}  {:>8}  {:>8}  {:>6}%",
+                    case.label, min, avg, max, ratio
+                );
+            }
         }
-    } else {
+
+        if submit {
+            report_l3 = Some(serde_json::json!({
+                "backend": backend.name(),
+                "rows": l3_rows,
+            }));
+        }
+    } else if !submit {
         println!();
         println!("Note: L1+L2 only (pure Rust, no Ollama needed). Add --l3 to include inference.");
     }
 
-    println!();
-    println!(
-        "GPU backend: {}",
-        ntk::gpu::resolve_configured_backend(
-            config.model.gpu_layers,
-            config.model.gpu_vendor,
-            config.model.cuda_device,
-        )
+    let gpu_backend = ntk::gpu::resolve_configured_backend(
+        config.model.gpu_layers,
+        config.model.gpu_vendor,
+        config.model.cuda_device,
     );
+
+    if submit {
+        let report = serde_json::json!({
+            "ntk_version": env!("CARGO_PKG_VERSION"),
+            "generated_at": chrono::Utc::now().to_rfc3339(),
+            "os": std::env::consts::OS,
+            "arch": std::env::consts::ARCH,
+            "cpu_count": num_cpus_best_effort(),
+            "backend": config.model.provider.as_str(),
+            "model": config.model.model_name.clone(),
+            "quantization": config.model.quantization.clone(),
+            "gpu_vendor": config.model.gpu_vendor.as_ref().map(|v| format!("{v:?}")),
+            "gpu_backend": format!("{gpu_backend}"),
+            "runs_per_payload": runs,
+            "payloads": report_payloads,
+            "layer3": report_l3,
+        });
+        let pretty = serde_json::to_string_pretty(&report).context("serializing bench report")?;
+        if let Some(path) = output {
+            if let Some(parent) = path.parent() {
+                std::fs::create_dir_all(parent).ok();
+            }
+            std::fs::write(&path, &pretty)
+                .with_context(|| format!("writing bench report to {}", path.display()))?;
+            println!("{}", path.display());
+            println!();
+            println!("Attach that file to a new issue at:");
+            println!("  https://github.com/VALRAW-ALL/ntk/issues/new?template=bench-report.md");
+        } else {
+            println!("{pretty}");
+        }
+    } else {
+        println!();
+        println!("GPU backend: {gpu_backend}");
+    }
     Ok(())
+}
+
+/// Best-effort CPU-count probe for bench reports. Falls back to 1 when
+/// the OS refuses to answer (rare). Kept local to avoid a new dep.
+fn num_cpus_best_effort() -> usize {
+    std::thread::available_parallelism()
+        .map(std::num::NonZeroUsize::get)
+        .unwrap_or(1)
 }
 
 fn run_discover() -> Result<()> {

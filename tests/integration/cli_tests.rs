@@ -207,6 +207,37 @@ fn test_ntk_test_compress_file() {
     );
 }
 
+/// `ntk bench --submit` must emit valid JSON with the expected shape.
+#[test]
+fn test_ntk_bench_submit_emits_valid_json() {
+    let output = ntk()
+        .args(["bench", "--runs", "1", "--submit"])
+        .output()
+        .expect("ntk bench --submit failed");
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        output.status.success(),
+        "bench --submit failed:\nstdout: {stdout}\nstderr: {stderr}"
+    );
+    let parsed: serde_json::Value = serde_json::from_str(&stdout).unwrap_or_else(|e| {
+        panic!("not valid JSON: {e}\nraw:\n{stdout}");
+    });
+    assert!(parsed.get("ntk_version").is_some(), "missing ntk_version");
+    assert!(parsed.get("os").is_some(), "missing os");
+    assert!(parsed.get("arch").is_some(), "missing arch");
+    assert!(parsed.get("gpu_backend").is_some(), "missing gpu_backend");
+    let payloads = parsed
+        .get("payloads")
+        .and_then(|v| v.as_array())
+        .expect("payloads array");
+    assert!(!payloads.is_empty(), "payloads should not be empty");
+    let first = &payloads[0];
+    for field in &["label", "tokens_in", "tokens_out_l2", "ratio_pct", "latency_us"] {
+        assert!(first.get(field).is_some(), "payload missing {field}");
+    }
+}
+
 /// `ntk diff` must emit unified diff blocks for the chosen layer.
 #[test]
 fn test_ntk_diff_emits_unified_diff() {
