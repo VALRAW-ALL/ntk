@@ -478,6 +478,15 @@ async fn async_run_daemon(gpu: bool) -> Result<()> {
         config.model.model_name, config.model.quantization, compute_mode
     );
 
+    // Pin the L2 tokenizer family once at startup so every /compress call
+    // reuses the same BPE without re-parsing the vocab. Default is
+    // cl100k_base; o200k_base is more accurate for Claude 3.5+/GPT-4o.
+    let tk = ntk::compressor::layer2_tokenizer::TokenizerKind::from_config_str(
+        &config.compression.tokenizer,
+    );
+    ntk::compressor::layer2_tokenizer::set_tokenizer(tk);
+    tracing::info!("Layer 2 tokenizer: {:?}", tk);
+
     // Auth: ensure the daemon has a shared-secret token before accepting
     // any request. Generated on first start, persisted at
     // `$HOME/.ntk/.token` with 0600 permissions on Unix.

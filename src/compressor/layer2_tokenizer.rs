@@ -2,21 +2,83 @@ use anyhow::{Context, Result};
 use once_cell::sync::Lazy;
 use regex::Regex;
 use std::sync::OnceLock;
-use tiktoken_rs::{cl100k_base, CoreBPE};
+use tiktoken_rs::{cl100k_base, o200k_base, CoreBPE};
 
 // ---------------------------------------------------------------------------
-// Tokenizer singleton — initialized once, reused for every call.
-// cl100k_base() parses the BPE vocab file (~50ms); caching it eliminates
-// that cost on every compression request.
+// Tokenizer family — which BPE vocab to use for token counting.
+//
+// - `cl100k_base` — Claude 3.x, GPT-3.5 / GPT-4 (older). Default for
+//   backward compatibility: every install pre-#17 used this tokenizer.
+// - `o200k_base`  — Claude 3.5 Sonnet, Claude 4, GPT-4o / o1 family.
+//   Produces ~5-10 % different counts vs cl100k on code and paths.
 // ---------------------------------------------------------------------------
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TokenizerKind {
+    Cl100k,
+    O200k,
+}
+
+impl TokenizerKind {
+    /// Parse a config string (case-insensitive, dashes/underscores allowed).
+    /// Falls back to `Cl100k` on unknown values with a warning — never
+    /// errors, because an unknown tokenizer should degrade to the known-good
+    /// default instead of breaking the compression pipeline.
+    pub fn from_config_str(s: &str) -> Self {
+        let lower = s.to_ascii_lowercase();
+        let normalized = lower.replace('-', "_").replace('.', "_");
+        match normalized.as_str() {
+            "o200k" | "o200k_base" | "gpt4o" | "claude35" | "claude_3_5" | "claude_4" => {
+                Self::O200k
+            }
+            "cl100k" | "cl100k_base" | "" | "default" => Self::Cl100k,
+            other => {
+                tracing::warn!("unknown tokenizer '{other}' — falling back to cl100k_base");
+                Self::Cl100k
+            }
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Tokenizer singletons — each BPE is parsed once (cl100k ~50 ms, o200k
+// ~80 ms) and reused for every call. Active choice is set at startup
+// via `set_tokenizer()` from server.rs; default stays at cl100k so
+// anything not using the new setter (tests, benches) is unaffected.
+// ---------------------------------------------------------------------------
+
+static ACTIVE: OnceLock<TokenizerKind> = OnceLock::new();
+
+/// Select the tokenizer family for this process. Idempotent — first call
+/// wins; later calls are no-ops so a daemon restart followed by a test
+/// harness in the same process can't corrupt each other.
+pub fn set_tokenizer(kind: TokenizerKind) {
+    let _ = ACTIVE.set(kind);
+}
+
+fn active_kind() -> TokenizerKind {
+    *ACTIVE.get().unwrap_or(&TokenizerKind::Cl100k)
+}
 
 fn tokenizer() -> Result<&'static CoreBPE> {
-    static BPE: OnceLock<CoreBPE> = OnceLock::new();
-    if let Some(bpe) = BPE.get() {
-        return Ok(bpe);
+    static CL100K: OnceLock<CoreBPE> = OnceLock::new();
+    static O200K: OnceLock<CoreBPE> = OnceLock::new();
+    match active_kind() {
+        TokenizerKind::Cl100k => {
+            if let Some(bpe) = CL100K.get() {
+                return Ok(bpe);
+            }
+            let bpe = cl100k_base().context("failed to load cl100k_base tokenizer")?;
+            Ok(CL100K.get_or_init(|| bpe))
+        }
+        TokenizerKind::O200k => {
+            if let Some(bpe) = O200K.get() {
+                return Ok(bpe);
+            }
+            let bpe = o200k_base().context("failed to load o200k_base tokenizer")?;
+            Ok(O200K.get_or_init(|| bpe))
+        }
     }
-    let bpe = cl100k_base().context("failed to load cl100k_base tokenizer")?;
-    Ok(BPE.get_or_init(|| bpe))
 }
 
 // ---------------------------------------------------------------------------
@@ -402,6 +464,39 @@ mod tests {
         // "hello world" is 2 tokens in cl100k_base.
         let result = process("hello world").unwrap();
         assert_eq!(result.original_tokens, 2);
+    }
+
+    #[test]
+    fn test_tokenizer_kind_from_config_str() {
+        assert_eq!(
+            TokenizerKind::from_config_str("cl100k_base"),
+            TokenizerKind::Cl100k
+        );
+        assert_eq!(
+            TokenizerKind::from_config_str("CL100K"),
+            TokenizerKind::Cl100k
+        );
+        assert_eq!(
+            TokenizerKind::from_config_str("o200k_base"),
+            TokenizerKind::O200k
+        );
+        assert_eq!(
+            TokenizerKind::from_config_str("o200k"),
+            TokenizerKind::O200k
+        );
+        assert_eq!(
+            TokenizerKind::from_config_str("gpt4o"),
+            TokenizerKind::O200k
+        );
+        assert_eq!(
+            TokenizerKind::from_config_str("claude-3.5"),
+            TokenizerKind::O200k
+        );
+        // Unknown falls back to default (not error).
+        assert_eq!(
+            TokenizerKind::from_config_str("unknown-tokenizer"),
+            TokenizerKind::Cl100k
+        );
     }
 
     #[test]

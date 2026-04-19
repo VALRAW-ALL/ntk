@@ -45,6 +45,18 @@ pub struct CompressionConfig {
     /// Internally bounded to 5 so the prefix stays below MAX_INTENT_CHARS
     /// even in the worst case.
     pub context_max_messages: usize,
+
+    /// Which BPE tokenizer Layer 2 uses for token counting. Accepts:
+    /// `"cl100k_base"` (default; Claude 3.x, GPT-3.5/4) or `"o200k_base"`
+    /// (Claude 3.5+ / 4, GPT-4o / o1 family). The two differ by ~5-10 %
+    /// on code-heavy outputs; pick the one your LLM uses so
+    /// `tokens_before/after` reflect the real cost.
+    #[serde(default = "default_tokenizer")]
+    pub tokenizer: String,
+}
+
+fn default_tokenizer() -> String {
+    "cl100k_base".to_string()
 }
 
 impl Default for CompressionConfig {
@@ -63,6 +75,7 @@ impl Default for CompressionConfig {
             preserve_first_stacktrace: true,
             preserve_error_counts: true,
             context_max_messages: 3,
+            tokenizer: default_tokenizer(),
         }
     }
 }
