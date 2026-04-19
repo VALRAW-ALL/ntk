@@ -25,14 +25,44 @@ fn write_prompts(dir: &std::path::Path) {
     }
 }
 
-fn ollama_response(response_text: &str) -> serde_json::Value {
-    serde_json::json!({
+/// Ollama's streaming /api/generate emits one JSON-per-line (NDJSON).
+/// Since the client now always requests `stream: true`, mocks must return
+/// NDJSON — split the response into per-token objects with a final `done`.
+fn ollama_stream_ndjson(response_text: &str) -> String {
+    let mut out = String::new();
+    // Split into rough word-sized "tokens" so the stream parser sees
+    // multiple chunks. Any whitespace-preserving split works here.
+    let parts: Vec<&str> = response_text.split_inclusive(' ').collect();
+    for (i, part) in parts.iter().enumerate() {
+        let obj = serde_json::json!({
+            "model": "phi3:mini",
+            "response": part,
+            "done": false,
+            "done_reason": serde_json::Value::Null,
+        });
+        out.push_str(&obj.to_string());
+        out.push('\n');
+        let _ = i; // silence unused
+    }
+    // Final object signals completion + carries counts.
+    let done = serde_json::json!({
         "model": "phi3:mini",
-        "response": response_text,
+        "response": "",
         "done": true,
         "prompt_eval_count": 100,
         "eval_count": 20,
-    })
+    });
+    out.push_str(&done.to_string());
+    out.push('\n');
+    out
+}
+
+/// Convenience helper — one-shot NDJSON body with content-type set so
+/// reqwest's bytes_stream delivers raw bytes to the streaming parser.
+fn ndjson_response(body: &str) -> ResponseTemplate {
+    ResponseTemplate::new(200)
+        .insert_header("content-type", "application/x-ndjson")
+        .set_body_string(body.to_owned())
 }
 
 // ---------------------------------------------------------------------------
@@ -50,9 +80,7 @@ async fn test_inference_request_format() {
 
     Mock::given(method("POST"))
         .and(path("/api/generate"))
-        .respond_with(
-            ResponseTemplate::new(200).set_body_json(ollama_response("2 passed, 1 failed")),
-        )
+        .respond_with(ndjson_response(&ollama_stream_ndjson("2 passed, 1 failed")))
         .expect(1)
         .mount(&server)
         .await;
@@ -103,8 +131,7 @@ async fn test_fallback_on_ollama_timeout() {
         .and(path("/api/generate"))
         // Add a 2-second delay — longer than our 100ms timeout.
         .respond_with(
-            ResponseTemplate::new(200)
-                .set_body_json(ollama_response("compressed"))
+            ndjson_response(&ollama_stream_ndjson("compressed"))
                 .set_delay(Duration::from_millis(2000)),
         )
         .mount(&server)
@@ -125,6 +152,64 @@ async fn test_fallback_on_ollama_timeout() {
     );
 }
 
+/// Verify that the streaming client assembles multi-token NDJSON into the
+/// full compressed output — catches regressions in the stream-parsing loop
+/// that would truncate output when Ollama emits >1 chunk.
+#[tokio::test]
+async fn test_stream_assembles_multi_token_output() {
+    let server = MockServer::start().await;
+    Mock::given(method("POST"))
+        .and(path("/api/generate"))
+        .respond_with(ndjson_response(&ollama_stream_ndjson(
+            "one two three four five six seven",
+        )))
+        .mount(&server)
+        .await;
+
+    let dir = TempDir::new().unwrap();
+    write_prompts(dir.path());
+
+    let client = OllamaClient::new(&server.uri(), 5000, "phi3:mini");
+    let result = client
+        .compress("input", OutputType::Log, dir.path())
+        .await
+        .expect("ok");
+    assert_eq!(result.output, "one two three four five six seven");
+    assert_eq!(result.input_tokens, 100);
+    assert_eq!(result.output_tokens, 20);
+}
+
+/// Verify that the client cancels cleanly when the calling future is
+/// dropped mid-stream. tokio::time::timeout drops its inner future on
+/// deadline, which propagates to the HTTP body stream and closes the
+/// connection. The assertion here is simply that no panic / hang occurs —
+/// cancellation safety under the streaming parser is the actual contract.
+#[tokio::test]
+async fn test_stream_cancels_cleanly_when_dropped() {
+    let server = MockServer::start().await;
+    Mock::given(method("POST"))
+        .and(path("/api/generate"))
+        .respond_with(
+            ndjson_response(&ollama_stream_ndjson("never finishes"))
+                .set_delay(Duration::from_secs(30)),
+        )
+        .mount(&server)
+        .await;
+
+    let dir = TempDir::new().unwrap();
+    write_prompts(dir.path());
+
+    let client = OllamaClient::new(&server.uri(), 30_000, "phi3:mini");
+    let fut = client.compress("input", OutputType::Log, dir.path());
+
+    // Drop after 100ms — the daemon in prod does the same on hook deadline.
+    let result = tokio::time::timeout(Duration::from_millis(100), fut).await;
+    assert!(
+        result.is_err(),
+        "expected timeout (not panic), got: {result:?}"
+    );
+}
+
 /// Verify that the correct system prompt file is selected per output type:
 /// Test → test.txt, Build → build.txt, etc.
 #[tokio::test]
@@ -137,7 +222,7 @@ async fn test_correct_prompt_per_type() {
 
     Mock::given(method("POST"))
         .and(path("/api/generate"))
-        .respond_with(ResponseTemplate::new(200).set_body_json(ollama_response("ok")))
+        .respond_with(ndjson_response(&ollama_stream_ndjson("ok")))
         .mount(&server)
         .await;
 

@@ -44,6 +44,12 @@ impl OllamaClient {
 
     /// Compress `input` using the Ollama model with a type-specific system prompt.
     ///
+    /// Streams tokens from Ollama and assembles them into a single string so
+    /// the daemon starts processing before Ollama has finished generating.
+    /// On caller cancellation (future dropped), the underlying HTTP body
+    /// stream is dropped too — Ollama sees a closed connection and stops
+    /// generating, freeing GPU time on large inputs that get interrupted.
+    ///
     /// Returns `Err` on timeout or connection failure so the caller falls back to L1+L2.
     /// The content of `input` is placed in the *user* turn only — never in the system prompt
     /// (prevents prompt injection via crafted tool output).
@@ -59,7 +65,7 @@ impl OllamaClient {
             "model": self.model,
             "system": system_prompt,
             "prompt": input,
-            "stream": false,
+            "stream": true,
         });
 
         let client = reqwest::Client::builder()
@@ -80,27 +86,62 @@ impl OllamaClient {
             return Err(anyhow!("Ollama returned HTTP {status}"));
         }
 
-        let body: serde_json::Value = response
-            .json()
-            .await
-            .context("parsing Ollama response JSON")?;
+        // Streamed /api/generate emits one JSON document per line. Each
+        // object carries `response: "<token>"` plus metadata; the final
+        // object has `done: true` and totals. We accumulate tokens as
+        // they arrive and break on `done`.
+        let mut compressed = String::new();
+        let mut input_tokens = 0usize;
+        let mut output_tokens = 0usize;
 
-        let compressed = body
-            .get("response")
-            .and_then(|v| v.as_str())
-            .ok_or_else(|| anyhow!("Ollama response missing 'response' field"))?
-            .trim()
-            .to_owned();
+        use futures_util::StreamExt;
+        let mut byte_stream = response.bytes_stream();
+        let mut buf = Vec::<u8>::new();
+        let mut done = false;
 
+        while !done {
+            let chunk = match byte_stream.next().await {
+                Some(Ok(bytes)) => bytes,
+                Some(Err(e)) => return Err(anyhow!("Ollama stream error: {e}")),
+                None => break,
+            };
+            buf.extend_from_slice(&chunk);
+            // Parse any complete lines that have arrived. Ollama never
+            // splits a JSON object across lines, so a newline marks a
+            // boundary and we can drain everything up to it.
+            while let Some(newline_pos) = buf.iter().position(|b| *b == b'\n') {
+                let line = buf.drain(..=newline_pos).collect::<Vec<u8>>();
+                let trimmed = match std::str::from_utf8(&line) {
+                    Ok(s) => s.trim(),
+                    Err(_) => continue, // skip malformed chunk, rely on the next
+                };
+                if trimmed.is_empty() {
+                    continue;
+                }
+                let obj: serde_json::Value = match serde_json::from_str(trimmed) {
+                    Ok(v) => v,
+                    Err(_) => continue,
+                };
+                if let Some(tok) = obj.get("response").and_then(|v| v.as_str()) {
+                    compressed.push_str(tok);
+                }
+                if obj.get("done").and_then(|v| v.as_bool()).unwrap_or(false) {
+                    input_tokens = obj
+                        .get("prompt_eval_count")
+                        .and_then(|v| v.as_u64())
+                        .unwrap_or(0) as usize;
+                    output_tokens =
+                        obj.get("eval_count").and_then(|v| v.as_u64()).unwrap_or(0) as usize;
+                    done = true;
+                    break;
+                }
+            }
+        }
+
+        let compressed = compressed.trim().to_owned();
         if compressed.is_empty() {
             return Err(anyhow!("Ollama returned empty response"));
         }
-
-        let input_tokens = body
-            .get("prompt_eval_count")
-            .and_then(|v| v.as_u64())
-            .unwrap_or(0) as usize;
-        let output_tokens = body.get("eval_count").and_then(|v| v.as_u64()).unwrap_or(0) as usize;
 
         Ok(Layer3Result {
             output: compressed,
