@@ -8,6 +8,9 @@
   "exports": {
     ".": "./index.js"
   },
+  "bin": {
+    "ctxlint": "./bin/ctxlint.js"
+  },
   "scripts": {
     "test": "node --test test.js"
   },
