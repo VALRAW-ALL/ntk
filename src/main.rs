@@ -162,6 +162,12 @@ enum Command {
 enum ModelAction {
     /// Interactive wizard: compare backends and configure one.
     Setup,
+    /// (Re)download and extract the llama-server binary for this OS +
+    /// configured `model.gpu_vendor`. Picks the appropriate llama.cpp
+    /// release asset automatically: CUDA for NVIDIA, Vulkan for AMD,
+    /// platform-default for Apple (Metal is bundled on macOS).
+    #[command(name = "install-server")]
+    InstallServer,
     /// Download the inference model (model and/or tokenizer).
     Pull {
         /// Quantization variant, e.g. q4_k_m, q5_k_m, q6_k (default: q5_k_m).
@@ -1431,11 +1437,21 @@ fn print_unified_diff(header: &str, before: &str, after: &str, context: usize) {
 fn run_model(action: ModelAction) -> Result<()> {
     match action {
         ModelAction::Setup => run_model_setup(),
+        ModelAction::InstallServer => run_install_server(),
         ModelAction::Pull { quant, backend } => run_model_pull(&quant, &backend),
         ModelAction::Test { debug } => run_model_test(debug),
         ModelAction::Bench => run_model_bench(),
         ModelAction::List => run_model_list(),
     }
+}
+
+fn run_install_server() -> Result<()> {
+    let dest = install_llama_server_binary()?;
+    println!();
+    println!("llama-server installed at: {}", dest.display());
+    println!("Restart the daemon to pick up the new binary:");
+    println!("  ntk stop && ntk start");
+    Ok(())
 }
 
 fn run_model_pull(quant: &str, backend: &str) -> Result<()> {
@@ -2664,8 +2680,11 @@ async fn install_llama_server_binary_async() -> Result<PathBuf> {
         .user_agent("ntk-installer/0.1")
         .build()?;
 
+    // The llama.cpp repo was transferred from ggerganov to ggml-org in early
+    // 2026; the old path returns a 301 whose Location is another API URL that
+    // reqwest follows transparently, but keeping it in sync is cleaner.
     let release: serde_json::Value = client
-        .get("https://api.github.com/repos/ggerganov/llama.cpp/releases/latest")
+        .get("https://api.github.com/repos/ggml-org/llama.cpp/releases/latest")
         .send()
         .await
         .map_err(|e| anyhow::anyhow!("GitHub API request failed: {e}"))?
@@ -2690,10 +2709,17 @@ async fn install_llama_server_binary_async() -> Result<PathBuf> {
         .ok_or_else(|| anyhow::anyhow!("no assets in GitHub release"))?;
 
     // ---- 2. Pick the right asset for this platform/arch ----
-    let (asset_name, asset_url) = select_llama_cpp_asset(assets).ok_or_else(|| {
+    // Read the user's chosen GPU vendor from config so we can pick the best
+    // asset automatically: nvidia→cuda, amd→vulkan, apple→macos default,
+    // otherwise vulkan (universal) or avx2 (CPU).
+    let cwd = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
+    let cfg = ntk::config::load(&cwd).unwrap_or_default();
+    let vendor_hint = cfg.model.gpu_vendor;
+
+    let (asset_name, asset_url) = select_llama_cpp_asset(assets, vendor_hint).ok_or_else(|| {
         anyhow::anyhow!(
             "No suitable llama.cpp binary found for {}/{}\n\
-             Download manually from: https://github.com/ggerganov/llama.cpp/releases",
+             Download manually from: https://github.com/ggml-org/llama.cpp/releases",
             std::env::consts::OS,
             std::env::consts::ARCH
         )
@@ -2725,11 +2751,22 @@ async fn install_llama_server_binary_async() -> Result<PathBuf> {
 
 /// Pick the best zip asset from the GitHub release assets list for the current OS/arch.
 /// Returns `(asset_name, download_url)` or `None` if no match found.
-fn select_llama_cpp_asset(assets: &[serde_json::Value]) -> Option<(String, String)> {
+/// Select the best llama.cpp binary for this platform + GPU vendor.
+///
+/// Preference by vendor (from `config.model.gpu_vendor`):
+/// - `nvidia` → cuda-13.1 > cuda-12.4 > vulkan > avx2
+/// - `amd` → vulkan > hip-radeon > avx2 (Vulkan is more reliable on older
+///   Polaris/Vega cards than ROCm/HIP)
+/// - `intel` → sycl > vulkan > avx2
+/// - `apple` → macos build (Metal is compiled into every macOS release)
+/// - `None` → vulkan > avx2 > plain (safe default)
+fn select_llama_cpp_asset(
+    assets: &[serde_json::Value],
+    vendor: Option<ntk::gpu::GpuVendor>,
+) -> Option<(String, String)> {
     let os = std::env::consts::OS; // "linux" | "macos" | "windows"
     let arch = std::env::consts::ARCH; // "x86_64" | "aarch64"
 
-    // Keywords that must appear in the asset name for os and arch.
     let os_keywords: &[&str] = match os {
         "linux" => &["linux", "ubuntu"],
         "macos" => &["macos", "osx"],
@@ -2742,7 +2779,6 @@ fn select_llama_cpp_asset(assets: &[serde_json::Value]) -> Option<(String, Strin
         _ => return None,
     };
 
-    // Collect all matching zip assets (case-insensitive).
     let candidates: Vec<(String, String)> = assets
         .iter()
         .filter_map(|a| {
@@ -2752,7 +2788,6 @@ fn select_llama_cpp_asset(assets: &[serde_json::Value]) -> Option<(String, Strin
                 return None;
             }
             let lower = name.to_lowercase();
-            // Must match at least one OS keyword AND at least one arch keyword.
             if !os_keywords.iter().any(|k| lower.contains(k)) {
                 return None;
             }
@@ -2763,25 +2798,33 @@ fn select_llama_cpp_asset(assets: &[serde_json::Value]) -> Option<(String, Strin
         })
         .collect();
 
-    // Preference order:
-    //   1. Vulkan — universal GPU (NVIDIA + AMD) without requiring CUDA/ROCm.
-    //              The single build that works for most users with a discrete GPU.
-    //   2. AVX2   — best CPU performance for CPU-only users.
-    //   3. plain  — any remaining candidate.
-    //   (CUDA builds are skipped here; users who want CUDA can download manually.)
-    let vulkan: Option<&(String, String)> = candidates
-        .iter()
-        .find(|(n, _)| n.to_lowercase().contains("vulkan"));
+    // Tokens in the asset filename that mark a given GPU feature. Ordered
+    // within each vendor from best to worst.
+    let vendor_pref: &[&str] = match vendor {
+        Some(ntk::gpu::GpuVendor::Nvidia) => &["cuda-13.1", "cuda-12.4", "cuda", "vulkan", "avx2"],
+        Some(ntk::gpu::GpuVendor::Amd) => &["vulkan", "hip-radeon", "hip", "avx2"],
+        // Intel Arc / integrated: SYCL or Vulkan both work; SYCL is
+        // Intel-tuned and faster when the OneAPI runtime is present.
+        Some(ntk::gpu::GpuVendor::Intel) => &["sycl", "vulkan", "avx2"],
+        Some(ntk::gpu::GpuVendor::Apple) => {
+            // macOS builds always carry Metal; there are no hip/vulkan/cuda
+            // variants on macOS — just pick the first macos+arch match.
+            return candidates.into_iter().next();
+        }
+        None => &["vulkan", "avx2"],
+    };
 
-    if let Some(v) = vulkan {
-        return Some(v.clone());
+    for token in vendor_pref {
+        if let Some(hit) = candidates
+            .iter()
+            .find(|(n, _)| n.to_lowercase().contains(token))
+        {
+            return Some(hit.clone());
+        }
     }
 
-    candidates
-        .iter()
-        .find(|(n, _)| n.to_lowercase().contains("avx2"))
-        .or_else(|| candidates.first())
-        .cloned()
+    // Nothing matched the preferred tokens — last resort: any candidate.
+    candidates.into_iter().next()
 }
 
 /// Returns true if `filename` is a platform shared library that should be

@@ -29,6 +29,23 @@ AMD    → HIP_VISIBLE_DEVICES=<device_id>
 
 This is done in `LlamaCppBackend::start()` via `.with_gpu_selection(vendor, device_id)`.
 
+## Binary selection at install time (`ntk model install-server`)
+
+`select_llama_cpp_asset(assets, vendor)` in `src/main.rs` picks the right
+zip from the llama.cpp GitHub release based on `config.model.gpu_vendor`:
+
+| Vendor | Preference order (filename tokens) |
+|---|---|
+| `Nvidia` | `cuda-13.1` > `cuda-12.4` > `cuda` > `vulkan` > `avx2` |
+| `Amd` | `vulkan` > `hip-radeon` > `hip` > `avx2` |
+| `Intel` | `sycl` > `vulkan` > `avx2` |
+| `Apple` | first `macos` match (Metal is bundled) |
+| `None` | `vulkan` > `avx2` |
+
+Source of truth: `https://api.github.com/repos/ggml-org/llama.cpp/releases/latest`.
+The repo was transferred from `ggerganov` to `ggml-org` in early 2026 —
+do not revert the URL.
+
 ## setup_gpu_selection() return signature
 
 Returns `(gpu_layers: i32, gpu_auto_detect: bool, device_id: u32, gpu_vendor: Option<GpuVendor>)`.
