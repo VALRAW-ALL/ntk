@@ -1,0 +1,7 @@
+{
+    "category":  "stack_trace",
+    "description":  "Rails ActiveRecord::RecordNotFound with Action Pack + Active Support + Puma frames.",
+    "min_ratio":  0.05,
+    "expected_layer":  2,
+    "command":  "rails server"
+}

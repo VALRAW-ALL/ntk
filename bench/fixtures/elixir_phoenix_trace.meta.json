@@ -1,0 +1,7 @@
+{
+    "category":  "stack_trace",
+    "description":  "Phoenix GenServer crash with Plug + Ecto + Postgrex + OTP frames.",
+    "min_ratio":  0.05,
+    "expected_layer":  2,
+    "command":  "mix phx.server"
+}

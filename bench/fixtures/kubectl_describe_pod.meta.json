@@ -1,0 +1,7 @@
+{
+    "category":  "container_log",
+    "description":  "kubectl describe pod with verbose Labels/Annotations + Events block.",
+    "min_ratio":  0.0,
+    "expected_layer":  2,
+    "command":  "kubectl describe pod api-server-7d9c4b8f6c-2x8jk"
+}

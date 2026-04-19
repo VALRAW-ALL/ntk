@@ -3,7 +3,9 @@ category: stack_trace
 language: ruby
 frameworks: [rails, actionpack, activesupport, rack, sidekiq]
 rules:
-  # Rails request-dispatch stack.
+  # Rails request-dispatch stack. Two filename conventions to match:
+  # bundler/gem cache paths (`/actionpack-7.1.2/lib/...`) AND the
+  # Rails error-page format (`actionpack (7.1.2) lib/action_controller/...`).
   - id: ruby.stack.rails_dispatch
     pattern:
       kind: frame-run
@@ -15,6 +17,11 @@ rules:
         - '/activesupport/lib/'
         - '/railties-'
         - '/railties/lib/'
+        - 'actionpack ('
+        - 'activesupport ('
+        - 'actionview ('
+        - 'activerecord ('
+        - 'railties ('
     transform:
       kind: collapse-run
       min_run: 3
@@ -22,7 +29,7 @@ rules:
     severity: lossy-safe
     invariants: [preserve_first_frame, preserve_last_frame, preserve_errors]
 
-  # Rack middleware chain.
+  # Rack middleware chain — gem path + error-page formats.
   - id: ruby.stack.rack
     pattern:
       kind: frame-run
@@ -31,6 +38,8 @@ rules:
         - '/rack-'
         - '/rack/lib/'
         - '/gems/rack-'
+        - 'rack ('
+        - 'puma ('
     transform:
       kind: collapse-run
       min_run: 3

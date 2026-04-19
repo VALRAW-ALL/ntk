@@ -186,6 +186,76 @@ fn java_ruleset_collapses_on_java_fixture() {
     );
 }
 
+/// Spot-check: Elixir ruleset on the Phoenix fixture.
+#[test]
+fn elixir_ruleset_collapses_on_phoenix_fixture() {
+    let path = rules_root().join("stack_trace").join("elixir.yaml");
+    let rule_file = load_rule_file(&path).expect("load elixir.yaml");
+    let input = fixture("elixir_phoenix_trace.txt").expect("elixir_phoenix_trace fixture");
+    let result = apply_rule_file(&input, &rule_file);
+    assert!(
+        result.output.contains("frames omitted"),
+        "expected collapse on Elixir Phoenix/Plug + Ecto + OTP frames:\n{}",
+        result.output
+    );
+}
+
+/// Spot-check: Ruby ruleset on the Rails fixture.
+#[test]
+fn ruby_ruleset_collapses_on_rails_fixture() {
+    let path = rules_root().join("stack_trace").join("ruby.yaml");
+    let rule_file = load_rule_file(&path).expect("load ruby.yaml");
+    let input = fixture("ruby_rails_trace.txt").expect("ruby_rails_trace fixture");
+    let result = apply_rule_file(&input, &rule_file);
+    assert!(
+        result.output.contains("frames omitted"),
+        "expected collapse on Rails actionpack/activesupport/puma frames:\n{}",
+        result.output
+    );
+}
+
+/// Spot-check: Swift ruleset on the iOS crash fixture.
+#[test]
+fn swift_ruleset_collapses_on_uikit_fixture() {
+    let path = rules_root().join("stack_trace").join("swift.yaml");
+    let rule_file = load_rule_file(&path).expect("load swift.yaml");
+    let input = fixture("swift_uikit_crash.txt").expect("swift_uikit_crash fixture");
+    let result = apply_rule_file(&input, &rule_file);
+    assert!(
+        result.output.contains("frames omitted"),
+        "expected collapse on UIKit/dyld/libsystem frames:\n{}",
+        result.output
+    );
+}
+
+/// Spot-check: kubectl ruleset on the describe-pod fixture — proves
+/// the line-match deletion primitive (Labels/Annotations) fires on
+/// realistic kubectl output.
+#[test]
+fn kubectl_ruleset_strips_metadata_on_describe_pod_fixture() {
+    let path = rules_root().join("container_log").join("kubectl.yaml");
+    let rule_file = load_rule_file(&path).expect("load kubectl.yaml");
+    let input = fixture("kubectl_describe_pod.txt").expect("kubectl_describe_pod fixture");
+    let result = apply_rule_file(&input, &rule_file);
+    // Annotations/Labels block should be reduced; the Events block
+    // (where the actual signal lives) MUST stay.
+    assert!(
+        !result
+            .output
+            .contains("kubectl.kubernetes.io/last-applied-configuration"),
+        "kubectl.yaml should drop the verbose Annotations metadata:\n{}",
+        result.output
+    );
+    assert!(
+        result.output.contains("Events:"),
+        "events block must be preserved (highest signal)"
+    );
+    assert!(
+        result.output.contains("Liveness probe failed"),
+        "Warning event must be preserved (preserve_errors invariant)"
+    );
+}
+
 /// Spot-check: PHP ruleset on the Symfony fixture.
 #[test]
 fn php_ruleset_collapses_on_symfony_fixture() {

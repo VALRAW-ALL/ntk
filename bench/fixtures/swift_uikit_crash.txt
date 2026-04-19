@@ -1,0 +1,19 @@
+Thread 0 Crashed:
+0   libsystem_kernel.dylib            0x00000001f1234abc __pthread_kill + 8
+1   libsystem_pthread.dylib           0x00000001f1234def pthread_kill + 268
+2   libsystem_c.dylib                 0x00000001f1235123 abort + 168
+3   libsystem_malloc.dylib            0x00000001f1236abc nano_calloc + 0x140
+4   libobjc.A.dylib                   0x00000001abc12345 objc_msgSend + 32
+5   Foundation                        0x00000001f5050aaa -[NSObject performSelector:] + 76
+6   CoreFoundation                    0x00000001f6060bbb -[NSException raise] + 12
+7   CoreFoundation                    0x00000001f6061ccc -[NSArray objectAtIndex:] + 188
+8   UIKitCore                         0x00000001f7070ddd -[UICollectionView layoutAttributesForItemAtIndexPath:] + 220
+9   UIKitCore                         0x00000001f7071eee -[UICollectionView _updateVisibleCellsNow:] + 1820
+10  UIKitCore                         0x00000001f7072fff -[UICollectionView layoutSubviews] + 320
+11  UIKitCore                         0x00000001f7073000 -[UIView(CALayerDelegate) layoutSublayersOfLayer:] + 2200
+12  GraphicsServices                  0x00000001f8080111 GSEventRunModal + 168
+13  MyApp.debug.dylib                 0x0000000100abcdef MyApp.HomeViewController.collectionView(_:cellForItemAt:) (HomeViewController.swift:127)
+14  MyApp.debug.dylib                 0x0000000100abc100 MyApp.AppDelegate.application(_:didFinishLaunchingWithOptions:) (AppDelegate.swift:42)
+15  UIKitCore                         0x00000001f7074111 UIApplicationMain + 168
+16  dyld                              0x00000001ddabc111 start + 2440
+*** Terminating app due to uncaught exception 'NSRangeException', reason: '*** -[__NSArray0 objectAtIndex:]: index 0 beyond bounds for empty array'

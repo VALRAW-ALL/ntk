@@ -1,0 +1,7 @@
+{
+    "category":  "stack_trace",
+    "description":  "Swift / iOS NSRangeException with libsystem + UIKitCore + dyld frames.",
+    "min_ratio":  0.0,
+    "expected_layer":  2,
+    "command":  "./MyApp.app"
+}

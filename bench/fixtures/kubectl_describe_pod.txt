@@ -1,0 +1,38 @@
+Name:             api-server-7d9c4b8f6c-2x8jk
+Namespace:        production
+Priority:         0
+Service Account:  api-server
+Node:             node-pool-1-abc123-xyz789/10.0.1.42
+Start Time:       Wed, 15 Apr 2026 10:23:45 +0000
+Labels:           app=api-server
+                  pod-template-hash=7d9c4b8f6c
+                  version=v1.2.3
+                  environment=production
+                  team=backend
+                  cost-center=engineering
+Annotations:      kubectl.kubernetes.io/last-applied-configuration: {"apiVersion":"v1","kind":"Pod"...}
+                  prometheus.io/scrape: true
+                  prometheus.io/port: 9090
+                  sidecar.istio.io/inject: false
+                  vault.hashicorp.com/agent-inject: true
+Status:           Running
+IP:               10.244.1.78
+Selector:         app=api-server
+Containers:
+  api:
+    Container ID:  containerd://abc123def456
+    Image:         registry.example.com/api-server:v1.2.3
+    Port:          8080/TCP
+    State:         Running
+      Started:     Wed, 15 Apr 2026 10:23:50 +0000
+    Ready:         True
+Events:
+  Type     Reason     Age   From               Message
+  ----     ------     ----  ----               -------
+  Normal   Scheduled  3m    default-scheduler  Successfully assigned production/api-server-7d9c4b8f6c-2x8jk to node-pool-1-abc123-xyz789
+  Normal   Pulling    3m    kubelet            Pulling image "registry.example.com/api-server:v1.2.3"
+  Normal   Pulled     2m    kubelet            Successfully pulled image
+  Normal   Created    2m    kubelet            Created container api
+  Normal   Started    2m    kubelet            Started container api
+  Warning  Unhealthy  1m    kubelet            Liveness probe failed: HTTP probe failed with statuscode: 503
+  Warning  BackOff    30s   kubelet            Back-off restarting failed container

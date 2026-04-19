@@ -1,0 +1,20 @@
+[error] GenServer #PID<0.523.0> terminating
+** (FunctionClauseError) no function clause matching in MyApp.UserController.show/2
+    (my_app 0.1.0) lib/my_app/controllers/user_controller.ex:42: MyApp.UserController.show(%Plug.Conn{params: %{"id" => "abc"}}, %{"id" => "abc"})
+    (phoenix 1.7.10) lib/phoenix/router.ex:432: Phoenix.Router.__call__/2
+    (phoenix 1.7.10) lib/phoenix/router.ex:115: Phoenix.Router.call/2
+    (phoenix 1.7.10) lib/phoenix/endpoint/cowboy2_handler.ex:54: Phoenix.Endpoint.Cowboy2Handler.init/4
+    (plug_cowboy 2.6.1) lib/plug/cowboy/handler.ex:11: Plug.Cowboy.Handler.init/2
+    (plug 1.14.2) lib/plug/builder.ex:115: Plug.Builder.call/2
+    (plug 1.14.2) lib/plug/builder.ex:80: Plug.Builder.init_module_plug/3
+    (ecto 3.10.3) lib/ecto/repo/queryable.ex:229: Ecto.Repo.Queryable.execute/4
+    (ecto 3.10.3) lib/ecto/repo/queryable.ex:19: Ecto.Repo.Queryable.all/3
+    (ecto_sql 3.10.2) lib/ecto/adapters/sql.ex:991: Ecto.Adapters.SQL.raise_sql_call_error/1
+    (db_connection 2.6.0) lib/db_connection.ex:1568: DBConnection.run/3
+    (postgrex 0.17.4) lib/postgrex/protocol.ex:418: Postgrex.Protocol.handle_execute/4
+    (stdlib 5.1.1) gen_server.erl:1113: :gen_server.try_dispatch/4
+    (stdlib 5.1.1) gen_server.erl:1190: :gen_server.handle_msg/6
+    (kernel 9.2) proc_lib.erl:241: :proc_lib.init_p_do_apply/3
+Last message: %Plug.Conn{adapter: {Plug.Cowboy.Conn, :...}}
+State: %{phoenix_pipelines: [:browser]}
+[error] Postgrex.Protocol (#PID<0.412.0>) failed to connect: ** (Postgrex.Error) ERROR 42P01 (undefined_table)
