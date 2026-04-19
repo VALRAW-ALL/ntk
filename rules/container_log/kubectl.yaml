@@ -1,0 +1,43 @@
+spec_version: 0.1
+category: container_log
+tool: kubectl
+rules:
+  # Per-container log prefix: '[pod/container] ...'. When running
+  # multiple replicas the same log line fires N times — template-dedup
+  # collapses the identical messages.
+  - id: kubectl.log_replicas_dedup
+    pattern:
+      kind: template-dedup
+      normalize:
+        # Pod-UUID suffixes in names like 'my-deploy-abc123-xyz789'
+        - regex: '[a-z0-9]{5,10}-[a-z0-9]{5,10}'
+          replacement: '§'
+        # Timestamps
+        - regex: '\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}'
+          replacement: '§'
+        - regex: '\d+\.\d+'
+          replacement: '§'
+    transform:
+      kind: dedup
+      min_run: 3
+      format: '[×{n}] {exemplar}'
+    severity: lossy-safe
+    invariants: [preserve_errors]
+
+  # kubectl describe: resource metadata blocks are highly structured
+  # and extremely verbose. The repeated 'Events:' sections that
+  # describe why a pod was scheduled / failed are worth keeping; the
+  # metadata above is not.
+  - id: kubectl.describe_metadata
+    pattern:
+      kind: line-match
+      classifier: regex
+      values:
+        - '^Labels:\s'
+        - '^Annotations:\s'
+        - '^Selector:\s'
+        - '^\s+[a-z0-9.-]+/[a-z0-9.-]+=\S+$'
+    transform:
+      kind: delete
+    severity: lossy-risky
+    invariants: [preserve_errors]

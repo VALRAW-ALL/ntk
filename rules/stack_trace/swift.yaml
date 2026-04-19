@@ -1,0 +1,35 @@
+spec_version: 0.1
+category: stack_trace
+language: swift
+frameworks: [uikit, foundation, combine, swiftui]
+rules:
+  # Swift crash report frames: 'N  libfoo.dylib  0xADDR  func + offset'
+  # The addresses + offsets are volatile (ASLR), paths are generally
+  # stable. Collapsing dylib-framework runs drops the noise that
+  # crash reports are notorious for.
+  - id: swift.stack.apple_frameworks
+    pattern:
+      kind: frame-run
+      classifier: regex
+      values:
+        - '^\d+\s+(UIKitCore|Foundation|CoreFoundation|SwiftUI|Combine|GraphicsServices)\s'
+    transform:
+      kind: collapse-run
+      min_run: 3
+      replacement: '... [{n} Apple framework frames omitted]'
+    severity: lossy-safe
+    invariants: [preserve_first_frame, preserve_last_frame, preserve_errors]
+
+  # Dyld / libsystem machinery at the bottom of every crash report.
+  - id: swift.stack.dyld_libsystem
+    pattern:
+      kind: frame-run
+      classifier: regex
+      values:
+        - '^\d+\s+(dyld|libsystem_|libdispatch|libobjc|libc\+\+)'
+    transform:
+      kind: collapse-run
+      min_run: 2
+      replacement: '... [{n} dyld/libsystem frames omitted]'
+    severity: lossy-safe
+    invariants: [preserve_first_frame, preserve_last_frame, preserve_errors]
