@@ -18,6 +18,10 @@ pub enum EditorTarget {
     /// under `context_servers` (command-object shape with
     /// `command.path`, `command.args`, `command.env`).
     Zed,
+    /// Continue — registers `ntk mcp-server` in `~/.continue/config.json`
+    /// under `mcpServers` (array of named server objects, distinct from
+    /// Cursor's object-keyed-by-name).
+    Continue,
 }
 
 impl EditorTarget {
@@ -25,7 +29,10 @@ impl EditorTarget {
     /// hook. Drives the install-path split between `inject_ntk_hook`
     /// and the MCP-specific inject functions.
     pub fn uses_mcp(self) -> bool {
-        matches!(self, EditorTarget::Cursor | EditorTarget::Zed)
+        matches!(
+            self,
+            EditorTarget::Cursor | EditorTarget::Zed | EditorTarget::Continue
+        )
     }
 }
 
@@ -352,6 +359,7 @@ fn editor_settings_path(editor: EditorTarget) -> Result<PathBuf> {
         EditorTarget::ClaudeCode => Ok(home.join(".claude").join("settings.json")),
         EditorTarget::OpenCode => Ok(home.join(".opencode").join("settings.json")),
         EditorTarget::Cursor => Ok(home.join(".cursor").join("mcp.json")),
+        EditorTarget::Continue => Ok(home.join(".continue").join("config.json")),
         EditorTarget::Zed => {
             // Zed reads its user settings from:
             //   Linux:   ~/.config/zed/settings.json
@@ -887,6 +895,7 @@ fn patch_settings(settings_path: &Path, auto_patch: bool, editor: EditorTarget) 
 
     let new_json = match editor {
         EditorTarget::Cursor => inject_ntk_mcp_server(&existing)?,
+        EditorTarget::Continue => inject_ntk_continue_mcp_server(&existing)?,
         EditorTarget::Zed => inject_ntk_zed_mcp_server(&existing)?,
         EditorTarget::ClaudeCode | EditorTarget::OpenCode => inject_ntk_hook(&existing)?,
     };
@@ -933,6 +942,44 @@ fn inject_ntk_mcp_server(json_str: &str) -> Result<String> {
     servers.insert("ntk".to_string(), server_entry);
 
     serde_json::to_string_pretty(&root).context("serializing patched mcp.json")
+}
+
+/// Inject NTK's MCP server into Continue's `mcpServers` array.
+/// Unlike Cursor (object keyed by name), Continue expects an array of
+/// objects with an inline `name` field.
+fn inject_ntk_continue_mcp_server(json_str: &str) -> Result<String> {
+    let mut root: serde_json::Value =
+        serde_json::from_str(json_str).with_context(|| "parsing Continue config.json")?;
+
+    let ntk_cmd = resolve_ntk_binary_for_mcp();
+
+    let entry = serde_json::json!({
+        "name": "ntk",
+        "command": ntk_cmd,
+        "args": ["mcp-server"],
+        "_ntk": NTK_HOOK_MARKER,
+    });
+
+    let servers = root
+        .as_object_mut()
+        .ok_or_else(|| anyhow!("Continue config.json root is not an object"))?
+        .entry("mcpServers")
+        .or_insert_with(|| serde_json::json!([]))
+        .as_array_mut()
+        .ok_or_else(|| anyhow!("Continue config.json[\"mcpServers\"] is not an array"))?;
+
+    // Idempotence safety: don't duplicate if a marker-carrying entry exists.
+    let already = servers.iter().any(|v| {
+        v.get("_ntk")
+            .and_then(|m| m.as_str())
+            .map(|s| s == NTK_HOOK_MARKER)
+            .unwrap_or(false)
+    });
+    if !already {
+        servers.push(entry);
+    }
+
+    serde_json::to_string_pretty(&root).context("serializing patched Continue config.json")
 }
 
 /// Inject NTK's MCP server into Zed's `context_servers` object. Zed
@@ -1036,24 +1083,34 @@ fn remove_ntk_hook_from_json(json_str: &str) -> Result<String> {
         });
     }
 
-    // MCP paths: drop our entry from either Cursor's mcpServers OR
-    // Zed's context_servers. Match on the _ntk marker rather than the
-    // key name so uninstall never clobbers a user-renamed server that
-    // happens to share the "ntk" key.
+    // MCP paths: drop our entry from Cursor's mcpServers (object),
+    // Continue's mcpServers (array), OR Zed's context_servers (object).
+    // Match on the _ntk marker rather than the key/name so uninstall
+    // never clobbers a user-renamed server.
     for ptr in &["/mcpServers", "/context_servers"] {
-        if let Some(servers) = root.pointer_mut(ptr).and_then(|v| v.as_object_mut()) {
-            let keys_to_drop: Vec<String> = servers
-                .iter()
-                .filter(|(_, v)| {
+        if let Some(val) = root.pointer_mut(ptr) {
+            if let Some(servers) = val.as_object_mut() {
+                let keys_to_drop: Vec<String> = servers
+                    .iter()
+                    .filter(|(_, v)| {
+                        v.get("_ntk")
+                            .and_then(|m| m.as_str())
+                            .map(|s| s == NTK_HOOK_MARKER)
+                            .unwrap_or(false)
+                    })
+                    .map(|(k, _)| k.clone())
+                    .collect();
+                for k in keys_to_drop {
+                    servers.remove(&k);
+                }
+            } else if let Some(arr) = val.as_array_mut() {
+                // Continue-style array: retain entries without our marker.
+                arr.retain(|v| {
                     v.get("_ntk")
                         .and_then(|m| m.as_str())
-                        .map(|s| s == NTK_HOOK_MARKER)
-                        .unwrap_or(false)
-                })
-                .map(|(k, _)| k.clone())
-                .collect();
-            for k in keys_to_drop {
-                servers.remove(&k);
+                        .map(|s| s != NTK_HOOK_MARKER)
+                        .unwrap_or(true)
+                });
             }
         }
     }
@@ -1201,6 +1258,50 @@ mod tests {
             !cleaned.contains(NTK_HOOK_MARKER),
             "marker still present: {cleaned}"
         );
+    }
+
+    #[test]
+    fn test_patch_adds_continue_mcp_array_entry() {
+        // Continue's mcpServers is an ARRAY of server objects keyed by
+        // an inline `name` field — distinct from Cursor's object map.
+        let (_dir, path) = temp_settings("{}");
+        patch_settings(&path, true, EditorTarget::Continue).unwrap();
+        let content = std::fs::read_to_string(&path).unwrap();
+        let v: serde_json::Value = serde_json::from_str(&content).unwrap();
+        let arr = v["mcpServers"].as_array().expect("mcpServers array");
+        assert_eq!(arr.len(), 1);
+        assert_eq!(arr[0]["name"], "ntk");
+        assert_eq!(arr[0]["_ntk"], NTK_HOOK_MARKER);
+        assert_eq!(arr[0]["args"][0], "mcp-server");
+    }
+
+    #[test]
+    fn test_continue_patch_is_idempotent() {
+        let (_dir, path) = temp_settings("{}");
+        patch_settings(&path, true, EditorTarget::Continue).unwrap();
+        patch_settings(&path, true, EditorTarget::Continue).unwrap();
+        let content = std::fs::read_to_string(&path).unwrap();
+        let v: serde_json::Value = serde_json::from_str(&content).unwrap();
+        // Must not duplicate into two array entries.
+        assert_eq!(v["mcpServers"].as_array().unwrap().len(), 1);
+    }
+
+    #[test]
+    fn test_uninstall_removes_continue_array_entry() {
+        let (_dir, path) = temp_settings("{}");
+        patch_settings(&path, true, EditorTarget::Continue).unwrap();
+        let content = std::fs::read_to_string(&path).unwrap();
+        let cleaned = remove_ntk_hook_from_json(&content).unwrap();
+        assert!(
+            !cleaned.contains(NTK_HOOK_MARKER),
+            "marker still present: {cleaned}"
+        );
+        // The array itself may remain empty, that's fine; verify the
+        // NTK entry specifically is gone.
+        let v: serde_json::Value = serde_json::from_str(&cleaned).unwrap();
+        if let Some(arr) = v.get("mcpServers").and_then(|v| v.as_array()) {
+            assert!(arr.iter().all(|e| e["name"] != "ntk"));
+        }
     }
 
     #[test]

@@ -24,6 +24,7 @@ free" via `ntk init -g`.
 | OpenCode | `~/.opencode/settings.json` | PostToolUse hook | ✅ `ntk init -g --opencode` |
 | Cursor | `~/.cursor/mcp.json` | MCP server (`ntk mcp-server`) | ✅ `ntk init -g --cursor` |
 | Zed | `<config>/zed/settings.json` | MCP via `context_servers` | ✅ `ntk init -g --zed` |
+| Continue | `~/.continue/config.json` | MCP via `mcpServers[]` | ✅ `ntk init -g --continue` |
 
 Everything below needs an adapter because the editor uses a different
 integration model. Each section documents the concrete shape; a
@@ -68,21 +69,41 @@ tool that returns a poll handle, or a streaming variant.
 
 ---
 
-## Continue (VS Code extension)
+## Continue ✅ shipped
 
-**Hook model:** tool plugin API via `~/.continue/config.json`.
-Continue calls tools after the model invokes them; the extension
-can wrap tool outputs in custom post-processors, but the API is
-JavaScript.
+```bash
+ntk init -g --continue
+```
 
-**Workable path — Continue plugin:**
-- Package a tiny JS plugin that calls the NTK daemon before
-  returning tool output to the model
-- The plugin posts to `http://127.0.0.1:8765/compress` with the
-  same payload the Claude Code hook uses
-- Distributes as `ntk-continue` npm package or inline snippet
+Registers NTK as an MCP server in `~/.continue/config.json`. Continue
+added MCP support in 2025; the agent can call `compress_output` the
+same way Cursor and Zed do.
 
-**Example plugin call (pseudo, to be written):**
+**Installed config (auto-written):**
+
+```json
+{
+  "mcpServers": [
+    {
+      "name": "ntk",
+      "command": "/abs/path/.ntk/bin/ntk",
+      "args": ["mcp-server"],
+      "_ntk": "ntk-hook"
+    }
+  ]
+}
+```
+
+Note Continue uses an **array** of server objects (each with an inline
+`name`) rather than Cursor's object-keyed-by-name — hence a separate
+inject function under the hood.
+
+The original plugin-based path (`~/.continue/plugins/ntk.js` calling
+the daemon over HTTP) is still documented below as an alternative for
+users on older Continue versions without MCP support.
+
+<details>
+<summary>Legacy plugin path (Continue &lt; 2025 MCP release)</summary>
 
 ```javascript
 // ~/.continue/plugins/ntk.js
@@ -99,7 +120,7 @@ export async function postProcess(toolName, output) {
 }
 ```
 
-Tracked as follow-up issue.
+</details>
 
 ---
 

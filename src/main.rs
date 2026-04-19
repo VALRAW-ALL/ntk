@@ -40,6 +40,11 @@ enum Command {
         #[arg(long)]
         zed: bool,
 
+        /// Target Continue (uses MCP via the mcpServers array in
+        /// ~/.continue/config.json — registers `ntk mcp-server`).
+        #[arg(long)]
+        r#continue: bool,
+
         /// Patch settings.json without prompting.
         #[arg(long)]
         auto_patch: bool,
@@ -257,12 +262,13 @@ fn main() -> Result<()> {
             opencode,
             cursor,
             zed,
+            r#continue,
             auto_patch,
             hook_only,
             show,
             uninstall,
         }) => run_init(
-            global, opencode, cursor, zed, auto_patch, hook_only, show, uninstall,
+            global, opencode, cursor, zed, r#continue, auto_patch, hook_only, show, uninstall,
         ),
 
         Some(Command::Start { gpu }) => run_daemon(gpu),
@@ -340,6 +346,7 @@ fn run_init(
     opencode: bool,
     cursor: bool,
     zed: bool,
+    r#continue: bool,
     auto_patch: bool,
     hook_only: bool,
     show: bool,
@@ -347,10 +354,13 @@ fn run_init(
 ) -> Result<()> {
     use ntk::installer::{EditorTarget, Installer};
 
-    let picked = [opencode, cursor, zed].iter().filter(|b| **b).count();
+    let picked = [opencode, cursor, zed, r#continue]
+        .iter()
+        .filter(|b| **b)
+        .count();
     if picked > 1 {
         return Err(anyhow!(
-            "--opencode, --cursor and --zed are mutually exclusive — pick one editor per install"
+            "--opencode, --cursor, --zed and --continue are mutually exclusive — pick one editor per install"
         ));
     }
 
@@ -358,6 +368,8 @@ fn run_init(
         EditorTarget::Cursor
     } else if zed {
         EditorTarget::Zed
+    } else if r#continue {
+        EditorTarget::Continue
     } else if opencode {
         EditorTarget::OpenCode
     } else {
