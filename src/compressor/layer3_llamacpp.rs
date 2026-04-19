@@ -208,7 +208,11 @@ impl LlamaCppBackend {
 
         if use_gpu {
             // Flash Attention reduces memory bandwidth during GPU inference.
-            cmd.arg("--flash-attn");
+            // llama.cpp b8840+ made this flag take an explicit value; "on"
+            // is equivalent to the old bare flag. "auto" is valid too but
+            // "on" is unambiguous (llama.cpp picks FA when available and we
+            // already know we have a GPU backend here).
+            cmd.arg("--flash-attn").arg("on");
         } else {
             // CPU mode: pin the entire model in RAM.
             // Without --mlock the OS can page out cold weight pages mid-inference,
