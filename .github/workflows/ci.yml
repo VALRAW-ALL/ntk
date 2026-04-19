@@ -148,7 +148,12 @@ jobs:
           key: ubuntu-deny-${{ hashFiles('**/Cargo.lock', 'deny.toml') }}
 
       - name: Install cargo-deny
-        run: cargo install cargo-deny --locked --quiet
+        run: |
+          if ! command -v cargo-deny >/dev/null 2>&1; then
+            cargo install cargo-deny --locked --quiet
+          else
+            echo "cargo-deny already installed (from cache): $(cargo-deny --version)"
+          fi
 
       - name: cargo deny check licenses
         run: cargo deny --all-features check licenses
