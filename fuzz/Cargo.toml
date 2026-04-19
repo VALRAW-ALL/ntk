@@ -27,3 +27,9 @@ name = "layer2_compress"
 path = "fuzz_targets/layer2_compress.rs"
 test = false
 doc = false
+
+[[bin]]
+name = "spec_loader"
+path = "fuzz_targets/spec_loader.rs"
+test = false
+doc = false

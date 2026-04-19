@@ -1,0 +1,43 @@
+spec_version: 0.1
+category: generic
+description: 'Delete progress-bar / spinner lines from any tool output (cargo, pip, npm, docker, etc).'
+rules:
+  # ASCII progress bars: '[====>    50%]  installing foo'. Any bar
+  # that contains equal signs, dashes, hashes, or greater-than markers
+  # immediately followed by whitespace-percent is noise.
+  - id: progress.ascii_bars
+    pattern:
+      kind: line-match
+      classifier: regex
+      values:
+        - '^\s*\[[=#\->@\s]+\]\s*\d+\s*%'
+        - '\[[=#-]+>?\s+\d+%\]'
+    transform:
+      kind: delete
+    severity: lossy-safe
+    invariants: [preserve_errors]
+
+  # Unicode spinner dots (Braille-based) used by cargo, rustup, tqdm.
+  - id: progress.unicode_spinner
+    pattern:
+      kind: line-match
+      classifier: regex
+      values:
+        - '[⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏]'
+    transform:
+      kind: delete
+    severity: lossy-safe
+    invariants: [preserve_errors]
+
+  # Download progress: 'Downloading X.Y of Z' / pip wheel bars.
+  - id: progress.downloading
+    pattern:
+      kind: line-match
+      classifier: starts_with
+      values:
+        - 'Downloading '
+        - '  Downloading '
+    transform:
+      kind: delete
+    severity: lossy-safe
+    invariants: [preserve_errors]

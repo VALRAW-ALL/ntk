@@ -53,6 +53,19 @@ pub struct CompressionConfig {
     /// `tokens_before/after` reflect the real cost.
     #[serde(default = "default_tokenizer")]
     pub tokenizer: String,
+
+    /// (Experimental, RFC-0001 POC — issue #24) Apply YAML rule files
+    /// as an extra L1.5 pass between L1 and L2. Accepts a path to a
+    /// single rule file OR a directory (every *.yaml inside is
+    /// composed in filename order).
+    ///
+    /// Default `None` = behaviour unchanged (hardcoded L1 only). When
+    /// set, each rule is dropped if its `preserve_errors` invariant
+    /// would be violated, so worst-case this stage is a no-op, never
+    /// a regression. The `NTK_SPEC_RULES` env var overrides this
+    /// field at runtime for A/B experiments.
+    #[serde(default)]
+    pub spec_rules_path: Option<std::path::PathBuf>,
 }
 
 fn default_tokenizer() -> String {
@@ -76,6 +89,7 @@ impl Default for CompressionConfig {
             preserve_error_counts: true,
             context_max_messages: 3,
             tokenizer: default_tokenizer(),
+            spec_rules_path: None,
         }
     }
 }

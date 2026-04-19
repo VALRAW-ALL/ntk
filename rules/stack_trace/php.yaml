@@ -1,0 +1,37 @@
+spec_version: 0.1
+category: stack_trace
+language: php
+frameworks: [symfony, laravel, composer]
+rules:
+  # Classic #N /path PHP trace entries inside vendor directories.
+  - id: php.stack.vendor_hash_entries
+    pattern:
+      kind: frame-run
+      classifier: contains
+      values:
+        - '/vendor/symfony/'
+        - '/vendor/laravel/'
+        - '/vendor/illuminate/'
+    transform:
+      kind: collapse-run
+      min_run: 3
+      replacement: '... [{n} PHP vendor frames omitted]'
+    severity: lossy-safe
+    invariants: [preserve_first_frame, preserve_last_frame, preserve_errors]
+
+  # Symfony's class-prefix trace format:
+  #   at Symfony\Component\HttpKernel\...->method()
+  - id: php.stack.symfony_class_prefix
+    pattern:
+      kind: frame-run
+      classifier: starts_with
+      values:
+        - 'at Symfony\'
+        - 'at Illuminate\'
+        - 'at Laravel\'
+    transform:
+      kind: collapse-run
+      min_run: 3
+      replacement: '... [{n} PHP namespace-prefix frames omitted]'
+    severity: lossy-safe
+    invariants: [preserve_first_frame, preserve_last_frame, preserve_errors]

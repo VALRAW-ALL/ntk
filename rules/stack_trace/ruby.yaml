@@ -1,0 +1,54 @@
+spec_version: 0.1
+category: stack_trace
+language: ruby
+frameworks: [rails, actionpack, activesupport, rack, sidekiq]
+rules:
+  # Rails request-dispatch stack.
+  - id: ruby.stack.rails_dispatch
+    pattern:
+      kind: frame-run
+      classifier: contains
+      values:
+        - '/actionpack-'
+        - '/actionpack/lib/'
+        - '/activesupport-'
+        - '/activesupport/lib/'
+        - '/railties-'
+        - '/railties/lib/'
+    transform:
+      kind: collapse-run
+      min_run: 3
+      replacement: '\t... [{n} Rails framework frames omitted]'
+    severity: lossy-safe
+    invariants: [preserve_first_frame, preserve_last_frame, preserve_errors]
+
+  # Rack middleware chain.
+  - id: ruby.stack.rack
+    pattern:
+      kind: frame-run
+      classifier: contains
+      values:
+        - '/rack-'
+        - '/rack/lib/'
+        - '/gems/rack-'
+    transform:
+      kind: collapse-run
+      min_run: 3
+      replacement: '\t... [{n} Rack middleware frames omitted]'
+    severity: lossy-safe
+    invariants: [preserve_first_frame, preserve_last_frame, preserve_errors]
+
+  # Sidekiq job workers.
+  - id: ruby.stack.sidekiq
+    pattern:
+      kind: frame-run
+      classifier: contains
+      values:
+        - '/sidekiq-'
+        - '/sidekiq/lib/'
+    transform:
+      kind: collapse-run
+      min_run: 3
+      replacement: '\t... [{n} Sidekiq frames omitted]'
+    severity: lossy-safe
+    invariants: [preserve_first_frame, preserve_last_frame, preserve_errors]

@@ -1,0 +1,69 @@
+spec_version: 0.1
+category: stack_trace
+language: java
+frameworks: [spring, tomcat, cglib, hibernate, netty]
+rules:
+  # Spring framework frames — Controllers, MVC, HTTP, Security pipelines.
+  - id: java.stack.spring
+    pattern:
+      kind: frame-run
+      classifier: starts_with
+      values:
+        - 'at org.springframework.'
+    transform:
+      kind: collapse-run
+      min_run: 3
+      replacement: '... [{n} Spring framework frames omitted]'
+    severity: lossy-safe
+    invariants:
+      - preserve_first_frame
+      - preserve_last_frame
+      - preserve_errors
+
+  # Tomcat / Jetty / servlet container.
+  - id: java.stack.container
+    pattern:
+      kind: frame-run
+      classifier: starts_with
+      values:
+        - 'at org.apache.tomcat.'
+        - 'at org.apache.catalina.'
+        - 'at org.eclipse.jetty.'
+    transform:
+      kind: collapse-run
+      min_run: 3
+      replacement: '... [{n} servlet-container frames omitted]'
+    severity: lossy-safe
+    invariants: [preserve_first_frame, preserve_last_frame, preserve_errors]
+
+  # CGLIB / dynamic proxy machinery — zero signal.
+  - id: java.stack.cglib
+    pattern:
+      kind: frame-run
+      classifier: starts_with
+      values:
+        - 'at net.sf.cglib.'
+        - 'at org.springframework.cglib.'
+        - 'at sun.reflect.'
+        - 'at java.lang.reflect.'
+        - 'at jdk.internal.reflect.'
+    transform:
+      kind: collapse-run
+      min_run: 3
+      replacement: '... [{n} reflection/proxy frames omitted]'
+    severity: lossy-safe
+    invariants: [preserve_first_frame, preserve_last_frame, preserve_errors]
+
+  # Netty event loop frames in reactive / async Java.
+  - id: java.stack.netty
+    pattern:
+      kind: frame-run
+      classifier: starts_with
+      values:
+        - 'at io.netty.'
+    transform:
+      kind: collapse-run
+      min_run: 3
+      replacement: '... [{n} Netty frames omitted]'
+    severity: lossy-safe
+    invariants: [preserve_first_frame, preserve_last_frame, preserve_errors]

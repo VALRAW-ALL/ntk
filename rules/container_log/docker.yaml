@@ -1,0 +1,34 @@
+spec_version: 0.1
+category: container_log
+tool: docker
+rules:
+  # Docker pull 'Pulling fs layer' / 'Waiting' / 'Pull complete' spam —
+  # zero signal, fires per layer.
+  - id: docker.pull_progress
+    pattern:
+      kind: line-match
+      classifier: regex
+      values:
+        - '^[a-f0-9]{12}: (Pulling fs layer|Waiting|Pull complete|Extracting|Verifying Checksum|Download complete)$'
+    transform:
+      kind: delete
+    severity: lossy-safe
+    invariants: [preserve_errors]
+
+  # BuildKit 'Step N/M' lines — agent cares about the RESULT, not per-step
+  # echo. Template-dedup collapses identical Step-family lines when a
+  # stage retries.
+  - id: docker.buildkit_step_dedup
+    pattern:
+      kind: template-dedup
+      normalize:
+        - regex: '\d+'
+          replacement: '§'
+        - regex: '[0-9a-f]{12,}'
+          replacement: '§'
+    transform:
+      kind: dedup
+      min_run: 3
+      format: '[×{n}] {exemplar}'
+    severity: lossy-safe
+    invariants: [preserve_errors]

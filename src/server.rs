@@ -1,4 +1,6 @@
-use crate::compressor::{layer1_filter, layer2_tokenizer, layer3_backend, layer4_context};
+use crate::compressor::{
+    layer1_filter, layer2_tokenizer, layer3_backend, layer4_context, spec_loader,
+};
 use crate::config::NtkConfig;
 use crate::detector;
 use crate::metrics::{CompressionRecord, MetricsDb, MetricsStore};
@@ -43,6 +45,24 @@ pub struct AppState {
     /// Shared secret the hook must present on privileged routes. Empty
     /// when auth is intentionally disabled via `NTK_DISABLE_AUTH=1`.
     pub auth_token: Arc<String>,
+    /// (Experimental, RFC-0001 POC) Pre-loaded YAML rulesets applied
+    /// between L1 and L2 when `compression.spec_rules_path` is set
+    /// (or `NTK_SPEC_RULES` env var overrides). Empty = feature off.
+    /// Cached here so the hot path never re-parses YAML.
+    pub spec_rules: Arc<Vec<spec_loader::RuleFile>>,
+}
+
+/// Resolve the effective spec-rules path from env var (wins) then
+/// config. `NTK_SPEC_RULES` is the experimental override used by the
+/// prompt/format A/B bench. Returns `None` when the feature is off.
+pub fn resolve_spec_rules_path(config: &NtkConfig) -> Option<std::path::PathBuf> {
+    if let Ok(v) = std::env::var("NTK_SPEC_RULES") {
+        let trimmed = v.trim();
+        if !trimmed.is_empty() {
+            return Some(std::path::PathBuf::from(trimmed));
+        }
+    }
+    config.compression.spec_rules_path.clone()
 }
 
 // ---------------------------------------------------------------------------
@@ -345,9 +365,28 @@ async fn handle_compress(
     let tokens_after_l1 = layer2_tokenizer::count_tokens(&l1.output)
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
+    // L1.5 — experimental spec-loader stage (RFC-0001 POC, #24).
+    // No-op when `state.spec_rules` is empty. The spec-loader's own
+    // `preserve_errors` invariant drops any rule whose transform
+    // would lose error signal, so worst-case this stage is a pass-
+    // through — never a regression versus pre-#24 behaviour.
+    let l1_output = if state.spec_rules.is_empty() {
+        l1.output.clone()
+    } else {
+        let r = spec_loader::apply_many(&l1.output, &state.spec_rules);
+        if !r.invariant_rejected.is_empty() {
+            tracing::debug!(
+                "spec_rules: {} rule(s) rejected by invariants: {:?}",
+                r.invariant_rejected.len(),
+                r.invariant_rejected
+            );
+        }
+        r.output
+    };
+
     // Layer 2
     let l2_start = Instant::now();
-    let l2 = layer2_tokenizer::process(&l1.output)
+    let l2 = layer2_tokenizer::process(&l1_output)
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
     let l2_latency = l2_start.elapsed().as_millis() as u64;
     let tokens_after_l2 = l2.compressed_tokens;

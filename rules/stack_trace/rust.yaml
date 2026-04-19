@@ -1,0 +1,53 @@
+spec_version: 0.1
+category: stack_trace
+language: rust
+frameworks: [std, core, tokio]
+rules:
+  # Rust panic unwinding machinery.
+  - id: rust.stack.panic_machinery
+    pattern:
+      kind: frame-run
+      classifier: contains
+      values:
+        - 'core::panicking::'
+        - 'std::panicking::'
+        - 'std::panic::'
+        - 'rust_panic'
+        - 'rust_begin_unwind'
+    transform:
+      kind: collapse-run
+      min_run: 2
+      replacement: '   [{n} Rust panic-machinery frames omitted]'
+    severity: lossy-safe
+    invariants: [preserve_first_frame, preserve_last_frame, preserve_errors]
+
+  # Rust runtime startup (main lang_start etc).
+  - id: rust.stack.runtime_boot
+    pattern:
+      kind: frame-run
+      classifier: contains
+      values:
+        - 'std::rt::'
+        - 'std::sys_common::backtrace::'
+    transform:
+      kind: collapse-run
+      min_run: 2
+      replacement: '   [{n} Rust runtime boot frames omitted]'
+    severity: lossy-safe
+    invariants: [preserve_first_frame, preserve_last_frame, preserve_errors]
+
+  # Tokio runtime internals.
+  - id: rust.stack.tokio
+    pattern:
+      kind: frame-run
+      classifier: contains
+      values:
+        - 'tokio::runtime::'
+        - 'tokio::task::'
+        - 'tokio::park::'
+    transform:
+      kind: collapse-run
+      min_run: 3
+      replacement: '   [{n} tokio runtime frames omitted]'
+    severity: lossy-safe
+    invariants: [preserve_first_frame, preserve_last_frame, preserve_errors]

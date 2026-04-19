@@ -1,0 +1,53 @@
+spec_version: 0.1
+category: stack_trace
+language: elixir
+frameworks: [phoenix, ecto, plug, otp]
+rules:
+  # Elixir frames look like: '    (app_name 1.0.0) lib/foo/bar.ex:42: Foo.Bar.func/2'
+  # Phoenix / Plug middleware and Ecto query chain are the usual
+  # suspects for aggressive collapse.
+  - id: elixir.stack.phoenix
+    pattern:
+      kind: frame-run
+      classifier: regex
+      values:
+        - '^\s*\(phoenix[_a-z]*\s+'
+        - '^\s*\(plug[_a-z]*\s+'
+    transform:
+      kind: collapse-run
+      min_run: 3
+      replacement: '    [{n} Phoenix/Plug frames omitted]'
+    severity: lossy-safe
+    invariants: [preserve_first_frame, preserve_last_frame, preserve_errors]
+
+  # Ecto query builder + adapter chain.
+  - id: elixir.stack.ecto
+    pattern:
+      kind: frame-run
+      classifier: regex
+      values:
+        - '^\s*\(ecto[_a-z]*\s+'
+        - '^\s*\(db_connection\s+'
+        - '^\s*\(postgrex\s+'
+    transform:
+      kind: collapse-run
+      min_run: 3
+      replacement: '    [{n} Ecto/database frames omitted]'
+    severity: lossy-safe
+    invariants: [preserve_first_frame, preserve_last_frame, preserve_errors]
+
+  # Erlang/OTP supervision and gen_server internals.
+  - id: elixir.stack.otp
+    pattern:
+      kind: frame-run
+      classifier: regex
+      values:
+        - '^\s*\(stdlib\s+'
+        - '^\s*\(kernel\s+'
+        - '^\s*\(elixir\s+'
+    transform:
+      kind: collapse-run
+      min_run: 3
+      replacement: '    [{n} OTP/stdlib frames omitted]'
+    severity: lossy-safe
+    invariants: [preserve_first_frame, preserve_last_frame, preserve_errors]

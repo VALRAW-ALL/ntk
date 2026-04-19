@@ -115,6 +115,12 @@ enum Command {
         /// intermediate output (L1, L2, and — when --with-l3 — L3).
         #[arg(long)]
         verbose: bool,
+        /// (POC) Run the input through the RFC-0001 YAML spec-loader
+        /// instead of the hardcoded L1/L2 path. Accepts a single rule
+        /// file OR a directory (all *.yaml files are composed in
+        /// filename order). Still passes through L2 after.
+        #[arg(long, value_name = "PATH")]
+        spec: Option<PathBuf>,
     },
 
     /// Manage the local inference model.
@@ -294,7 +300,16 @@ fn main() -> Result<()> {
             l4_format,
             daemon_url,
             verbose,
-        }) => run_test_compress(&file, with_l3, context, &l4_format, &daemon_url, verbose),
+            spec,
+        }) => run_test_compress(
+            &file,
+            with_l3,
+            context,
+            &l4_format,
+            &daemon_url,
+            verbose,
+            spec.as_deref(),
+        ),
 
         Some(Command::Model { action }) => run_model(action),
 
@@ -585,6 +600,30 @@ async fn async_run_daemon(gpu: bool) -> Result<()> {
         t
     };
 
+    // Experimental: pre-load the POC spec rulesets if the operator
+    // pointed us at a rules path. `NTK_SPEC_RULES` overrides the
+    // config field for A/B experimentation without editing JSON.
+    let spec_rules = match ntk::server::resolve_spec_rules_path(&config) {
+        Some(path) => match ntk::compressor::spec_loader::load_rules_from_path(&path) {
+            Ok(files) => {
+                tracing::info!(
+                    "spec_rules: loaded {} ruleset(s) from {}",
+                    files.len(),
+                    path.display()
+                );
+                files
+            }
+            Err(e) => {
+                tracing::warn!(
+                    "spec_rules: path {} unusable, falling back to hardcoded L1 only: {e}",
+                    path.display()
+                );
+                Vec::new()
+            }
+        },
+        None => Vec::new(),
+    };
+
     let state = ntk::server::AppState {
         config: Arc::new(config),
         metrics: Arc::clone(&metrics),
@@ -596,6 +635,7 @@ async fn async_run_daemon(gpu: bool) -> Result<()> {
         backend_name: backend_name.clone(),
         model_info: model_info.clone(),
         auth_token: Arc::new(auth_token),
+        spec_rules: Arc::new(spec_rules),
     };
 
     let router = ntk::server::build_router(state);
@@ -1250,6 +1290,128 @@ fn print_verbose_section(
     println!("└─────────────────────────────────");
 }
 
+/// Run `ntk test-compress --spec <path>` — compose every rule file at
+/// `spec_path` (file OR dir of *.yaml) and apply the merged ruleset
+/// to the input. L2 runs on the result. Invariant rejections are
+/// reported; non-zero rejection count exits non-zero so CI can gate.
+fn run_test_compress_spec(
+    file: &std::path::Path,
+    spec_path: &std::path::Path,
+    verbose: bool,
+) -> Result<()> {
+    use ntk::compressor::{layer2_tokenizer, spec_loader};
+    use std::time::Instant;
+
+    let canonical = file
+        .canonicalize()
+        .map_err(|e| anyhow!("cannot read {}: {e}", file.display()))?;
+    let input = std::fs::read_to_string(&canonical)
+        .map_err(|e| anyhow!("reading {}: {e}", canonical.display()))?;
+    let original_tokens = layer2_tokenizer::count_tokens(&input)?;
+
+    // Resolve --spec to one or more rule files. File arg is treated
+    // singly; directory arg loads every *.yaml inside in sorted order
+    // (deterministic composition).
+    let rule_files: Vec<std::path::PathBuf> = if spec_path.is_dir() {
+        let mut v: Vec<_> = std::fs::read_dir(spec_path)
+            .map_err(|e| anyhow!("reading dir {}: {e}", spec_path.display()))?
+            .filter_map(|e| e.ok())
+            .map(|e| e.path())
+            .filter(|p| p.extension().and_then(|s| s.to_str()) == Some("yaml"))
+            .collect();
+        v.sort();
+        v
+    } else {
+        vec![spec_path.to_path_buf()]
+    };
+
+    if rule_files.is_empty() {
+        return Err(anyhow!(
+            "no *.yaml rule files found at {}",
+            spec_path.display()
+        ));
+    }
+
+    let t_spec = Instant::now();
+    let mut current = input.clone();
+    let mut total_applied: Vec<String> = Vec::new();
+    let mut total_rejected: Vec<String> = Vec::new();
+    for rf in &rule_files {
+        let loaded =
+            spec_loader::load_rule_file(rf).map_err(|e| anyhow!("{}: {e}", rf.display()))?;
+        let result = spec_loader::apply_rule_file(&current, &loaded);
+        current = result.output;
+        total_applied.extend(result.applied);
+        total_rejected.extend(result.invariant_rejected);
+    }
+    let spec_elapsed = t_spec.elapsed();
+    let after_spec_tokens = layer2_tokenizer::count_tokens(&current)?;
+
+    let t_l2 = Instant::now();
+    let l2 = layer2_tokenizer::process(&current)?;
+    let l2_elapsed = t_l2.elapsed();
+
+    let saved = original_tokens.saturating_sub(l2.compressed_tokens);
+    let ratio_pct = if original_tokens > 0 {
+        (saved as f64 / original_tokens as f64) * 100.0
+    } else {
+        0.0
+    };
+
+    if verbose {
+        println!(
+            "Spec path:          {} ({} rule file{})",
+            spec_path.display(),
+            rule_files.len(),
+            if rule_files.len() == 1 { "" } else { "s" }
+        );
+        println!("Original tokens:    {original_tokens}");
+        println!(
+            "After spec tokens:  {after_spec_tokens}  ({} ms)",
+            spec_elapsed.as_millis()
+        );
+        println!(
+            "After L2 tokens:    {} ({} ms)",
+            l2.compressed_tokens,
+            l2_elapsed.as_millis()
+        );
+        println!("Spec+L2 compression: {ratio_pct:.1}%");
+        println!("Rules applied:       {}", total_applied.join(", "));
+        if !total_rejected.is_empty() {
+            println!(
+                "Rules rejected by invariants: {}",
+                total_rejected.join(", ")
+            );
+        }
+        println!();
+        println!("--- Compressed output (spec → L2) ---");
+        println!("{}", l2.output);
+    } else {
+        println!("File:              {}", canonical.display());
+        println!("Spec rulesets:     {}", rule_files.len());
+        println!("Original tokens:   {original_tokens}");
+        println!("After spec tokens: {after_spec_tokens}");
+        println!("After L2 tokens:   {}", l2.compressed_tokens);
+        println!("Spec+L2 compression: {ratio_pct:.1}%");
+        if !total_rejected.is_empty() {
+            println!("Invariant rejections: {}", total_rejected.join(", "));
+        }
+        println!();
+        println!("--- Compressed output (spec → L2) ---");
+        println!("{}", l2.output);
+    }
+
+    // Non-zero exit when a rule was rejected so CI can gate.
+    if !total_rejected.is_empty() {
+        return Err(anyhow!(
+            "{} rule(s) rejected by invariant check",
+            total_rejected.len()
+        ));
+    }
+    Ok(())
+}
+
+#[allow(clippy::too_many_arguments)]
 fn run_test_compress(
     file: &std::path::Path,
     with_l3: bool,
@@ -1257,9 +1419,17 @@ fn run_test_compress(
     l4_format: &str,
     daemon_url: &str,
     verbose: bool,
+    spec: Option<&std::path::Path>,
 ) -> Result<()> {
     use ntk::compressor::{layer1_filter, layer2_tokenizer};
     use std::time::Instant;
+
+    // POC path: when --spec is provided, replace L1 with the RFC-0001
+    // YAML ruleset engine. L2 still runs on the result — the spec
+    // only subsumes the line-level transformations L1 handles.
+    if let Some(spec_path) = spec {
+        return run_test_compress_spec(file, spec_path, verbose);
+    }
 
     let canonical = file
         .canonicalize()

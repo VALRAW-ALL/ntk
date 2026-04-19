@@ -1,0 +1,32 @@
+spec_version: 0.1
+category: generic
+description: 'Strip ANSI escape sequences (color codes, cursor moves) from any terminal output.'
+rules:
+  # CSI sequences: ESC [ params letter. Covers SGR colors, cursor moves,
+  # line clearing. The capture doesn't need to survive — the whole match
+  # is replaced with empty string via rewrite.
+  - id: ansi.csi_sequences
+    pattern:
+      kind: line-match
+      classifier: regex
+      values:
+        - '\x1b\[[0-9;?]*[ -/]*[@-~]'
+    transform:
+      kind: rewrite
+      replacement: ''
+    severity: lossy-safe
+    invariants: [preserve_errors]
+
+  # OSC sequences: ESC ] ... BEL or ESC ] ... ESC \. Terminal titles,
+  # hyperlinks (OSC 8). Agents don't care about hyperlinks in tool output.
+  - id: ansi.osc_sequences
+    pattern:
+      kind: line-match
+      classifier: regex
+      values:
+        - '\x1b\][0-9]*;[^\x07\x1b]*(\x07|\x1b\\)'
+    transform:
+      kind: rewrite
+      replacement: ''
+    severity: lossy-safe
+    invariants: [preserve_errors]

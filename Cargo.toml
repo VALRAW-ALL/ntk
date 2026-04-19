@@ -144,6 +144,10 @@ path = "tests/integration/snapshots_per_layer.rs"
 name = "bench_ratios_regression"
 path = "tests/integration/bench_ratios_regression.rs"
 
+[[test]]
+name = "spec_corpus_integration"
+path = "tests/integration/spec_corpus_integration.rs"
+
 [[bench]]
 name = "compression_bench"
 path = "tests/benchmarks/compression_bench.rs"
