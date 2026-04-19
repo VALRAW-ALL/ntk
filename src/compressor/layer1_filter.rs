@@ -79,7 +79,16 @@ pub fn filter(input: &str) -> Layer1Result {
         applied_rules.push(format!("progress_removed({progress_removed} lines)"));
     }
 
-    let after_template_dedup = group_by_template(&after_progress);
+    let after_diag = remove_diagnostic_noise(&after_progress);
+    let diag_removed = after_progress
+        .lines()
+        .count()
+        .saturating_sub(after_diag.lines().count());
+    if diag_removed > 0 {
+        applied_rules.push(format!("diagnostic_noise({diag_removed} lines)"));
+    }
+
+    let after_template_dedup = group_by_template(&after_diag);
     let dedup_groups = after_template_dedup
         .matches("[×")
         .count()
@@ -182,6 +191,79 @@ fn remove_progress_bars(input: &str) -> String {
     }
 
     out.join("\n")
+}
+
+// ---------------------------------------------------------------------------
+// Step 3.5 — Drop universally-noisy diagnostic lines
+//
+// Two narrow targets, both common across language toolchains:
+//
+//   1. TypeScript / Rust / Elm "wavy underline" rows — pure tilde +
+//      whitespace + caret characters. They highlight the previous
+//      content line, which already carries the same span as a
+//      `^^^^` annotation; the tilde row is redundant for an LLM.
+//
+//   2. Git porcelain noise per file: `index abc..def 100644`,
+//      `--- a/path`, `+++ b/path`. The `diff --git a/x b/x` header
+//      one line above already names the file. The `index` SHAs are
+//      volatile (rebase / amend invalidates them) and useless to
+//      the model.
+//
+// Both deletions are line-conservative: lines that contain *any*
+// content beyond the noise pattern stay. An error_signal line will
+// never start with `~` or `index `, so the preserve_errors invariant
+// holds trivially.
+// ---------------------------------------------------------------------------
+
+fn remove_diagnostic_noise(input: &str) -> String {
+    let mut out: Vec<&str> = Vec::with_capacity(input.lines().count());
+    for line in input.lines() {
+        if is_wavy_underline(line) || is_git_diff_metadata(line) {
+            continue;
+        }
+        out.push(line);
+    }
+    out.join("\n")
+}
+
+fn is_wavy_underline(line: &str) -> bool {
+    let trimmed = line.trim();
+    if trimmed.is_empty() {
+        return false;
+    }
+    // Accept only lines composed of `~`, `^`, and whitespace.
+    trimmed
+        .chars()
+        .all(|c| c == '~' || c == '^' || c.is_whitespace())
+        // Require at least 3 tildes/carets so a stray `~` in code
+        // (e.g. JS bitwise NOT in a snippet) doesn't get caught.
+        && trimmed.chars().filter(|c| *c == '~' || *c == '^').count() >= 3
+}
+
+fn is_git_diff_metadata(line: &str) -> bool {
+    // `index abc1234..def5678 100644` — SHA range + file mode.
+    // Match liberally on the prefix; the tail varies (line ranges,
+    // missing mode for new files, etc).
+    if let Some(rest) = line.strip_prefix("index ") {
+        let head: String = rest.chars().take(20).collect();
+        if head.contains("..") {
+            return true;
+        }
+    }
+    // `--- a/path/to/file` and `+++ b/path/to/file` per-file diff
+    // markers. The `diff --git a/x b/x` line one above already
+    // names both sides.
+    if let Some(rest) = line.strip_prefix("--- ") {
+        if rest.starts_with("a/") || rest == "/dev/null" {
+            return true;
+        }
+    }
+    if let Some(rest) = line.strip_prefix("+++ ") {
+        if rest.starts_with("b/") || rest == "/dev/null" {
+            return true;
+        }
+    }
+    false
 }
 
 // ---------------------------------------------------------------------------
@@ -1045,5 +1127,68 @@ java.lang.IllegalStateException: View must be attached
         assert!(result.output.contains("IllegalStateException"));
         // User frame must survive.
         assert!(result.output.contains("HomeFragment.onViewCreated"));
+    }
+
+    #[test]
+    fn test_diagnostic_noise_drops_wavy_underlines() {
+        let input = "\
+src/foo.tsx:10:3 - error TS2300: Type 'string' is not assignable to type 'number'.
+
+10   const result = fetchUser(id);
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Found 1 error in 1 file.
+";
+        let result = filter(input);
+        assert!(
+            !result.output.contains("~~~~~~~~~~~~~~~~~~"),
+            "wavy underline must be dropped: {}",
+            result.output
+        );
+        // Error line preserved (preserve_errors invariant).
+        assert!(result.output.contains("error TS2300"));
+        assert!(result.output.contains("Found 1 error"));
+    }
+
+    #[test]
+    fn test_diagnostic_noise_drops_git_index_and_per_file_headers() {
+        let input = "\
+diff --git a/src/server.rs b/src/server.rs
+index abc1234..def5678 100644
+--- a/src/server.rs
++++ b/src/server.rs
+@@ -45,12 +45,28 @@ pub struct CompressResponse {
+     pub compressed: String,
++    pub tokens_after_l1: Option<usize>,
+";
+        let result = filter(input);
+        assert!(
+            !result.output.contains("index abc1234..def5678"),
+            "git index line must be dropped: {}",
+            result.output
+        );
+        assert!(
+            !result.output.contains("--- a/src/server.rs"),
+            "--- a/ marker must be dropped"
+        );
+        assert!(
+            !result.output.contains("+++ b/src/server.rs"),
+            "+++ b/ marker must be dropped"
+        );
+        // Hunk header + diff header MUST stay so the LLM still sees
+        // which file changed and where.
+        assert!(result.output.contains("diff --git a/src/server.rs"));
+        assert!(result.output.contains("@@ -45"));
+    }
+
+    #[test]
+    fn test_diagnostic_noise_does_not_drop_user_code_with_tildes() {
+        // A real code line containing a single `~` (JS bitwise NOT)
+        // must NOT be classified as a wavy underline.
+        let input = "\
+const inverted = ~flags;
+";
+        let result = filter(input);
+        assert!(result.output.contains("~flags"));
     }
 }
