@@ -124,23 +124,45 @@ export async function postProcess(toolName, output) {
 
 ---
 
-## Aider
+## Aider ⚠️ blocked on upstream
 
-**Hook model:** `--lint-cmd` / `--test-cmd` flags in `.aider.conf.yml`,
-but these are *pre*-command validators, not *post*-output filters.
-Aider does not expose a post-tool-response hook.
+Aider has **no viable live-compression hook** today. The runtime
+flags it exposes (`--lint-cmd`, `--test-cmd`) are *pre*-command
+validators, not *post*-output filters — they run before a command
+executes and can block it, but they can't rewrite the output the
+model sees.
 
-**Workable path — wrapper CLI:**
-- Ship `ntk-aider` as a shell wrapper that spawns `aider` with its
-  stdout piped through a small NTK filter process
-- Compression happens at the terminal-output layer, not the model
-  context — less precise but works today
+### Why a wrapper script is not a real solution
 
-**Alternative — patch Aider upstream:**
-- Aider accepts PRs that add a `--post-tool-cmd` hook. A well-scoped
-  PR there would make native NTK integration possible.
+Piping `aider`'s stdout through a filter would break its interactive
+TUI (user input prompts, streaming generation, multi-line edits).
+Aider is a chat-like loop in the terminal, not a unidirectional
+stream; intercepting stdout corrupts the interface.
 
-Tracked as follow-up issue.
+### Post-session review (best-effort, partial value)
+
+Aider writes a chat transcript to `.aider.chat.history.md`. After a
+session ends you can feed that file through NTK manually for review:
+
+```bash
+ntk test-compress .aider.chat.history.md --verbose
+```
+
+This gives you the same compression statistics you'd see for a
+live hook, but **only retrospectively** — the actual LLM calls
+during the session used the full uncompressed context and paid full
+token cost.
+
+### The real path forward
+
+A well-scoped PR to [paul-gauthier/aider](https://github.com/paul-gauthier/aider)
+adding a `--post-tool-cmd <cmd>` flag (mirroring Claude Code's
+PostToolUse hook contract) would make native NTK integration a
+one-line config change. Opening that PR requires alignment with the
+Aider maintainer on the hook shape — hence an upstream coordination
+task rather than a local NTK code change.
+
+Tracked as a **blocked** follow-up until upstream accepts the hook.
 
 ---
 
