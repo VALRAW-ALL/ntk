@@ -35,6 +35,11 @@ enum Command {
         #[arg(long)]
         cursor: bool,
 
+        /// Target Zed (uses MCP via context_servers in Zed's
+        /// settings.json — registers `ntk mcp-server`).
+        #[arg(long)]
+        zed: bool,
+
         /// Patch settings.json without prompting.
         #[arg(long)]
         auto_patch: bool,
@@ -251,12 +256,13 @@ fn main() -> Result<()> {
             global,
             opencode,
             cursor,
+            zed,
             auto_patch,
             hook_only,
             show,
             uninstall,
         }) => run_init(
-            global, opencode, cursor, auto_patch, hook_only, show, uninstall,
+            global, opencode, cursor, zed, auto_patch, hook_only, show, uninstall,
         ),
 
         Some(Command::Start { gpu }) => run_daemon(gpu),
@@ -325,10 +331,15 @@ fn main() -> Result<()> {
 // Command handlers
 // ---------------------------------------------------------------------------
 
+// The install surface needs one boolean per editor target; packing them
+// into a struct would obscure the CLI shape without making the function
+// simpler. Lint exception is scoped to this single function.
+#[allow(clippy::too_many_arguments)]
 fn run_init(
     _global: bool,
     opencode: bool,
     cursor: bool,
+    zed: bool,
     auto_patch: bool,
     hook_only: bool,
     show: bool,
@@ -336,14 +347,17 @@ fn run_init(
 ) -> Result<()> {
     use ntk::installer::{EditorTarget, Installer};
 
-    if opencode && cursor {
+    let picked = [opencode, cursor, zed].iter().filter(|b| **b).count();
+    if picked > 1 {
         return Err(anyhow!(
-            "--opencode and --cursor are mutually exclusive — pick one editor per install"
+            "--opencode, --cursor and --zed are mutually exclusive — pick one editor per install"
         ));
     }
 
     let editor = if cursor {
         EditorTarget::Cursor
+    } else if zed {
+        EditorTarget::Zed
     } else if opencode {
         EditorTarget::OpenCode
     } else {

@@ -11,18 +11,21 @@ use crate::output::terminal as term;
 pub enum EditorTarget {
     ClaudeCode,
     OpenCode,
-    /// Cursor — integrates via Model Context Protocol rather than a
-    /// PostToolUse hook. Writes to `~/.cursor/mcp.json` and registers
-    /// `ntk mcp-server` as the command. The MCP server is self-contained
-    /// (no `ntk start` daemon required).
+    /// Cursor — registers `ntk mcp-server` in `~/.cursor/mcp.json`
+    /// under the `mcpServers` key (flat command/args shape).
     Cursor,
+    /// Zed — registers `ntk mcp-server` in the user's Zed settings.json
+    /// under `context_servers` (command-object shape with
+    /// `command.path`, `command.args`, `command.env`).
+    Zed,
 }
 
 impl EditorTarget {
-    /// Returns true when the editor uses MCP (mcpServers in JSON)
-    /// rather than a PostToolUse hook. Drives the install-path split.
+    /// Returns true when the editor uses MCP rather than a PostToolUse
+    /// hook. Drives the install-path split between `inject_ntk_hook`
+    /// and the MCP-specific inject functions.
     pub fn uses_mcp(self) -> bool {
-        matches!(self, EditorTarget::Cursor)
+        matches!(self, EditorTarget::Cursor | EditorTarget::Zed)
     }
 }
 
@@ -345,12 +348,22 @@ fn global_config_path() -> Result<PathBuf> {
 
 fn editor_settings_path(editor: EditorTarget) -> Result<PathBuf> {
     let home = home_dir()?;
-    let rel = match editor {
-        EditorTarget::ClaudeCode => Path::new(".claude").join("settings.json"),
-        EditorTarget::OpenCode => Path::new(".opencode").join("settings.json"),
-        EditorTarget::Cursor => Path::new(".cursor").join("mcp.json"),
-    };
-    Ok(home.join(rel))
+    match editor {
+        EditorTarget::ClaudeCode => Ok(home.join(".claude").join("settings.json")),
+        EditorTarget::OpenCode => Ok(home.join(".opencode").join("settings.json")),
+        EditorTarget::Cursor => Ok(home.join(".cursor").join("mcp.json")),
+        EditorTarget::Zed => {
+            // Zed reads its user settings from:
+            //   Linux:   ~/.config/zed/settings.json
+            //   macOS:   ~/.config/zed/settings.json (XDG-first, overrides the
+            //            Application Support path for dev installs)
+            //   Windows: %APPDATA%\Zed\settings.json
+            // dirs::config_dir() resolves to the correct root on each OS.
+            let cfg =
+                dirs::config_dir().ok_or_else(|| anyhow!("cannot determine config directory"))?;
+            Ok(cfg.join("zed").join("settings.json"))
+        }
+    }
 }
 
 #[cfg(target_os = "windows")]
@@ -872,10 +885,10 @@ fn patch_settings(settings_path: &Path, auto_patch: bool, editor: EditorTarget) 
         return Ok(());
     }
 
-    let new_json = if editor.uses_mcp() {
-        inject_ntk_mcp_server(&existing)?
-    } else {
-        inject_ntk_hook(&existing)?
+    let new_json = match editor {
+        EditorTarget::Cursor => inject_ntk_mcp_server(&existing)?,
+        EditorTarget::Zed => inject_ntk_zed_mcp_server(&existing)?,
+        EditorTarget::ClaudeCode | EditorTarget::OpenCode => inject_ntk_hook(&existing)?,
     };
 
     // In non-auto mode, always proceed (interactive prompt not supported in
@@ -920,6 +933,37 @@ fn inject_ntk_mcp_server(json_str: &str) -> Result<String> {
     servers.insert("ntk".to_string(), server_entry);
 
     serde_json::to_string_pretty(&root).context("serializing patched mcp.json")
+}
+
+/// Inject NTK's MCP server into Zed's `context_servers` object. Zed
+/// uses a different shape from Cursor: the command lives inside a
+/// nested `command` object with `path`, `args`, and `env` keys.
+fn inject_ntk_zed_mcp_server(json_str: &str) -> Result<String> {
+    let mut root: serde_json::Value =
+        serde_json::from_str(json_str).with_context(|| "parsing Zed settings.json")?;
+
+    let ntk_cmd = resolve_ntk_binary_for_mcp();
+
+    let server_entry = serde_json::json!({
+        "command": {
+            "path": ntk_cmd,
+            "args": ["mcp-server"],
+            "env": {}
+        },
+        "_ntk": NTK_HOOK_MARKER,
+    });
+
+    let servers = root
+        .as_object_mut()
+        .ok_or_else(|| anyhow!("Zed settings.json root is not an object"))?
+        .entry("context_servers")
+        .or_insert_with(|| serde_json::json!({}))
+        .as_object_mut()
+        .ok_or_else(|| anyhow!("Zed settings.json[\"context_servers\"] is not an object"))?;
+
+    servers.insert("ntk".to_string(), server_entry);
+
+    serde_json::to_string_pretty(&root).context("serializing patched Zed settings.json")
 }
 
 /// Best-effort absolute path to the installed `ntk` binary — Cursor
@@ -992,25 +1036,25 @@ fn remove_ntk_hook_from_json(json_str: &str) -> Result<String> {
         });
     }
 
-    // mcpServers path (Cursor): drop the "ntk" entry when its _ntk marker
-    // matches ours. We match on marker rather than name so the uninstall
-    // never clobbers a user-renamed server that happens to be called "ntk".
-    if let Some(servers) = root
-        .pointer_mut("/mcpServers")
-        .and_then(|v| v.as_object_mut())
-    {
-        let keys_to_drop: Vec<String> = servers
-            .iter()
-            .filter(|(_, v)| {
-                v.get("_ntk")
-                    .and_then(|m| m.as_str())
-                    .map(|s| s == NTK_HOOK_MARKER)
-                    .unwrap_or(false)
-            })
-            .map(|(k, _)| k.clone())
-            .collect();
-        for k in keys_to_drop {
-            servers.remove(&k);
+    // MCP paths: drop our entry from either Cursor's mcpServers OR
+    // Zed's context_servers. Match on the _ntk marker rather than the
+    // key name so uninstall never clobbers a user-renamed server that
+    // happens to share the "ntk" key.
+    for ptr in &["/mcpServers", "/context_servers"] {
+        if let Some(servers) = root.pointer_mut(ptr).and_then(|v| v.as_object_mut()) {
+            let keys_to_drop: Vec<String> = servers
+                .iter()
+                .filter(|(_, v)| {
+                    v.get("_ntk")
+                        .and_then(|m| m.as_str())
+                        .map(|s| s == NTK_HOOK_MARKER)
+                        .unwrap_or(false)
+                })
+                .map(|(k, _)| k.clone())
+                .collect();
+            for k in keys_to_drop {
+                servers.remove(&k);
+            }
         }
     }
 
@@ -1112,6 +1156,45 @@ mod tests {
     fn test_uninstall_removes_cursor_mcp_entry() {
         let (_dir, path) = temp_settings("{}");
         patch_settings(&path, true, EditorTarget::Cursor).unwrap();
+        let content = std::fs::read_to_string(&path).unwrap();
+        let cleaned = remove_ntk_hook_from_json(&content).unwrap();
+        assert!(
+            !cleaned.contains(NTK_HOOK_MARKER),
+            "marker still present: {cleaned}"
+        );
+    }
+
+    #[test]
+    fn test_patch_adds_zed_context_server() {
+        // Zed uses context_servers with the nested command object.
+        let (_dir, path) = temp_settings("{}");
+        patch_settings(&path, true, EditorTarget::Zed).unwrap();
+        let content = std::fs::read_to_string(&path).unwrap();
+        assert!(
+            content.contains("context_servers"),
+            "zed path must write context_servers: {content}"
+        );
+        assert!(
+            content.contains("mcp-server"),
+            "zed entry must register ntk mcp-server: {content}"
+        );
+        assert!(
+            content.contains(NTK_HOOK_MARKER),
+            "_ntk marker missing from zed entry: {content}"
+        );
+        // Zed's shape nests the command — check for the path field.
+        let v: serde_json::Value = serde_json::from_str(&content).unwrap();
+        let cmd = v
+            .pointer("/context_servers/ntk/command")
+            .expect("nested command object");
+        assert!(cmd.get("path").is_some(), "zed command missing path: {cmd}");
+        assert!(cmd.get("args").is_some(), "zed command missing args: {cmd}");
+    }
+
+    #[test]
+    fn test_uninstall_removes_zed_context_server() {
+        let (_dir, path) = temp_settings("{}");
+        patch_settings(&path, true, EditorTarget::Zed).unwrap();
         let content = std::fs::read_to_string(&path).unwrap();
         let cleaned = remove_ntk_hook_from_json(&content).unwrap();
         assert!(

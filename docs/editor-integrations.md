@@ -23,6 +23,7 @@ free" via `ntk init -g`.
 | Claude Code | `~/.claude/settings.json` | PostToolUse hook | ✅ `ntk init -g` |
 | OpenCode | `~/.opencode/settings.json` | PostToolUse hook | ✅ `ntk init -g --opencode` |
 | Cursor | `~/.cursor/mcp.json` | MCP server (`ntk mcp-server`) | ✅ `ntk init -g --cursor` |
+| Zed | `<config>/zed/settings.json` | MCP via `context_servers` | ✅ `ntk init -g --zed` |
 
 Everything below needs an adapter because the editor uses a different
 integration model. Each section documents the concrete shape; a
@@ -122,21 +123,37 @@ Tracked as follow-up issue.
 
 ---
 
-## Zed
+## Zed ✅ shipped
 
-**Hook model:** Zed agent panel has no public hook API. Zed's
-extension API is Rust (WASM) and limited to editor-side surfaces
-(completions, diagnostics), not agent tool outputs.
+```bash
+ntk init -g --zed
+```
 
-**Workable path — Zed extension:**
-- Not viable today with the public extension API. Upstream support
-  is needed.
+Registers NTK as a context server in Zed's `settings.json` (resolved
+via `dirs::config_dir()`: `~/.config/zed/settings.json` on Linux/macOS,
+`%APPDATA%\Zed\settings.json` on Windows).
 
-**Alternative — MCP bridge:**
-- Zed gained MCP server support in late 2025; same integration as
-  Cursor above would work transparently once NTK ships an MCP server.
+**Installed config (auto-written):**
 
-Tracked as follow-up issue.
+```json
+{
+  "context_servers": {
+    "ntk": {
+      "command": {
+        "path": "/path/to/.ntk/bin/ntk",
+        "args": ["mcp-server"],
+        "env": {}
+      },
+      "_ntk": "ntk-hook"
+    }
+  }
+}
+```
+
+Reuses the exact same `ntk mcp-server` binary as Cursor (shipped in
+#27). Zed's agent calls `compress_output` the same way — only the
+JSON shape around it differs (`context_servers` + nested `command`
+object vs Cursor's flat `mcpServers`).
 
 ---
 
