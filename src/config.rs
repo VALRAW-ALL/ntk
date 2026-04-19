@@ -38,6 +38,13 @@ pub struct CompressionConfig {
     pub max_output_tokens: usize,
     pub preserve_first_stacktrace: bool,
     pub preserve_error_counts: bool,
+    /// How many of the most-recent user messages Layer 4 folds into the
+    /// context prefix. 1 keeps the original single-message behavior;
+    /// larger values enable decay-weighted stacking of older messages to
+    /// preserve long-running debug intent across many Bash calls.
+    /// Internally bounded to 5 so the prefix stays below MAX_INTENT_CHARS
+    /// even in the worst case.
+    pub context_max_messages: usize,
 }
 
 impl Default for CompressionConfig {
@@ -55,6 +62,7 @@ impl Default for CompressionConfig {
             max_output_tokens: 500,
             preserve_first_stacktrace: true,
             preserve_error_counts: true,
+            context_max_messages: 3,
         }
     }
 }

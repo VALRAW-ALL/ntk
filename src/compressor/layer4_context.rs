@@ -65,6 +65,116 @@ pub fn extract_context(path: &Path) -> Option<SessionContext> {
     extract_from_jsonl(&bytes)
 }
 
+/// Read the transcript at `path`, return up to `max_messages` most-recent
+/// user intents merged into a single `SessionContext` with decay weighting:
+/// the most recent message keeps 60 % of MAX_INTENT_CHARS, the next 25 %,
+/// the rest share 15 %. Older-first → newer-last so L3 reads the recent
+/// intent as the strongest signal.
+///
+/// `max_messages = 1` (or less) short-circuits to `extract_context` for
+/// exact backward compatibility.
+pub fn extract_context_with_decay(path: &Path, max_messages: usize) -> Option<SessionContext> {
+    let bytes = std::fs::read_to_string(path).ok()?;
+    extract_from_jsonl_multi(&bytes, max_messages)
+}
+
+/// Stacked-intent parser. Walks the transcript in reverse and collects up
+/// to `max_messages` non-meta user messages, oldest-first in the returned
+/// list by its index (so index 0 is the most recent).
+fn collect_user_messages(jsonl: &str, max_messages: usize) -> Vec<SessionContext> {
+    let mut out: Vec<SessionContext> = Vec::with_capacity(max_messages);
+    let lines: Vec<&str> = jsonl.lines().collect();
+    let mut assistant_turns_after = 0usize;
+
+    for line in lines.iter().rev() {
+        if out.len() >= max_messages {
+            break;
+        }
+        if line.is_empty() {
+            continue;
+        }
+        let event: TranscriptEvent = match serde_json::from_str(line) {
+            Ok(e) => e,
+            Err(_) => continue,
+        };
+        if event.is_meta {
+            continue;
+        }
+        match event.event_type.as_str() {
+            "assistant" => {
+                assistant_turns_after = assistant_turns_after.saturating_add(1);
+            }
+            "user" => {
+                if let Some(text) = extract_user_text(&event) {
+                    if let Some(cleaned) = clean_intent(&text) {
+                        out.push(SessionContext {
+                            user_intent: cleaned,
+                            turns_ago: assistant_turns_after,
+                        });
+                    }
+                }
+            }
+            _ => {}
+        }
+    }
+    out
+}
+
+pub fn extract_from_jsonl_multi(jsonl: &str, max_messages: usize) -> Option<SessionContext> {
+    // Single-message path: keep exact legacy behavior — one message, full budget.
+    if max_messages <= 1 {
+        return extract_from_jsonl(jsonl);
+    }
+    let messages = collect_user_messages(jsonl, max_messages.min(5));
+    if messages.is_empty() {
+        return None;
+    }
+    if messages.len() == 1 {
+        return messages.into_iter().next();
+    }
+
+    // Decay budget per slot, summing to ≤ MAX_INTENT_CHARS. Index 0 is the
+    // most recent message and gets the largest slice.
+    const BUDGETS: &[f32] = &[0.60, 0.25, 0.10, 0.03, 0.02];
+    let mut turns_ago_most_recent = usize::MAX;
+
+    // Render oldest→newest so the model reads history then the live intent.
+    let mut parts: Vec<String> = Vec::with_capacity(messages.len());
+    for (i, ctx) in messages.iter().enumerate().rev() {
+        let budget_frac = BUDGETS.get(i).copied().unwrap_or(0.02);
+        let budget = ((MAX_INTENT_CHARS as f32) * budget_frac) as usize;
+        let slice = truncate_chars(&ctx.user_intent, budget.max(20));
+        let label = if i == 0 {
+            "Current:".to_string()
+        } else {
+            format!("Earlier ({} turns ago):", ctx.turns_ago)
+        };
+        parts.push(format!("{label} {slice}"));
+        if i == 0 {
+            turns_ago_most_recent = ctx.turns_ago;
+        }
+    }
+    let combined = parts.join(" | ");
+    // Final safety clamp to the absolute cap.
+    let combined = truncate_chars(&combined, MAX_INTENT_CHARS);
+
+    Some(SessionContext {
+        user_intent: combined,
+        turns_ago: turns_ago_most_recent,
+    })
+}
+
+fn truncate_chars(s: &str, max_chars: usize) -> String {
+    if s.chars().count() <= max_chars {
+        return s.to_owned();
+    }
+    // Reserve 3 chars for the ellipsis so the total length stays ≤ max_chars.
+    let take = max_chars.saturating_sub(3).max(1);
+    let mut out: String = s.chars().take(take).collect();
+    out.push_str("...");
+    out
+}
+
 /// Parser split out for testability (no filesystem).
 pub fn extract_from_jsonl(jsonl: &str) -> Option<SessionContext> {
     // Walk the transcript in reverse — the most recent user message wins.
@@ -251,6 +361,77 @@ pub fn format_context(ctx: &SessionContext, fmt: PromptFormat) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_decay_single_message_matches_legacy() {
+        // max_messages=1 must produce identical output to the classic extractor.
+        let jsonl = r#"{"type":"user","message":{"role":"user","content":[{"type":"text","text":"fix the auth bug"}]}}
+"#;
+        let legacy = extract_from_jsonl(jsonl).expect("legacy ok");
+        let decayed = extract_from_jsonl_multi(jsonl, 1).expect("decay ok");
+        assert_eq!(legacy.user_intent, decayed.user_intent);
+        assert_eq!(legacy.turns_ago, decayed.turns_ago);
+    }
+
+    #[test]
+    fn test_decay_stacks_multiple_messages_oldest_first() {
+        let jsonl = r#"{"type":"user","message":{"role":"user","content":[{"type":"text","text":"overall goal: ship v2 release"}]}}
+{"type":"assistant","message":{"role":"assistant","content":[{"type":"text","text":"got it"}]}}
+{"type":"user","message":{"role":"user","content":[{"type":"text","text":"start by running the tests"}]}}
+{"type":"assistant","message":{"role":"assistant","content":[{"type":"text","text":"ok"}]}}
+{"type":"user","message":{"role":"user","content":[{"type":"text","text":"one test is failing, find the cause"}]}}
+"#;
+        let result = extract_from_jsonl_multi(jsonl, 3).expect("has result");
+        // All three messages should appear, in order oldest → newest.
+        assert!(
+            result.user_intent.contains("overall goal"),
+            "missing oldest: {}",
+            result.user_intent
+        );
+        assert!(
+            result.user_intent.contains("start by running"),
+            "missing middle: {}",
+            result.user_intent
+        );
+        assert!(
+            result.user_intent.contains("one test is failing"),
+            "missing most recent: {}",
+            result.user_intent
+        );
+        // The most recent ("Current:") must appear AFTER the earlier labels.
+        let current_pos = result.user_intent.find("Current:").expect("Current label");
+        let earlier_pos = result.user_intent.find("Earlier (").expect("Earlier label");
+        assert!(
+            earlier_pos < current_pos,
+            "expected Earlier before Current, got: {}",
+            result.user_intent
+        );
+    }
+
+    #[test]
+    fn test_decay_respects_max_intent_chars() {
+        // 3 long messages — the combined output must still fit the cap.
+        let long_a = "a".repeat(600);
+        let long_b = "b".repeat(600);
+        let long_c = "c".repeat(600);
+        let jsonl = format!(
+            "{{\"type\":\"user\",\"message\":{{\"role\":\"user\",\"content\":[{{\"type\":\"text\",\"text\":\"{long_a}\"}}]}}}}\n\
+             {{\"type\":\"user\",\"message\":{{\"role\":\"user\",\"content\":[{{\"type\":\"text\",\"text\":\"{long_b}\"}}]}}}}\n\
+             {{\"type\":\"user\",\"message\":{{\"role\":\"user\",\"content\":[{{\"type\":\"text\",\"text\":\"{long_c}\"}}]}}}}\n"
+        );
+        let r = extract_from_jsonl_multi(&jsonl, 3).expect("ok");
+        assert!(
+            r.user_intent.chars().count() <= MAX_INTENT_CHARS,
+            "decay overran the budget: {} chars",
+            r.user_intent.chars().count()
+        );
+    }
+
+    #[test]
+    fn test_decay_empty_transcript_returns_none() {
+        assert!(extract_from_jsonl_multi("", 3).is_none());
+        assert!(extract_from_jsonl_multi("{}", 3).is_none());
+    }
 
     const SAMPLE: &str = r#"{"type":"system","content":"startup"}
 {"parentUuid":null,"type":"user","message":{"role":"user","content":[{"type":"text","text":"please help me debug this build error"}]},"isMeta":false,"uuid":"abc","sessionId":"s1"}
