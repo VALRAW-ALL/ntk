@@ -17,6 +17,16 @@ $MinChars     = 500
 # own hook timeout if any is enforced by future versions.
 $TimeoutSecs  = 305
 
+# Auth token. The daemon writes it to ~/.ntk/.token on first start. If the
+# file does not exist the daemon is either stopped or running in
+# NTK_DISABLE_AUTH=1 mode — in both cases sending no header is correct.
+$NtkHomeDir = if ($env:NTK_HOME) { $env:NTK_HOME } else { $env:USERPROFILE }
+$NtkTokenFile = Join-Path $NtkHomeDir ".ntk\.token"
+$NtkToken = ""
+if (Test-Path $NtkTokenFile) {
+    try { $NtkToken = (Get-Content -Raw -LiteralPath $NtkTokenFile).Trim() } catch {}
+}
+
 # Read stdin — use $input pipeline variable (works for both piped and redirected stdin).
 # [Console]::In.ReadToEnd() fails when PowerShell is launched as a subprocess with
 # redirected stdin; $input correctly handles both interactive and subprocess contexts.
@@ -67,6 +77,9 @@ $payload = @{
 } | ConvertTo-Json -Compress -Depth 5
 
 # POST to daemon via System.Net.WebRequest (synchronous, no async, works in PS5 subprocesses).
+# X-NTK-Token header is required unless the daemon was started with
+# NTK_DISABLE_AUTH=1 — if the token file is absent we omit the header and
+# let the daemon reject / accept based on its own mode.
 try {
     $bytes   = [System.Text.Encoding]::UTF8.GetBytes($payload)
     $req     = [System.Net.WebRequest]::Create("${NtkDaemonUrl}/compress")
@@ -74,6 +87,9 @@ try {
     $req.ContentType = 'application/json'
     $req.Timeout     = $TimeoutSecs * 1000
     $req.ContentLength = $bytes.Length
+    if ($NtkToken) {
+        $req.Headers.Add('X-NTK-Token', $NtkToken)
+    }
     $reqStream = $req.GetRequestStream()
     $reqStream.Write($bytes, 0, $bytes.Length)
     $reqStream.Close()

@@ -3,10 +3,12 @@ use crate::config::NtkConfig;
 use crate::detector;
 use crate::metrics::{CompressionRecord, MetricsDb, MetricsStore};
 use crate::output::dashboard::{WarnBuffer, WarnEntry};
+use crate::security;
 use axum::{
     extract::{Json, State},
-    http::StatusCode,
-    response::Json as RespJson,
+    http::{Request, StatusCode},
+    middleware::{self, Next},
+    response::{Json as RespJson, Response},
     routing::{get, post},
     Router,
 };
@@ -37,6 +39,9 @@ pub struct AppState {
     pub backend_name: String,
     /// Model info string — "phi3:mini q5_k_m [GPU]" — served via /state.
     pub model_info: String,
+    /// Shared secret the hook must present on privileged routes. Empty
+    /// when auth is intentionally disabled via `NTK_DISABLE_AUTH=1`.
+    pub auth_token: Arc<String>,
 }
 
 // ---------------------------------------------------------------------------
@@ -111,13 +116,51 @@ pub struct HealthResponse {
 // ---------------------------------------------------------------------------
 
 pub fn build_router(state: AppState) -> Router {
-    Router::new()
+    // /health stays open so `ntk status` and external liveness checks can
+    // hit it without the token. Everything else — including /state which
+    // exposes warn logs and config hints — requires the token.
+    let protected = Router::new()
         .route("/compress", post(handle_compress))
         .route("/metrics", get(handle_metrics))
         .route("/records", get(handle_records))
-        .route("/health", get(handle_health))
         .route("/state", get(handle_state))
+        .layer(middleware::from_fn_with_state(state.clone(), require_token));
+
+    Router::new()
+        .route("/health", get(handle_health))
+        .merge(protected)
         .with_state(state)
+}
+
+/// Rejects requests to privileged routes that lack a matching
+/// `X-NTK-Token` header. Bypass only via `NTK_DISABLE_AUTH=1`.
+async fn require_token(
+    State(state): State<AppState>,
+    req: Request<axum::body::Body>,
+    next: Next,
+) -> Result<Response, (StatusCode, &'static str)> {
+    if security::auth_disabled() {
+        return Ok(next.run(req).await);
+    }
+    let expected = state.auth_token.as_str();
+    if expected.is_empty() {
+        // No token configured — treat as auth disabled but log a warning.
+        // This branch is defensive; startup should always populate a token.
+        tracing::warn!(
+            "auth_token is empty — permitting request. Restart `ntk start` to re-generate."
+        );
+        return Ok(next.run(req).await);
+    }
+    let presented = req
+        .headers()
+        .get(security::TOKEN_HEADER)
+        .and_then(|v| v.to_str().ok())
+        .unwrap_or("");
+    if security::constant_time_eq(expected, presented) {
+        Ok(next.run(req).await)
+    } else {
+        Err((StatusCode::UNAUTHORIZED, "missing or invalid X-NTK-Token"))
+    }
 }
 
 // ---------------------------------------------------------------------------

@@ -14,6 +14,16 @@ MIN_CHARS=500       # skip compression for short outputs
 # the daemon has time to fall back to L1+L2 before this request aborts.
 TIMEOUT_SECS=305
 
+# Auth token. The daemon writes it to ~/.ntk/.token on first start. If the
+# file does not exist the daemon is either stopped or running in
+# NTK_DISABLE_AUTH=1 mode — in both cases sending no header is correct.
+NTK_HOME_DIR="${NTK_HOME:-$HOME}"
+NTK_TOKEN_FILE="${NTK_HOME_DIR}/.ntk/.token"
+NTK_TOKEN=""
+if [ -r "$NTK_TOKEN_FILE" ]; then
+    NTK_TOKEN=$(tr -d '[:space:]' < "$NTK_TOKEN_FILE")
+fi
+
 # Read full stdin into a variable.
 input=$(cat)
 
@@ -53,10 +63,20 @@ if [ -z "$payload" ]; then
 fi
 
 # POST to daemon. On any error, exit 0 so Claude Code uses the original output.
-response=$(curl -s --max-time "$TIMEOUT_SECS" \
-    -X POST "${NTK_DAEMON_URL}/compress" \
-    -H "Content-Type: application/json" \
-    -d "$payload" 2>/dev/null) || exit 0
+# The daemon rejects unauthenticated requests (401) unless NTK_DISABLE_AUTH=1,
+# which is why we pass the shared secret from ~/.ntk/.token as X-NTK-Token.
+if [ -n "$NTK_TOKEN" ]; then
+    response=$(curl -s --max-time "$TIMEOUT_SECS" \
+        -X POST "${NTK_DAEMON_URL}/compress" \
+        -H "Content-Type: application/json" \
+        -H "X-NTK-Token: ${NTK_TOKEN}" \
+        -d "$payload" 2>/dev/null) || exit 0
+else
+    response=$(curl -s --max-time "$TIMEOUT_SECS" \
+        -X POST "${NTK_DAEMON_URL}/compress" \
+        -H "Content-Type: application/json" \
+        -d "$payload" 2>/dev/null) || exit 0
+fi
 
 if [ -z "$response" ]; then
     exit 0

@@ -5,5 +5,6 @@ pub mod gpu;
 pub mod installer;
 pub mod metrics;
 pub mod output;
+pub mod security;
 pub mod server;
 pub mod telemetry;

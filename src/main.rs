@@ -411,6 +411,23 @@ async fn async_run_daemon(gpu: bool) -> Result<()> {
         config.model.model_name, config.model.quantization, compute_mode
     );
 
+    // Auth: ensure the daemon has a shared-secret token before accepting
+    // any request. Generated on first start, persisted at
+    // `$HOME/.ntk/.token` with 0600 permissions on Unix.
+    let auth_token: String = if ntk::security::auth_disabled() {
+        tracing::warn!(
+            "NTK_DISABLE_AUTH=1 — daemon accepts unauthenticated requests. \
+             This is intended for debugging only; unset in production."
+        );
+        String::new()
+    } else {
+        let t = ntk::security::load_or_create_token()
+            .context("failed to load/create daemon auth token")?;
+        let path = ntk::security::token_path()?;
+        tracing::info!("auth token loaded from {}", path.display());
+        t
+    };
+
     let state = ntk::server::AppState {
         config: Arc::new(config),
         metrics: Arc::clone(&metrics),
@@ -421,6 +438,7 @@ async fn async_run_daemon(gpu: bool) -> Result<()> {
         addr: addr.clone(),
         backend_name: backend_name.clone(),
         model_info: model_info.clone(),
+        auth_token: Arc::new(auth_token),
     };
 
     let router = ntk::server::build_router(state);
@@ -1190,15 +1208,23 @@ fn run_test_compress(
         }
 
         let url = format!("{}/compress", daemon_url.trim_end_matches('/'));
+        // Shared-secret token — /compress is a protected route.
+        let token = ntk::security::load_or_create_token()
+            .ok()
+            .unwrap_or_default();
         let rt = tokio::runtime::Runtime::new()?;
         let body: serde_json::Value = rt.block_on(async {
             let client = reqwest::Client::builder()
                 .timeout(std::time::Duration::from_secs(300))
                 .build()?;
-            let resp =
-                client.post(&url).json(&payload).send().await.map_err(|e| {
-                    anyhow!("daemon unreachable at {url}: {e}. Run `ntk start` first.")
-                })?;
+            let mut req = client.post(&url).json(&payload);
+            if !token.is_empty() {
+                req = req.header(ntk::security::TOKEN_HEADER, &token);
+            }
+            let resp = req
+                .send()
+                .await
+                .map_err(|e| anyhow!("daemon unreachable at {url}: {e}. Run `ntk start` first."))?;
             let status = resp.status();
             if !status.is_success() {
                 let text = resp.text().await.unwrap_or_default();
@@ -3953,6 +3979,13 @@ fn pid_file_path() -> Result<PathBuf> {
 
 /// Minimal synchronous HTTP GET using reqwest in a blocking context.
 fn ureq_get(url: &str) -> Result<String> {
+    // The CLI and daemon run as the same user, so the CLI can read the
+    // shared-secret token file and authenticate on /metrics, /records,
+    // and /state. /health works regardless (it's the open route) so
+    // `ntk status` keeps working even without the token file.
+    let token = ntk::security::load_or_create_token()
+        .ok()
+        .unwrap_or_default();
     let rt = tokio::runtime::Builder::new_current_thread()
         .enable_all()
         .build()?;
@@ -3960,8 +3993,11 @@ fn ureq_get(url: &str) -> Result<String> {
         let client = reqwest::Client::builder()
             .timeout(std::time::Duration::from_secs(5))
             .build()?;
-        let text = client
-            .get(url)
+        let mut req = client.get(url);
+        if !token.is_empty() {
+            req = req.header(ntk::security::TOKEN_HEADER, &token);
+        }
+        let text = req
             .send()
             .await
             .map_err(|e| anyhow!("daemon unreachable — is `ntk start` running? ({e})"))?

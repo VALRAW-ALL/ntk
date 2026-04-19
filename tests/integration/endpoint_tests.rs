@@ -16,6 +16,13 @@ fn empty_warn_log() -> WarnBuffer {
 }
 
 fn test_server() -> TestServer {
+    test_server_with_token("")
+}
+
+/// Build a test server with an explicit shared-secret token. When empty,
+/// the daemon's middleware falls back to the open-mode path (with a warn
+/// log) — which mirrors the original test behaviour before auth landed.
+fn test_server_with_token(token: &str) -> TestServer {
     let config = Arc::new(NtkConfig::default());
     let metrics = Arc::new(Mutex::new(MetricsStore::new()));
     let state = AppState {
@@ -28,6 +35,7 @@ fn test_server() -> TestServer {
         addr: "127.0.0.1:8765".to_string(),
         backend_name: "test".to_string(),
         model_info: String::new(),
+        auth_token: Arc::new(token.to_string()),
     };
     let router = build_router(state);
     TestServer::new(router).expect("test server")
@@ -120,6 +128,7 @@ async fn test_compress_rejects_oversized_input() {
         addr: "127.0.0.1:8765".to_string(),
         backend_name: "test".to_string(),
         model_info: String::new(),
+        auth_token: Arc::new(String::new()),
     };
     let server = TestServer::new(build_router(state)).expect("test server");
 
@@ -129,6 +138,42 @@ async fn test_compress_rejects_oversized_input() {
         .await;
 
     resp.assert_status(axum::http::StatusCode::PAYLOAD_TOO_LARGE);
+}
+
+// --- Auth token (X-NTK-Token) ---------------------------------------------
+
+#[tokio::test]
+async fn test_compress_rejected_without_auth_token() {
+    // Given a server configured with a real token, a request that does not
+    // carry X-NTK-Token must get 401.
+    let server = test_server_with_token("s3cret-token");
+    let resp = server
+        .post("/compress")
+        .json(&serde_json::json!({ "output": "some output longer than ten chars" }))
+        .await;
+    resp.assert_status(axum::http::StatusCode::UNAUTHORIZED);
+}
+
+#[tokio::test]
+async fn test_compress_accepted_with_correct_auth_token() {
+    let server = test_server_with_token("s3cret-token");
+    let resp = server
+        .post("/compress")
+        .add_header(
+            axum::http::HeaderName::from_static("x-ntk-token"),
+            axum::http::HeaderValue::from_static("s3cret-token"),
+        )
+        .json(&serde_json::json!({ "output": "some output longer than ten chars" }))
+        .await;
+    resp.assert_status_ok();
+}
+
+#[tokio::test]
+async fn test_health_endpoint_open_without_token() {
+    // Health stays open for liveness probes and `ntk status`.
+    let server = test_server_with_token("s3cret-token");
+    let resp = server.get("/health").await;
+    resp.assert_status_ok();
 }
 
 // --- Layer 4 (context injection) — endpoint-level tests ------------------
