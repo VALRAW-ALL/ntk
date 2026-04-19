@@ -5,3 +5,4 @@ pub mod layer3_candle;
 pub mod layer3_inference;
 pub mod layer3_llamacpp;
 pub mod layer4_context;
+pub mod spec_loader;

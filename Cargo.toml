@@ -57,6 +57,10 @@ similar = "2"
 # transitive dep via reqwest/tokio; promoted to direct so StreamExt is
 # usable without enabling reqwest's own re-export.
 futures-util = { version = "0.3", default-features = false, features = ["std"] }
+# YAML parser for the context-linter spec POC (#24 / RFC-0001). Pure
+# Rust; MIT/Apache-2.0. Used only by spec_loader — hardcoded rules
+# still ship in layer1_filter.rs and remain the primary path.
+serde_yaml = "0.9"
 
 [target.'cfg(unix)'.dependencies]
 nix = { version = "0.27", features = ["signal"] }

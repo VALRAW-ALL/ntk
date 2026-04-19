@@ -1,0 +1,68 @@
+spec_version: 0.1
+category: stack_trace
+language: python
+frameworks: [django, flask, fastapi, gunicorn, werkzeug, asgiref]
+rules:
+  # Any Python frame whose File "..." path contains /site-packages/ —
+  # catches most third-party installs regardless of framework.
+  - id: py.stack.site_packages
+    applies_to: stack_trace.frame_run
+    pattern:
+      kind: frame-run
+      classifier: contains
+      values:
+        - '/site-packages/'
+        - '\\site-packages\\'
+      unit: 2                      # Python emits each frame as 2 lines
+    transform:
+      kind: collapse-run
+      min_run: 3
+      replacement: '[{n} framework frames omitted]'
+    severity: lossy-safe
+    invariants:
+      - preserve_first_frame
+      - preserve_last_frame
+      - preserve_errors
+
+  # Django's own source tree (core / db / http).
+  - id: py.stack.django_core
+    applies_to: stack_trace.frame_run
+    pattern:
+      kind: frame-run
+      classifier: contains
+      values:
+        - '/django/core/'
+        - '/django/db/'
+        - '/django/http/'
+      unit: 2
+    transform:
+      kind: collapse-run
+      min_run: 3
+      replacement: '[{n} Django framework frames omitted]'
+    severity: lossy-safe
+    invariants:
+      - preserve_first_frame
+      - preserve_last_frame
+      - preserve_errors
+
+  # ASGI / WSGI runtime shims — high-volume, zero signal.
+  - id: py.stack.asgi_runtime
+    applies_to: stack_trace.frame_run
+    pattern:
+      kind: frame-run
+      classifier: contains
+      values:
+        - '/gunicorn/'
+        - '/asgiref/'
+        - '/werkzeug/'
+        - '/uvicorn/'
+      unit: 2
+    transform:
+      kind: collapse-run
+      min_run: 3
+      replacement: '[{n} ASGI/WSGI runtime frames omitted]'
+    severity: lossy-safe
+    invariants:
+      - preserve_first_frame
+      - preserve_last_frame
+      - preserve_errors
