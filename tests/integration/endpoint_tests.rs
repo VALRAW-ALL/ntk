@@ -264,6 +264,46 @@ async fn test_l3_cache_roundtrip_and_ttl() {
 }
 
 #[tokio::test]
+async fn test_prune_clears_fresh_data_at_days_zero() {
+    // With days=0, every row is older-than-now (strictly less than
+    // CURRENT_TIMESTAMP), so prune should delete everything and VACUUM.
+    use ntk::metrics::MetricsDb;
+    let tmp = tempfile::tempdir().expect("tempdir");
+    let db = MetricsDb::init(&tmp.path().join("p.db"))
+        .await
+        .expect("init");
+
+    let k = MetricsDb::l3_cache_key("x", "y", "m", "p");
+    db.store_l3_cache(&k, "v", "m").await.expect("store");
+    assert_eq!(db.l3_cache_size().await.expect("size"), 1);
+
+    // Sleep so CURRENT_TIMESTAMP advances past the insertion's second.
+    tokio::time::sleep(std::time::Duration::from_millis(1100)).await;
+
+    let (recs, cache) = db.prune_older_than(0).await.expect("prune");
+    assert_eq!(cache, 1, "expected 1 cache row deleted");
+    // No compression_records inserted above; should be 0.
+    assert_eq!(recs, 0);
+    assert_eq!(db.l3_cache_size().await.expect("size2"), 0);
+}
+
+#[tokio::test]
+async fn test_prune_preserves_recent_with_ttl() {
+    // With a large ttl the just-inserted row must survive.
+    use ntk::metrics::MetricsDb;
+    let tmp = tempfile::tempdir().expect("tempdir");
+    let db = MetricsDb::init(&tmp.path().join("p2.db"))
+        .await
+        .expect("init");
+
+    let k = MetricsDb::l3_cache_key("a", "b", "m", "p");
+    db.store_l3_cache(&k, "v", "m").await.expect("store");
+    let (_recs, cache) = db.prune_older_than(30).await.expect("prune");
+    assert_eq!(cache, 0, "recent row must not be pruned at ttl=30");
+    assert_eq!(db.l3_cache_size().await.expect("size"), 1);
+}
+
+#[tokio::test]
 async fn test_l3_cache_distinct_keys_dont_collide() {
     use ntk::metrics::MetricsDb;
     let tmp = tempfile::tempdir().expect("tempdir");

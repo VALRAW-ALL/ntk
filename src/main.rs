@@ -143,6 +143,18 @@ enum Command {
         output: Option<PathBuf>,
     },
 
+    /// Prune old rows from the SQLite metrics database (compression_records
+    /// and l3_cache) to keep disk usage bounded in long-running installs.
+    /// Runs VACUUM after deletion so freed pages are returned to the OS.
+    Prune {
+        /// Delete rows older than this many days. Default: 30.
+        #[arg(long, default_value = "30")]
+        older_than: u32,
+        /// Show what would be deleted without actually deleting.
+        #[arg(long)]
+        dry_run: bool,
+    },
+
     /// Show a unified diff between the input file and the output of a
     /// specific compression layer. Useful for pinpointing which rule
     /// fired when a fixture's ratio regresses.
@@ -255,6 +267,11 @@ fn main() -> Result<()> {
             layer,
             context,
         }) => run_diff(&file, &layer, context),
+
+        Some(Command::Prune {
+            older_than,
+            dry_run,
+        }) => run_prune(older_than, dry_run),
     }
 }
 
@@ -1345,6 +1362,60 @@ fn run_test_compress(
             "tip: pass --with-l3 (or --context \"<intent>\") to also run Layer 3/4 via the daemon."
         );
     }
+    Ok(())
+}
+
+fn run_prune(older_than: u32, dry_run: bool) -> Result<()> {
+    use ntk::metrics::MetricsDb;
+    let cwd = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
+    let config = ntk::config::load(&cwd).unwrap_or_default();
+    let db_path = config.storage_path_expanded();
+
+    if !db_path.exists() {
+        println!(
+            "No metrics database at {} — nothing to prune.",
+            db_path.display()
+        );
+        return Ok(());
+    }
+
+    let rt = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()?;
+
+    rt.block_on(async {
+        let db = MetricsDb::init(&db_path).await?;
+        let rec_before = db.records_size().await?;
+        let cache_before = db.l3_cache_size().await?;
+        println!("Database: {}", db_path.display());
+        println!("  compression_records: {rec_before}");
+        println!("  l3_cache entries:    {cache_before}");
+        println!();
+
+        if dry_run {
+            println!(
+                "--dry-run: would prune rows older than {older_than} day(s).\n\
+                 Re-run without --dry-run to actually delete + VACUUM."
+            );
+            return Ok::<(), anyhow::Error>(());
+        }
+
+        let (recs, cache) = db.prune_older_than(older_than).await?;
+        println!("Pruned (older than {older_than} days):");
+        println!("  compression_records: {recs} row(s) deleted");
+        println!("  l3_cache entries:    {cache} row(s) deleted");
+        println!();
+        println!("VACUUM completed.");
+
+        let rec_after = db.records_size().await?;
+        let cache_after = db.l3_cache_size().await?;
+        println!();
+        println!("After prune:");
+        println!("  compression_records: {rec_after}");
+        println!("  l3_cache entries:    {cache_after}");
+        Ok(())
+    })?;
+
     Ok(())
 }
 

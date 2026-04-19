@@ -271,13 +271,53 @@ impl MetricsDb {
         Ok(())
     }
 
-    /// Return total rows in the cache. Used by tests and the forthcoming
-    /// `ntk prune` command.
+    /// Return total rows in the cache. Used by tests and the `ntk prune` command.
     pub async fn l3_cache_size(&self) -> Result<usize> {
         let row = sqlx::query("SELECT COUNT(*) as n FROM l3_cache")
             .fetch_one(&self.pool)
             .await
             .context("counting l3_cache")?;
+        Ok(row.get::<i64, _>("n") as usize)
+    }
+
+    /// Delete rows older than `days` from both compression_records and
+    /// l3_cache. Returns `(records_deleted, cache_deleted)`. Used by
+    /// `ntk prune` to keep SQLite size bounded in long-running installs.
+    pub async fn prune_older_than(&self, days: u32) -> Result<(usize, usize)> {
+        let cutoff = format!("-{days} days");
+        let rec_res =
+            sqlx::query("DELETE FROM compression_records WHERE created_at < datetime('now', ?)")
+                .bind(&cutoff)
+                .execute(&self.pool)
+                .await
+                .context("pruning compression_records")?;
+        let records_deleted = rec_res.rows_affected() as usize;
+
+        let cache_res = sqlx::query("DELETE FROM l3_cache WHERE created_at < datetime('now', ?)")
+            .bind(&cutoff)
+            .execute(&self.pool)
+            .await
+            .context("pruning l3_cache")?;
+        let cache_deleted = cache_res.rows_affected() as usize;
+
+        // Reclaim disk space. VACUUM cannot run inside a transaction —
+        // sqlx runs each query in its own transaction by default, so this
+        // call produces a standalone statement and is safe.
+        sqlx::query("VACUUM")
+            .execute(&self.pool)
+            .await
+            .context("VACUUM after prune")?;
+
+        Ok((records_deleted, cache_deleted))
+    }
+
+    /// Total rows in compression_records. Used by tests and the
+    /// `ntk prune --show` dry-run path.
+    pub async fn records_size(&self) -> Result<usize> {
+        let row = sqlx::query("SELECT COUNT(*) as n FROM compression_records")
+            .fetch_one(&self.pool)
+            .await
+            .context("counting compression_records")?;
         Ok(row.get::<i64, _>("n") as usize)
     }
 
