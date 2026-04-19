@@ -585,4 +585,100 @@ mod tests {
         // compression untouched
         assert_eq!(base.compression.inference_threshold_tokens, 300);
     }
+
+    // --- Regression tests covering the three scenarios described in #14 ---
+
+    #[test]
+    fn test_merge_scenario_inherit_all() {
+        // Empty local config → every global value is preserved.
+        let dir = temp_dir();
+        fs::write(dir.path().join(".ntk.json"), "{}").unwrap();
+
+        let mut base = NtkConfig::default();
+        let expected_port = base.daemon.port;
+        let expected_host = base.daemon.host.clone();
+        let expected_threshold = base.compression.inference_threshold_tokens;
+        merge_local(&mut base, dir.path()).unwrap();
+
+        assert_eq!(base.daemon.port, expected_port);
+        assert_eq!(base.daemon.host, expected_host);
+        assert_eq!(
+            base.compression.inference_threshold_tokens,
+            expected_threshold
+        );
+    }
+
+    #[test]
+    fn test_merge_scenario_partial_nested_override() {
+        // Local overrides daemon.port only — daemon.host + other top-level
+        // sections must remain at global defaults. Regression guard for the
+        // bug described in issue #14.
+        let dir = temp_dir();
+        fs::write(
+            dir.path().join(".ntk.json"),
+            r#"{ "daemon": { "port": 7777 } }"#,
+        )
+        .unwrap();
+
+        let mut base = NtkConfig::default();
+        merge_local(&mut base, dir.path()).unwrap();
+
+        assert_eq!(base.daemon.port, 7777);
+        assert_eq!(base.daemon.host, "127.0.0.1", "host must NOT be zeroed");
+        assert!(base.daemon.auto_start, "unspecified bool must NOT be false");
+        assert_eq!(base.compression.inference_threshold_tokens, 300);
+    }
+
+    #[test]
+    fn test_merge_scenario_total_override_of_a_section() {
+        // Local specifies every field in the `daemon` section — those
+        // override globally, and other sections stay intact.
+        let dir = temp_dir();
+        fs::write(
+            dir.path().join(".ntk.json"),
+            r#"{ "daemon": {
+                "port": 1234,
+                "host": "::1",
+                "auto_start": false,
+                "log_level": "debug"
+            } }"#,
+        )
+        .unwrap();
+
+        let mut base = NtkConfig::default();
+        merge_local(&mut base, dir.path()).unwrap();
+
+        assert_eq!(base.daemon.port, 1234);
+        assert_eq!(base.daemon.host, "::1");
+        assert!(!base.daemon.auto_start);
+        assert_eq!(base.daemon.log_level, "debug");
+        // Other sections untouched.
+        assert_eq!(base.compression.inference_threshold_tokens, 300);
+        assert!(base.compression.enabled);
+    }
+
+    #[test]
+    fn test_merge_scenario_deep_nested_override() {
+        // A sibling field inside the same deep object must not get zeroed
+        // when only one sibling is overridden.
+        let dir = temp_dir();
+        fs::write(
+            dir.path().join(".ntk.json"),
+            r#"{ "compression": { "inference_threshold_tokens": 1000 } }"#,
+        )
+        .unwrap();
+
+        let mut base = NtkConfig::default();
+        merge_local(&mut base, dir.path()).unwrap();
+
+        assert_eq!(base.compression.inference_threshold_tokens, 1000);
+        assert!(
+            base.compression.enabled,
+            "sibling bool must stay at default"
+        );
+        assert!(
+            base.compression.layer1_enabled,
+            "deeper sibling bool must stay at default"
+        );
+    }
 }
