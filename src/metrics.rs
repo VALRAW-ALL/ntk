@@ -175,7 +175,110 @@ impl MetricsDb {
         .await
         .context("creating compression_records table")?;
 
+        // Layer 3 inference cache. Key is a SHA-256 hex digest over
+        // (l2_output + context_prefix + model + prompt_format). Value is
+        // the compressed output L3 produced. Entries older than the
+        // configured TTL are pruned lazily on lookup.
+        sqlx::query(
+            "CREATE TABLE IF NOT EXISTS l3_cache (
+                hash       TEXT PRIMARY KEY,
+                output     TEXT NOT NULL,
+                model      TEXT NOT NULL,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+            )",
+        )
+        .execute(&pool)
+        .await
+        .context("creating l3_cache table")?;
+
         Ok(Self { pool })
+    }
+
+    // ----- L3 cache ------------------------------------------------------
+
+    /// Compute the cache key for an L3 invocation. Exposed for tests and
+    /// the server handler. Deterministic: same inputs → same key.
+    pub fn l3_cache_key(
+        l2_output: &str,
+        context: &str,
+        model: &str,
+        prompt_format: &str,
+    ) -> String {
+        use sha2::{Digest, Sha256};
+        let mut hasher = Sha256::new();
+        hasher.update(l2_output.as_bytes());
+        hasher.update(b"\x1f"); // unit separator — avoids hash collisions
+        hasher.update(context.as_bytes());
+        hasher.update(b"\x1f");
+        hasher.update(model.as_bytes());
+        hasher.update(b"\x1f");
+        hasher.update(prompt_format.as_bytes());
+        let digest = hasher.finalize();
+        let mut hex = String::with_capacity(64);
+        for b in digest {
+            use std::fmt::Write;
+            let _ = write!(hex, "{b:02x}");
+        }
+        hex
+    }
+
+    /// Look up a cached L3 result. Returns `None` when the key is absent
+    /// or the entry is older than `ttl_days`. Expired rows are deleted as
+    /// a side effect so the cache does not grow without bound.
+    pub async fn lookup_l3_cache(&self, hash: &str, ttl_days: u32) -> Result<Option<String>> {
+        // sqlite datetime('now', '-N days') returns ISO timestamps that sort
+        // lexicographically; the comparison on created_at works as expected.
+        let cutoff = format!("-{ttl_days} days");
+        let row = sqlx::query(
+            "SELECT output FROM l3_cache
+             WHERE hash = ? AND created_at >= datetime('now', ?)",
+        )
+        .bind(hash)
+        .bind(&cutoff)
+        .fetch_optional(&self.pool)
+        .await
+        .context("looking up l3_cache")?;
+
+        // Lazy prune of stale rows matching this key (don't let them linger).
+        if row.is_none() {
+            let _ = sqlx::query(
+                "DELETE FROM l3_cache
+                 WHERE hash = ? AND created_at < datetime('now', ?)",
+            )
+            .bind(hash)
+            .bind(&cutoff)
+            .execute(&self.pool)
+            .await;
+        }
+
+        Ok(row.map(|r| r.get::<String, _>("output")))
+    }
+
+    /// Insert or replace a cache entry. On conflict, overwrite so the
+    /// most recent completion wins — model/prompt drift is handled
+    /// transparently.
+    pub async fn store_l3_cache(&self, hash: &str, output: &str, model: &str) -> Result<()> {
+        sqlx::query(
+            "INSERT OR REPLACE INTO l3_cache (hash, output, model, created_at)
+             VALUES (?, ?, ?, CURRENT_TIMESTAMP)",
+        )
+        .bind(hash)
+        .bind(output)
+        .bind(model)
+        .execute(&self.pool)
+        .await
+        .context("inserting l3_cache row")?;
+        Ok(())
+    }
+
+    /// Return total rows in the cache. Used by tests and the forthcoming
+    /// `ntk prune` command.
+    pub async fn l3_cache_size(&self) -> Result<usize> {
+        let row = sqlx::query("SELECT COUNT(*) as n FROM l3_cache")
+            .fetch_one(&self.pool)
+            .await
+            .context("counting l3_cache")?;
+        Ok(row.get::<i64, _>("n") as usize)
     }
 
     /// Persist a compression record to SQLite.
@@ -335,6 +438,44 @@ mod tests {
         assert_eq!(summary.total_compressions, 0);
         assert_eq!(summary.total_tokens_saved, 0);
         assert_eq!(summary.average_ratio, 0.0);
+    }
+
+    #[test]
+    fn test_l3_cache_key_is_deterministic() {
+        let k1 = MetricsDb::l3_cache_key("foo", "ctx", "ollama", "prefix");
+        let k2 = MetricsDb::l3_cache_key("foo", "ctx", "ollama", "prefix");
+        assert_eq!(k1, k2);
+        assert_eq!(k1.len(), 64); // SHA-256 hex
+    }
+
+    #[test]
+    fn test_l3_cache_key_changes_on_any_input() {
+        let base = MetricsDb::l3_cache_key("foo", "ctx", "ollama", "prefix");
+        assert_ne!(
+            base,
+            MetricsDb::l3_cache_key("foo2", "ctx", "ollama", "prefix")
+        );
+        assert_ne!(
+            base,
+            MetricsDb::l3_cache_key("foo", "ctx2", "ollama", "prefix")
+        );
+        assert_ne!(
+            base,
+            MetricsDb::l3_cache_key("foo", "ctx", "candle", "prefix")
+        );
+        assert_ne!(
+            base,
+            MetricsDb::l3_cache_key("foo", "ctx", "ollama", "goal")
+        );
+    }
+
+    #[test]
+    fn test_l3_cache_key_separator_prevents_collision() {
+        // Without the 0x1f separator, ("ab","c") and ("a","bc") would hash
+        // the same bytes. Make sure they do not.
+        let k1 = MetricsDb::l3_cache_key("ab", "c", "m", "p");
+        let k2 = MetricsDb::l3_cache_key("a", "bc", "m", "p");
+        assert_ne!(k1, k2);
     }
 
     #[test]

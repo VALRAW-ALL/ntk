@@ -103,6 +103,18 @@ fn is_empty_latency(l: &LayerLatency) -> bool {
     l.l1.is_none() && l.l2.is_none() && l.l3.is_none()
 }
 
+/// Stable string label for a `PromptFormat` variant. Used as part of the
+/// L3 cache key so switching prompt strategy invalidates cached rows
+/// automatically.
+fn prompt_format_label(f: layer4_context::PromptFormat) -> &'static str {
+    match f {
+        layer4_context::PromptFormat::Prefix => "prefix",
+        layer4_context::PromptFormat::XmlWrap => "xmlwrap",
+        layer4_context::PromptFormat::Goal => "goal",
+        layer4_context::PromptFormat::Json => "json",
+    }
+}
+
 #[derive(Debug, Serialize)]
 pub struct HealthResponse {
     pub status: &'static str,
@@ -272,6 +284,7 @@ async fn handle_compress(
     // Layer 3 (optional, only when threshold exceeded)
     let mut l3_latency: Option<u64> = None;
     let mut tokens_after_l3: Option<usize> = None;
+    let mut l3_cache_hit = false;
     let (output, layer_used, final_tokens) =
         if state.config.compression.layer3_enabled && l2.compressed_tokens > threshold {
             // Prompts dir: NTK_PROMPTS_DIR env var, or ~/.ntk/system-prompts/, or ./system-prompts/
@@ -282,41 +295,105 @@ async fn handle_compress(
             } else {
                 format!("{context_prefix}{}", l2.output)
             };
-            let l3_start = Instant::now();
-            let l3_result = state
-                .backend
-                .compress(&l3_input, output_type, &prompts_dir)
-                .await;
-            l3_latency = Some(l3_start.elapsed().as_millis() as u64);
-            match l3_result {
-                Ok(l3) => {
-                    let l3_tokens = layer2_tokenizer::count_tokens(&l3.output)
-                        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
-                    tokens_after_l3 = Some(l3_tokens);
-                    (l3.output, 3u8, l3_tokens)
+
+            // L3 cache: identical (l2_output, context, model, format) →
+            // identical output, every time. Checking SQLite (~1 ms) is
+            // strictly cheaper than re-running inference (50–800 ms).
+            let cache_enabled = state.config.l3_cache.enabled;
+            let backend_name = state.backend.name().to_owned();
+            let prompt_format_key = prompt_format_label(prompt_format);
+            let cache_key = MetricsDb::l3_cache_key(
+                &l2.output,
+                &context_prefix,
+                &backend_name,
+                prompt_format_key,
+            );
+            let cached_output = if cache_enabled {
+                if let Some(db) = state.db.as_ref() {
+                    match db
+                        .lookup_l3_cache(&cache_key, state.config.l3_cache.ttl_days)
+                        .await
+                    {
+                        Ok(hit) => hit,
+                        Err(e) => {
+                            tracing::warn!("l3_cache lookup failed: {e}");
+                            None
+                        }
+                    }
+                } else {
+                    None
                 }
-                Err(e) => {
-                    tracing::warn!(
-                        "Layer 3 inference failed ({name}): {e}",
-                        name = state.backend.name()
-                    );
-                    // Graceful fallback: Layer 3 unavailable → use Layer 2 output.
-                    if state.config.model.fallback_to_layer1_on_timeout {
-                        (l2.output.clone(), 2u8, l2.compressed_tokens)
-                    } else {
-                        return Err((
-                            StatusCode::SERVICE_UNAVAILABLE,
-                            format!(
-                                "Layer 3 inference unavailable ({}): {e}",
-                                state.backend.name()
-                            ),
-                        ));
+            } else {
+                None
+            };
+
+            if let Some(hit) = cached_output {
+                l3_cache_hit = true;
+                l3_latency = Some(0);
+                let l3_tokens = layer2_tokenizer::count_tokens(&hit)
+                    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+                tokens_after_l3 = Some(l3_tokens);
+                (hit, 3u8, l3_tokens)
+            } else {
+                let l3_start = Instant::now();
+                let l3_result = state
+                    .backend
+                    .compress(&l3_input, output_type, &prompts_dir)
+                    .await;
+                l3_latency = Some(l3_start.elapsed().as_millis() as u64);
+                match l3_result {
+                    Ok(l3) => {
+                        let l3_tokens = layer2_tokenizer::count_tokens(&l3.output)
+                            .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+                        tokens_after_l3 = Some(l3_tokens);
+
+                        // Cache the successful completion for reuse on
+                        // identical inputs. Best-effort — storage errors
+                        // are logged but don't affect the response.
+                        if cache_enabled {
+                            if let Some(db) = state.db.as_ref() {
+                                if let Err(e) = db
+                                    .store_l3_cache(&cache_key, &l3.output, &backend_name)
+                                    .await
+                                {
+                                    tracing::warn!("l3_cache store failed: {e}");
+                                }
+                            }
+                        }
+
+                        (l3.output, 3u8, l3_tokens)
+                    }
+                    Err(e) => {
+                        tracing::warn!(
+                            "Layer 3 inference failed ({name}): {e}",
+                            name = state.backend.name()
+                        );
+                        // Graceful fallback: Layer 3 unavailable → use Layer 2 output.
+                        if state.config.model.fallback_to_layer1_on_timeout {
+                            (l2.output.clone(), 2u8, l2.compressed_tokens)
+                        } else {
+                            return Err((
+                                StatusCode::SERVICE_UNAVAILABLE,
+                                format!(
+                                    "Layer 3 inference unavailable ({}): {e}",
+                                    state.backend.name()
+                                ),
+                            ));
+                        }
                     }
                 }
             }
         } else {
             (l2.output.clone(), 2u8, l2.compressed_tokens)
         };
+    // Tracing: signal cache hits so operators can tune ttl_days / size.
+    if l3_cache_hit {
+        tracing::info!(
+            "L3 cache hit: {tokens}t in 0ms (original L3 would be ~{threshold}+ ms)",
+            tokens = final_tokens,
+            threshold = threshold
+        );
+    }
 
     let latency_ms = started.elapsed().as_millis() as u64;
     let compressed_tokens = final_tokens;

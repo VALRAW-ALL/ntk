@@ -210,6 +210,31 @@ impl Default for TelemetryConfig {
     }
 }
 
+/// Deterministic cache for Layer 3 inference results.
+///
+/// Running the same command twice in the same branch produces identical
+/// output, which currently triggers a fresh L3 call (50–800 ms). Caching
+/// the prompt→output pair in SQLite reduces repeat latency to a lookup
+/// (<5 ms on a warm pool).
+///
+/// Cache key is `SHA-256(l2_output + context_prefix + model_name +
+/// prompt_format)`. Entries older than `ttl_days` are pruned on lookup.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(default)]
+pub struct L3CacheConfig {
+    pub enabled: bool,
+    pub ttl_days: u32,
+}
+
+impl Default for L3CacheConfig {
+    fn default() -> Self {
+        Self {
+            enabled: true,
+            ttl_days: 7,
+        }
+    }
+}
+
 /// Optional security features (opt-in).
 ///
 /// `audit_log` appends a single JSONL record per /compress call to
@@ -247,6 +272,7 @@ pub struct NtkConfig {
     pub display: DisplayConfig,
     pub telemetry: TelemetryConfig,
     pub security: SecurityConfig,
+    pub l3_cache: L3CacheConfig,
 }
 
 // ---------------------------------------------------------------------------

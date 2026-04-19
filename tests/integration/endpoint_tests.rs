@@ -227,6 +227,64 @@ async fn test_audit_log_appends_record_when_enabled() {
     );
 }
 
+// --- L3 cache (SQLite-backed) ---------------------------------------------
+
+#[tokio::test]
+async fn test_l3_cache_roundtrip_and_ttl() {
+    use ntk::metrics::MetricsDb;
+    let tmp = tempfile::tempdir().expect("tempdir");
+    let db_path = tmp.path().join("metrics.db");
+    let db = MetricsDb::init(&db_path).await.expect("init db");
+
+    let key = MetricsDb::l3_cache_key("l2_out", "ctx", "ollama", "prefix");
+
+    // Miss on empty table.
+    assert!(db.lookup_l3_cache(&key, 7).await.expect("lookup").is_none());
+
+    // Store then hit.
+    db.store_l3_cache(&key, "summary", "ollama")
+        .await
+        .expect("store");
+    let hit = db.lookup_l3_cache(&key, 7).await.expect("lookup2");
+    assert_eq!(hit.as_deref(), Some("summary"));
+    assert_eq!(db.l3_cache_size().await.expect("size"), 1);
+
+    // Re-store with a new output overwrites the row (INSERT OR REPLACE).
+    db.store_l3_cache(&key, "updated", "ollama")
+        .await
+        .expect("restore");
+    assert_eq!(
+        db.lookup_l3_cache(&key, 7)
+            .await
+            .expect("lookup3")
+            .as_deref(),
+        Some("updated")
+    );
+    assert_eq!(db.l3_cache_size().await.expect("size2"), 1);
+}
+
+#[tokio::test]
+async fn test_l3_cache_distinct_keys_dont_collide() {
+    use ntk::metrics::MetricsDb;
+    let tmp = tempfile::tempdir().expect("tempdir");
+    let db = MetricsDb::init(&tmp.path().join("m.db"))
+        .await
+        .expect("init");
+
+    let k1 = MetricsDb::l3_cache_key("a", "b", "m", "p");
+    let k2 = MetricsDb::l3_cache_key("a", "c", "m", "p");
+    db.store_l3_cache(&k1, "one", "m").await.expect("store1");
+    db.store_l3_cache(&k2, "two", "m").await.expect("store2");
+    assert_eq!(
+        db.lookup_l3_cache(&k1, 30).await.expect("get1").as_deref(),
+        Some("one")
+    );
+    assert_eq!(
+        db.lookup_l3_cache(&k2, 30).await.expect("get2").as_deref(),
+        Some("two")
+    );
+}
+
 #[tokio::test]
 async fn test_audit_log_silent_when_disabled() {
     // With audit_log=false (default), no file should be created.
