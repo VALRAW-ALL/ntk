@@ -343,6 +343,76 @@ impl MetricsDb {
         Ok(())
     }
 
+    /// Return records with `id > after_id`, optionally filtered by the
+    /// first word of the command (e.g. "cargo", "git"). Used by
+    /// `ntk tail --follow` to stream new rows since the last poll.
+    /// Returns rows in ascending id order so callers can pick the
+    /// max id as the cursor for the next tick.
+    pub async fn records_since(
+        &self,
+        after_id: i64,
+        command_filter: Option<&str>,
+        limit: usize,
+    ) -> Result<Vec<TailRow>> {
+        let rows = if let Some(cmd) = command_filter {
+            // Match the first whitespace-delimited word. SQLite has no
+            // regex by default, so we use LIKE 'cmd %' OR command = 'cmd'.
+            let prefix = format!("{cmd} %");
+            sqlx::query(
+                "SELECT id, command, original_tokens, compressed_tokens,
+                        layer_used, latency_ms, created_at
+                 FROM compression_records
+                 WHERE id > ? AND (command = ? OR command LIKE ?)
+                 ORDER BY id ASC LIMIT ?",
+            )
+            .bind(after_id)
+            .bind(cmd)
+            .bind(&prefix)
+            .bind(limit as i64)
+            .fetch_all(&self.pool)
+            .await
+            .context("fetching tail rows (filtered)")?
+        } else {
+            sqlx::query(
+                "SELECT id, command, original_tokens, compressed_tokens,
+                        layer_used, latency_ms, created_at
+                 FROM compression_records
+                 WHERE id > ?
+                 ORDER BY id ASC LIMIT ?",
+            )
+            .bind(after_id)
+            .bind(limit as i64)
+            .fetch_all(&self.pool)
+            .await
+            .context("fetching tail rows")?
+        };
+
+        let out: Vec<TailRow> = rows
+            .iter()
+            .map(|r| TailRow {
+                id: r.get::<i64, _>("id"),
+                command: r.get::<String, _>("command"),
+                original_tokens: r.get::<i64, _>("original_tokens") as usize,
+                compressed_tokens: r.get::<i64, _>("compressed_tokens") as usize,
+                layer_used: r.get::<i64, _>("layer_used") as u8,
+                latency_ms: r.get::<i64, _>("latency_ms") as u64,
+                created_at: r.get::<String, _>("created_at"),
+            })
+            .collect();
+        Ok(out)
+    }
+
+    /// The max id currently in compression_records, or 0 when empty.
+    /// Used as the starting cursor for `ntk tail --follow` so the
+    /// command does not replay the entire history on startup.
+    pub async fn max_record_id(&self) -> Result<i64> {
+        let row = sqlx::query("SELECT COALESCE(MAX(id), 0) as max_id FROM compression_records")
+            .fetch_one(&self.pool)
+            .await
+            .context("fetching max record id")?;
+        Ok(row.get::<i64, _>("max_id"))
+    }
+
     /// Return the last `n` records, most-recent-last.
     pub async fn history(&self, n: usize) -> Result<Vec<HistoryRow>> {
         let rows = sqlx::query(
@@ -399,6 +469,20 @@ impl MetricsDb {
 pub struct HistoryRow {
     pub command: String,
     pub output_type: String,
+    pub original_tokens: usize,
+    pub compressed_tokens: usize,
+    pub layer_used: u8,
+    pub latency_ms: u64,
+    pub created_at: String,
+}
+
+/// A single row returned by `records_since` — carries the id so the
+/// caller can advance its cursor for the next poll. Columns match the
+/// human-readable format used by `ntk tail`.
+#[derive(Debug, Clone, Serialize)]
+pub struct TailRow {
+    pub id: i64,
+    pub command: String,
     pub original_tokens: usize,
     pub compressed_tokens: usize,
     pub layer_used: u8,

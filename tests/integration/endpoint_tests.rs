@@ -264,6 +264,53 @@ async fn test_l3_cache_roundtrip_and_ttl() {
 }
 
 #[tokio::test]
+async fn test_records_since_returns_rows_ascending_after_cursor() {
+    use ntk::detector::OutputType;
+    use ntk::metrics::{CompressionRecord, MetricsDb};
+    let tmp = tempfile::tempdir().expect("tempdir");
+    let db = MetricsDb::init(&tmp.path().join("tail.db"))
+        .await
+        .expect("init");
+
+    assert_eq!(db.max_record_id().await.expect("max"), 0);
+
+    for i in 0..3 {
+        let r = CompressionRecord {
+            command: if i == 1 {
+                "git status".into()
+            } else {
+                "cargo test".into()
+            },
+            output_type: OutputType::Test,
+            original_tokens: 100 + i,
+            compressed_tokens: 20 + i,
+            layer_used: 2,
+            latency_ms: 5,
+            rtk_pre_filtered: false,
+            timestamp: chrono::Utc::now(),
+        };
+        db.persist(&r).await.expect("persist");
+    }
+
+    // After cursor=0, all three rows come back ascending.
+    let rows = db.records_since(0, None, 10).await.expect("all");
+    assert_eq!(rows.len(), 3);
+    assert!(rows[0].id < rows[1].id && rows[1].id < rows[2].id);
+
+    // Command filter: only the git row.
+    let git_only = db.records_since(0, Some("git"), 10).await.expect("filter");
+    assert_eq!(git_only.len(), 1);
+    assert_eq!(git_only[0].command, "git status");
+
+    // Cursor advances: rows after the first id should be 2.
+    let after_first = db
+        .records_since(rows[0].id, None, 10)
+        .await
+        .expect("after first");
+    assert_eq!(after_first.len(), 2);
+}
+
+#[tokio::test]
 async fn test_prune_clears_fresh_data_at_days_zero() {
     // With days=0, every row is older-than-now (strictly less than
     // CURRENT_TIMESTAMP), so prune should delete everything and VACUUM.

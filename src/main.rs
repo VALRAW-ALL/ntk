@@ -143,6 +143,25 @@ enum Command {
         output: Option<PathBuf>,
     },
 
+    /// Stream recent compression events from the metrics database.
+    /// Useful for debugging "is the hook firing?" during a live session
+    /// and for spotting which commands dominate token usage over time.
+    Tail {
+        /// Follow the tail (poll every --interval ms until Ctrl+C).
+        #[arg(short = 'f', long)]
+        follow: bool,
+        /// Polling interval in milliseconds when --follow is set.
+        #[arg(long, default_value = "2000")]
+        interval: u64,
+        /// Show this many recent rows before starting to follow.
+        #[arg(short = 'n', long, default_value = "10")]
+        lines: usize,
+        /// Only show rows whose command starts with this word (e.g.
+        /// "cargo", "git"). Case-sensitive; matches the first token.
+        #[arg(long)]
+        command: Option<String>,
+    },
+
     /// Prune old rows from the SQLite metrics database (compression_records
     /// and l3_cache) to keep disk usage bounded in long-running installs.
     /// Runs VACUUM after deletion so freed pages are returned to the OS.
@@ -272,6 +291,13 @@ fn main() -> Result<()> {
             older_than,
             dry_run,
         }) => run_prune(older_than, dry_run),
+
+        Some(Command::Tail {
+            follow,
+            interval,
+            lines,
+            command,
+        }) => run_tail(follow, interval, lines, command),
     }
 }
 
@@ -1372,6 +1398,147 @@ fn run_test_compress(
         );
     }
     Ok(())
+}
+
+fn run_tail(
+    follow: bool,
+    interval_ms: u64,
+    lines: usize,
+    command_filter: Option<String>,
+) -> Result<()> {
+    use ntk::metrics::MetricsDb;
+    let cwd = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
+    let config = ntk::config::load(&cwd).unwrap_or_default();
+    let db_path = config.storage_path_expanded();
+
+    if !db_path.exists() {
+        println!(
+            "No metrics database at {} — no rows to tail yet.\n\
+             Start the daemon and run some Bash tool calls first.",
+            db_path.display()
+        );
+        return Ok(());
+    }
+
+    let rt = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()?;
+
+    rt.block_on(async {
+        let db = MetricsDb::init(&db_path).await?;
+
+        // Initial page: most-recent `lines` rows. SQL returns DESC;
+        // flip to chronological before printing so the live tail below
+        // appends naturally.
+        let mut cursor = {
+            let hist = db.history(lines).await?;
+            for row in &hist {
+                print_tail_line_history(row);
+            }
+            db.max_record_id().await?
+        };
+
+        if !follow {
+            return Ok::<(), anyhow::Error>(());
+        }
+
+        tracing::info!(
+            "tailing {} (every {interval_ms}ms, Ctrl+C to stop)",
+            db_path.display()
+        );
+
+        // Poll loop. Ctrl+C propagates through tokio::signal::ctrl_c.
+        let mut ticker =
+            tokio::time::interval(std::time::Duration::from_millis(interval_ms.max(200)));
+        ticker.tick().await; // consume the immediate first tick
+
+        loop {
+            tokio::select! {
+                _ = tokio::signal::ctrl_c() => {
+                    println!();
+                    return Ok(());
+                }
+                _ = ticker.tick() => {
+                    let rows = db
+                        .records_since(cursor, command_filter.as_deref(), 500)
+                        .await?;
+                    for r in &rows {
+                        print_tail_line(r);
+                        if r.id > cursor {
+                            cursor = r.id;
+                        }
+                    }
+                }
+            }
+        }
+    })?;
+
+    Ok(())
+}
+
+fn print_tail_line(r: &ntk::metrics::TailRow) {
+    // created_at is ISO; keep only the HH:MM:SS slice for terseness.
+    let ts = r
+        .created_at
+        .split(['T', ' '])
+        .nth(1)
+        .and_then(|t| t.split('.').next())
+        .unwrap_or(&r.created_at);
+    let ratio_pct = if r.original_tokens > 0 {
+        let saved = r.original_tokens.saturating_sub(r.compressed_tokens);
+        saved
+            .saturating_mul(100)
+            .checked_div(r.original_tokens)
+            .unwrap_or(0)
+    } else {
+        0
+    };
+    println!(
+        "{ts} | {cmd:<30} | {bi:>5}→{ao:<5} ({pct:>3}%) | {lat:>5} ms | L{layer}",
+        cmd = truncate(&r.command, 30),
+        bi = r.original_tokens,
+        ao = r.compressed_tokens,
+        pct = ratio_pct,
+        lat = r.latency_ms,
+        layer = r.layer_used,
+    );
+}
+
+fn print_tail_line_history(r: &ntk::metrics::HistoryRow) {
+    let ts = r
+        .created_at
+        .split(['T', ' '])
+        .nth(1)
+        .and_then(|t| t.split('.').next())
+        .unwrap_or(&r.created_at);
+    let ratio_pct = if r.original_tokens > 0 {
+        let saved = r.original_tokens.saturating_sub(r.compressed_tokens);
+        saved
+            .saturating_mul(100)
+            .checked_div(r.original_tokens)
+            .unwrap_or(0)
+    } else {
+        0
+    };
+    println!(
+        "{ts} | {cmd:<30} | {bi:>5}→{ao:<5} ({pct:>3}%) | {lat:>5} ms | L{layer}",
+        cmd = truncate(&r.command, 30),
+        bi = r.original_tokens,
+        ao = r.compressed_tokens,
+        pct = ratio_pct,
+        lat = r.latency_ms,
+        layer = r.layer_used,
+    );
+}
+
+fn truncate(s: &str, max_chars: usize) -> String {
+    if s.chars().count() <= max_chars {
+        return s.to_owned();
+    }
+    let take = max_chars.saturating_sub(1);
+    let mut out: String = s.chars().take(take).collect();
+    out.push('…');
+    out
 }
 
 fn run_prune(older_than: u32, dry_run: bool) -> Result<()> {
