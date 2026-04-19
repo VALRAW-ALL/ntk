@@ -207,6 +207,49 @@ fn test_ntk_test_compress_file() {
     );
 }
 
+/// `ntk diff` must emit unified diff blocks for the chosen layer.
+#[test]
+fn test_ntk_diff_emits_unified_diff() {
+    let fixture = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("tests/fixtures/cargo_test_output.txt");
+    assert!(fixture.exists(), "fixture not found: {}", fixture.display());
+
+    let output = ntk()
+        .args([
+            "diff",
+            fixture.to_str().expect("path"),
+            "--layer",
+            "l1",
+            "--context",
+            "1",
+        ])
+        .output()
+        .expect("ntk diff failed");
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        output.status.success(),
+        "ntk diff failed:\nstdout: {stdout}\nstderr: {stderr}"
+    );
+
+    // Header for the L1 comparison must appear.
+    assert!(
+        stdout.contains("Input vs L1"),
+        "missing L1 header in diff output:\n{stdout}"
+    );
+    // At least one deletion line (L1 removes ANSI/progress/duplicates) —
+    // cargo_test_output.txt reliably produces some.
+    assert!(
+        stdout.lines().any(|l| l.contains("- -")) || stdout.lines().any(|l| l.contains(" -  ")),
+        "expected at least one '-' line (removal) in diff:\n{stdout}"
+    );
+    assert!(
+        !stdout.contains("thread 'main' panicked"),
+        "ntk diff panicked: {stdout}"
+    );
+}
+
 /// `ntk test-compress --verbose` must emit sectioned breakdown headers
 /// for the Input, L1, and L2 stages. L3 section only appears with --with-l3.
 #[test]

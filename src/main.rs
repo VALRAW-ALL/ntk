@@ -131,6 +131,20 @@ enum Command {
         #[arg(long)]
         l3: bool,
     },
+
+    /// Show a unified diff between the input file and the output of a
+    /// specific compression layer. Useful for pinpointing which rule
+    /// fired when a fixture's ratio regresses.
+    Diff {
+        /// Path to the file to diff.
+        file: PathBuf,
+        /// Which layer to compare against: l1 | l2 | all (default: all).
+        #[arg(long, default_value = "all")]
+        layer: String,
+        /// Context lines around changes (default: 3, 0 = changes only).
+        #[arg(long, default_value = "3")]
+        context: usize,
+    },
 }
 
 #[derive(Subcommand, Debug)]
@@ -213,6 +227,12 @@ fn main() -> Result<()> {
         Some(Command::Test { l3 }) => run_test(l3),
 
         Some(Command::Bench { runs, l3 }) => run_bench(runs, l3),
+
+        Some(Command::Diff {
+            file,
+            layer,
+            context,
+        }) => run_diff(&file, &layer, context),
     }
 }
 
@@ -1296,6 +1316,92 @@ fn run_test_compress(
         );
     }
     Ok(())
+}
+
+fn run_diff(file: &std::path::Path, layer: &str, context: usize) -> Result<()> {
+    use ntk::compressor::{layer1_filter, layer2_tokenizer};
+    use similar::{ChangeTag, TextDiff};
+
+    let canonical = file
+        .canonicalize()
+        .map_err(|e| anyhow!("cannot read {}: {e}", file.display()))?;
+    let input = std::fs::read_to_string(&canonical)
+        .map_err(|e| anyhow!("reading {}: {e}", canonical.display()))?;
+
+    let layer = layer.to_lowercase();
+    let show_l1 = matches!(layer.as_str(), "l1" | "all");
+    let show_l2 = matches!(layer.as_str(), "l2" | "all");
+    if !show_l1 && !show_l2 {
+        return Err(anyhow!(
+            "unknown --layer '{layer}' (expected: l1 | l2 | all)"
+        ));
+    }
+
+    let l1 = layer1_filter::filter(&input);
+    let l2 = if show_l2 {
+        Some(layer2_tokenizer::process(&l1.output)?)
+    } else {
+        None
+    };
+
+    println!("File: {}", canonical.display());
+    println!();
+
+    if show_l1 {
+        print_unified_diff("Input vs L1", &input, &l1.output, context);
+        if !l1.applied_rules.is_empty() {
+            println!("L1 applied: {}", l1.applied_rules.join(", "));
+        }
+        println!();
+    }
+
+    if let Some(l2) = l2 {
+        print_unified_diff("L1 vs L2", &l1.output, &l2.output, context);
+        if !l2.applied_rules.is_empty() {
+            println!("L2 applied: {}", l2.applied_rules.join(", "));
+        }
+    }
+
+    // Suppress the unused-import warning when the function runs in isolation
+    // (similar::ChangeTag / TextDiff are consumed inside print_unified_diff).
+    let _ = (ChangeTag::Equal, TextDiff::configure());
+    Ok(())
+}
+
+fn print_unified_diff(header: &str, before: &str, after: &str, context: usize) {
+    use similar::{ChangeTag, TextDiff};
+
+    println!("─── {header} ─────────────────────────────");
+    let diff = TextDiff::from_lines(before, after);
+
+    // similar's grouped_ops emits hunks centered on changes. Using the
+    // requested context size keeps output scannable even for large files.
+    for (hunk_idx, group) in diff.grouped_ops(context).iter().enumerate() {
+        if hunk_idx > 0 {
+            println!("  …");
+        }
+        for op in group {
+            for change in diff.iter_changes(op) {
+                let (sign, prefix) = match change.tag() {
+                    ChangeTag::Delete => ("-", "- "),
+                    ChangeTag::Insert => ("+", "+ "),
+                    ChangeTag::Equal => (" ", "  "),
+                };
+                let old_line = change
+                    .old_index()
+                    .map(|n| format!("{:>4}", n.saturating_add(1)))
+                    .unwrap_or_else(|| "    ".to_string());
+                let new_line = change
+                    .new_index()
+                    .map(|n| format!("{:>4}", n.saturating_add(1)))
+                    .unwrap_or_else(|| "    ".to_string());
+                // Trim one trailing newline so our println! doesn't double it.
+                let text = change.to_string_lossy().trim_end_matches('\n').to_string();
+                println!("{old_line} {new_line} {sign}{prefix}{text}");
+            }
+        }
+    }
+    println!();
 }
 
 fn run_model(action: ModelAction) -> Result<()> {

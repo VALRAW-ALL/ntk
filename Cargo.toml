@@ -44,6 +44,9 @@ sha2 = "0.10"
 uuid = { version = "1", features = ["v4"] }
 url = "2"
 chrono = { version = "0.4", features = ["serde"] }
+# Already a transitive dep via insta (dev); elevated to direct so `ntk diff`
+# can produce unified / line-level diffs for the per-layer debugger.
+similar = "2"
 
 [target.'cfg(unix)'.dependencies]
 nix = { version = "0.27", features = ["signal"] }
