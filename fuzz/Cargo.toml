@@ -1,0 +1,29 @@
+[package]
+name = "ntk-fuzz"
+version = "0.0.0"
+publish = false
+edition = "2021"
+license = "MIT"
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+libfuzzer-sys = "0.4"
+ntk = { path = ".." }
+
+# Prevent this crate from being published or treated as a workspace member
+# of the parent.
+[workspace]
+
+[[bin]]
+name = "layer1_filter"
+path = "fuzz_targets/layer1_filter.rs"
+test = false
+doc = false
+
+[[bin]]
+name = "layer2_compress"
+path = "fuzz_targets/layer2_compress.rs"
+test = false
+doc = false

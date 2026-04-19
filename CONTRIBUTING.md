@@ -87,6 +87,23 @@ Be kind. Assume good intent. Critique ideas, not people. If you can't
 write a review comment that a stranger would read as constructive, sleep
 on it and try again the next day.
 
+## Fuzzing
+
+CI runs proptest (`cargo test --test compression_invariants`) which
+covers the "never panics on arbitrary bytes" contract for L1 and L2
+with 256 random samples per build. For deeper coverage, use the
+`fuzz/` nested crate with cargo-fuzz locally:
+
+```bash
+cargo install cargo-fuzz
+cd fuzz
+cargo +nightly fuzz run layer1_filter  -- -max_total_time=60
+cargo +nightly fuzz run layer2_compress -- -max_total_time=60
+```
+
+The `fuzz/` crate is excluded from the main workspace, so `cargo build`
+and CI won't try to compile it without nightly.
+
 ## Snapshot tests
 
 NTK keeps two layers of snapshots in `tests/integration/snapshots/`:

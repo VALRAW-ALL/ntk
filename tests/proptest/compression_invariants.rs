@@ -153,6 +153,36 @@ proptest! {
 }
 
 // ---------------------------------------------------------------------------
+// Robustness invariant (#16) — neither L1 nor L2 panics on adversarial
+// byte sequences decoded via from_utf8_lossy. This mirrors the hook's
+// real-world input path (raw stdout bytes → JSON → String). A proptest
+// covers the no-panic guarantee on CI; cargo-fuzz in fuzz/ extends the
+// same contract to coverage-guided exploration when run locally.
+// ---------------------------------------------------------------------------
+
+fn arb_raw_bytes() -> impl Strategy<Value = Vec<u8>> {
+    // Any byte sequence up to 4 KiB — covers invalid UTF-8, null bytes,
+    // ANSI escapes, truncated multi-byte sequences, etc.
+    proptest::collection::vec(any::<u8>(), 0..4096)
+}
+
+proptest! {
+    #[test]
+    fn prop_layer1_filter_never_panics_on_arbitrary_bytes(bytes in arb_raw_bytes()) {
+        let s = String::from_utf8_lossy(&bytes);
+        // Just needs to return — panic would abort the proptest run.
+        let _ = layer1_filter::filter(&s);
+    }
+
+    #[test]
+    fn prop_layer2_compress_never_panics_on_arbitrary_bytes(bytes in arb_raw_bytes()) {
+        let s = String::from_utf8_lossy(&bytes);
+        // L2 returns Result; Err is acceptable — panic is not.
+        let _ = layer2_tokenizer::process(&s);
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Invariant 7: error / warning / panic lines are never dropped by L1.
 //
 // The canonical NTK promise: "error information preservation 100%".

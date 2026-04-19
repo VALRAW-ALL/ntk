@@ -1,3 +1,9 @@
+[workspace]
+# Exclude the fuzz/ nested crate so `cargo build` at the workspace root
+# doesn't pull libfuzzer-sys (which requires nightly + libFuzzer on the
+# host). Run fuzz targets from inside fuzz/ with `cargo +nightly fuzz`.
+exclude = ["fuzz"]
+
 [package]
 name = "ntk"
 version = "0.2.28"
