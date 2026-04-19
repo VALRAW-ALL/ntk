@@ -3,6 +3,7 @@ pub mod config;
 pub mod detector;
 pub mod gpu;
 pub mod installer;
+pub mod mcp_server;
 pub mod metrics;
 pub mod output;
 pub mod security;

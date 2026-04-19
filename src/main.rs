@@ -30,6 +30,11 @@ enum Command {
         #[arg(long)]
         opencode: bool,
 
+        /// Target Cursor (uses MCP instead of PostToolUse hook —
+        /// registers `ntk mcp-server` in ~/.cursor/mcp.json).
+        #[arg(long)]
+        cursor: bool,
+
         /// Patch settings.json without prompting.
         #[arg(long)]
         auto_patch: bool,
@@ -143,6 +148,16 @@ enum Command {
         output: Option<PathBuf>,
     },
 
+    /// Run NTK as a Model Context Protocol (MCP) server over stdio.
+    /// Exposes L1+L2 compression as a `compress_output` tool any
+    /// MCP-compatible client (Cursor, Zed, Windsurf, Claude Desktop)
+    /// can invoke. Self-contained — does not require `ntk start`.
+    ///
+    /// Clients launch this as a child process; it never prints to
+    /// stdout except for JSON-RPC responses. Logs go to stderr.
+    #[command(name = "mcp-server")]
+    McpServer,
+
     /// Stream recent compression events from the metrics database.
     /// Useful for debugging "is the hook firing?" during a live session
     /// and for spotting which commands dominate token usage over time.
@@ -235,11 +250,14 @@ fn main() -> Result<()> {
         Some(Command::Init {
             global,
             opencode,
+            cursor,
             auto_patch,
             hook_only,
             show,
             uninstall,
-        }) => run_init(global, opencode, auto_patch, hook_only, show, uninstall),
+        }) => run_init(
+            global, opencode, cursor, auto_patch, hook_only, show, uninstall,
+        ),
 
         Some(Command::Start { gpu }) => run_daemon(gpu),
 
@@ -287,6 +305,8 @@ fn main() -> Result<()> {
             context,
         }) => run_diff(&file, &layer, context),
 
+        Some(Command::McpServer) => ntk::mcp_server::run(),
+
         Some(Command::Prune {
             older_than,
             dry_run,
@@ -308,6 +328,7 @@ fn main() -> Result<()> {
 fn run_init(
     _global: bool,
     opencode: bool,
+    cursor: bool,
     auto_patch: bool,
     hook_only: bool,
     show: bool,
@@ -315,7 +336,15 @@ fn run_init(
 ) -> Result<()> {
     use ntk::installer::{EditorTarget, Installer};
 
-    let editor = if opencode {
+    if opencode && cursor {
+        return Err(anyhow!(
+            "--opencode and --cursor are mutually exclusive — pick one editor per install"
+        ));
+    }
+
+    let editor = if cursor {
+        EditorTarget::Cursor
+    } else if opencode {
         EditorTarget::OpenCode
     } else {
         EditorTarget::ClaudeCode

@@ -18,10 +18,11 @@ free" via `ntk init -g`.
 
 **Native support** (today):
 
-| Editor | Config file | Status |
-|---|---|---|
-| Claude Code | `~/.claude/settings.json` | ✅ `ntk init -g` |
-| OpenCode | `~/.opencode/settings.json` | ✅ `ntk init -g --opencode` |
+| Editor | Config file | Integration | Status |
+|---|---|---|---|
+| Claude Code | `~/.claude/settings.json` | PostToolUse hook | ✅ `ntk init -g` |
+| OpenCode | `~/.opencode/settings.json` | PostToolUse hook | ✅ `ntk init -g --opencode` |
+| Cursor | `~/.cursor/mcp.json` | MCP server (`ntk mcp-server`) | ✅ `ntk init -g --cursor` |
 
 Everything below needs an adapter because the editor uses a different
 integration model. Each section documents the concrete shape; a
@@ -30,33 +31,39 @@ a new `EditorTarget` variant.
 
 ---
 
-## Cursor
+## Cursor ✅ shipped
 
-**Hook model:** none (as of 2026). Cursor's agent uses its own
-ReAct loop without a user-extensible PostToolUse.
+```bash
+ntk init -g --cursor
+```
 
-**Workable path — MCP server:**
-- Cursor consumes MCP servers via `~/.cursor/mcp.json`
-- NTK would expose itself as an MCP server that provides a
-  `compress_output` tool the agent can call before showing long
-  command results
-- Implementation cost: add JSON-RPC handler to NTK (stdio-based),
-  ~300 LOC. New `ntk mcp-server` subcommand spawned by Cursor.
+Registers NTK as an MCP server in `~/.cursor/mcp.json`. The agent gets
+a `compress_output` tool it can call whenever a long command result
+would otherwise blow up the context window.
 
-**Example `~/.cursor/mcp.json` stanza (when shipped):**
+**How it works:**
+- `ntk mcp-server` is a stdio JSON-RPC server (protocol `2024-11-05`)
+- Synchronous — runs L1+L2 in-process, no `ntk start` daemon needed
+- Protocol: `initialize` → `tools/list` → `tools/call compress_output`
+- Tool returns `{ content: [{type:"text", text:<compressed>}], _meta: { tokens_before, tokens_after, ratio_pct, applied_rules } }`
+
+**Installed config (auto-written):**
 
 ```json
 {
   "mcpServers": {
     "ntk": {
-      "command": "ntk",
-      "args": ["mcp-server"]
+      "command": "/path/to/.ntk/bin/ntk",
+      "args": ["mcp-server"],
+      "_ntk": "ntk-hook"
     }
   }
 }
 ```
 
-Tracked as follow-up issue.
+**L3 note:** the MCP tool runs L1+L2 only. L3 (neural inference) would
+require a running daemon — deferred to a future `compress_output_l3`
+tool that returns a poll handle, or a streaming variant.
 
 ---
 

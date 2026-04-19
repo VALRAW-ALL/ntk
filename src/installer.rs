@@ -11,6 +11,19 @@ use crate::output::terminal as term;
 pub enum EditorTarget {
     ClaudeCode,
     OpenCode,
+    /// Cursor — integrates via Model Context Protocol rather than a
+    /// PostToolUse hook. Writes to `~/.cursor/mcp.json` and registers
+    /// `ntk mcp-server` as the command. The MCP server is self-contained
+    /// (no `ntk start` daemon required).
+    Cursor,
+}
+
+impl EditorTarget {
+    /// Returns true when the editor uses MCP (mcpServers in JSON)
+    /// rather than a PostToolUse hook. Drives the install-path split.
+    pub fn uses_mcp(self) -> bool {
+        matches!(self, EditorTarget::Cursor)
+    }
 }
 
 pub struct Installer {
@@ -143,7 +156,7 @@ impl Installer {
         // (Model backend / Ollama installation is handled separately by `ntk model setup`.)
         let settings_path = editor_settings_path(self.editor)?;
         let sp = term::Spinner::start("Patching editor settings …");
-        match patch_settings(&settings_path, self.auto_patch) {
+        match patch_settings(&settings_path, self.auto_patch, self.editor) {
             Ok(()) => {
                 let msg = settings_path.display().to_string();
                 sp.finish_ok(&msg);
@@ -335,6 +348,7 @@ fn editor_settings_path(editor: EditorTarget) -> Result<PathBuf> {
     let rel = match editor {
         EditorTarget::ClaudeCode => Path::new(".claude").join("settings.json"),
         EditorTarget::OpenCode => Path::new(".opencode").join("settings.json"),
+        EditorTarget::Cursor => Path::new(".cursor").join("mcp.json"),
     };
     Ok(home.join(rel))
 }
@@ -827,7 +841,7 @@ fn ollama_candidates() -> Vec<PathBuf> {
 
 /// Inject the NTK PostToolUse hook into editor settings.json.
 /// Idempotent: if the hook is already present, does nothing.
-fn patch_settings(settings_path: &Path, auto_patch: bool) -> Result<()> {
+fn patch_settings(settings_path: &Path, auto_patch: bool, editor: EditorTarget) -> Result<()> {
     // Ensure parent dir exists.
     if let Some(parent) = settings_path.parent() {
         ensure_dir(parent)?;
@@ -841,14 +855,11 @@ fn patch_settings(settings_path: &Path, auto_patch: bool) -> Result<()> {
         "{}".to_owned()
     };
 
-    // Idempotence: hook already present.
-    // On Windows, also check that the stored command is not the broken `~` form
-    // (written by older NTK versions). If so, replace the entry with the correct
-    // absolute path so the hook actually works.
+    // Idempotence: entry already present under the editor's marker.
     if existing.contains(NTK_HOOK_MARKER) {
         #[cfg(target_os = "windows")]
-        if existing.contains("File ~/.ntk") {
-            // Remove stale entry then re-inject with the corrected command below.
+        if !editor.uses_mcp() && existing.contains("File ~/.ntk") {
+            // Remove stale hook then re-inject with corrected absolute path.
             let cleaned = remove_ntk_hook_from_json(&existing)?;
             let new_json = inject_ntk_hook(&cleaned)?;
             let backup = settings_path.with_extension("ntk.bak");
@@ -861,7 +872,11 @@ fn patch_settings(settings_path: &Path, auto_patch: bool) -> Result<()> {
         return Ok(());
     }
 
-    let new_json = inject_ntk_hook(&existing)?;
+    let new_json = if editor.uses_mcp() {
+        inject_ntk_mcp_server(&existing)?
+    } else {
+        inject_ntk_hook(&existing)?
+    };
 
     // In non-auto mode, always proceed (interactive prompt not supported in
     // library code — callers can add prompting around this function).
@@ -875,6 +890,54 @@ fn patch_settings(settings_path: &Path, auto_patch: bool) -> Result<()> {
     }
 
     write_atomic(settings_path, &new_json)
+}
+
+/// Inject `{"mcpServers": {"ntk": {"command": "ntk", "args": ["mcp-server"]}}}`
+/// into a Cursor-style mcp.json without destroying existing entries. This
+/// is the MCP equivalent of `inject_ntk_hook` for PostToolUse-style editors.
+fn inject_ntk_mcp_server(json_str: &str) -> Result<String> {
+    let mut root: serde_json::Value =
+        serde_json::from_str(json_str).with_context(|| "parsing mcp.json")?;
+
+    // Resolve the absolute path to the installed `ntk` binary when
+    // available; fall back to the bare "ntk" command assuming PATH.
+    let ntk_cmd = resolve_ntk_binary_for_mcp();
+
+    let server_entry = serde_json::json!({
+        "command": ntk_cmd,
+        "args": ["mcp-server"],
+        "_ntk": NTK_HOOK_MARKER,
+    });
+
+    let servers = root
+        .as_object_mut()
+        .ok_or_else(|| anyhow!("mcp.json root is not an object"))?
+        .entry("mcpServers")
+        .or_insert_with(|| serde_json::json!({}))
+        .as_object_mut()
+        .ok_or_else(|| anyhow!("mcp.json[\"mcpServers\"] is not an object"))?;
+
+    servers.insert("ntk".to_string(), server_entry);
+
+    serde_json::to_string_pretty(&root).context("serializing patched mcp.json")
+}
+
+/// Best-effort absolute path to the installed `ntk` binary — Cursor
+/// spawns the MCP server from an environment where PATH may differ
+/// from the shell's, so an absolute command is the safe default.
+/// Falls back to the bare "ntk" string when the usual install path
+/// isn't present.
+fn resolve_ntk_binary_for_mcp() -> String {
+    if let Ok(home) = home_dir() {
+        let bin = home
+            .join(".ntk")
+            .join("bin")
+            .join(if cfg!(windows) { "ntk.exe" } else { "ntk" });
+        if bin.exists() {
+            return bin.display().to_string();
+        }
+    }
+    "ntk".to_string()
 }
 
 /// Inject the NTK hook entry into the JSON string without losing existing content.
@@ -914,6 +977,8 @@ fn remove_ntk_hook_from_json(json_str: &str) -> Result<String> {
     let mut root: serde_json::Value =
         serde_json::from_str(json_str).with_context(|| "parsing settings.json")?;
 
+    // PostToolUse path (Claude Code / OpenCode): remove any entry carrying
+    // the _ntk marker.
     if let Some(post_tool_use) = root
         .pointer_mut("/hooks/PostToolUse")
         .and_then(|v| v.as_array_mut())
@@ -925,6 +990,28 @@ fn remove_ntk_hook_from_json(json_str: &str) -> Result<String> {
                 .map(|s| s != NTK_HOOK_MARKER)
                 .unwrap_or(true)
         });
+    }
+
+    // mcpServers path (Cursor): drop the "ntk" entry when its _ntk marker
+    // matches ours. We match on marker rather than name so the uninstall
+    // never clobbers a user-renamed server that happens to be called "ntk".
+    if let Some(servers) = root
+        .pointer_mut("/mcpServers")
+        .and_then(|v| v.as_object_mut())
+    {
+        let keys_to_drop: Vec<String> = servers
+            .iter()
+            .filter(|(_, v)| {
+                v.get("_ntk")
+                    .and_then(|m| m.as_str())
+                    .map(|s| s == NTK_HOOK_MARKER)
+                    .unwrap_or(false)
+            })
+            .map(|(k, _)| k.clone())
+            .collect();
+        for k in keys_to_drop {
+            servers.remove(&k);
+        }
     }
 
     serde_json::to_string_pretty(&root).context("serializing cleaned settings.json")
@@ -949,7 +1036,7 @@ mod tests {
     #[test]
     fn test_patch_adds_hook() {
         let (_dir, path) = temp_settings("{}");
-        patch_settings(&path, true).unwrap();
+        patch_settings(&path, true, EditorTarget::ClaudeCode).unwrap();
         let content = std::fs::read_to_string(&path).unwrap();
         assert!(content.contains(NTK_HOOK_MARKER));
         assert!(content.contains("PostToolUse"));
@@ -958,9 +1045,9 @@ mod tests {
     #[test]
     fn test_idempotent_patch() {
         let (_dir, path) = temp_settings("{}");
-        patch_settings(&path, true).unwrap();
+        patch_settings(&path, true, EditorTarget::ClaudeCode).unwrap();
         let first = std::fs::read_to_string(&path).unwrap();
-        patch_settings(&path, true).unwrap();
+        patch_settings(&path, true, EditorTarget::ClaudeCode).unwrap();
         let second = std::fs::read_to_string(&path).unwrap();
         // Hook must not be duplicated.
         assert_eq!(
@@ -972,7 +1059,7 @@ mod tests {
     #[test]
     fn test_uninstall_removes_hook() {
         let (_dir, path) = temp_settings("{}");
-        patch_settings(&path, true).unwrap();
+        patch_settings(&path, true, EditorTarget::ClaudeCode).unwrap();
         assert!(std::fs::read_to_string(&path)
             .unwrap()
             .contains(NTK_HOOK_MARKER));
@@ -988,11 +1075,49 @@ mod tests {
     #[test]
     fn test_backup_created_before_patch() {
         let (_dir, path) = temp_settings("{\"existing\": true}");
-        patch_settings(&path, true).unwrap();
+        patch_settings(&path, true, EditorTarget::ClaudeCode).unwrap();
         let backup = path.with_extension("ntk.bak");
         assert!(backup.exists(), "backup file should be created");
         let bak_content = std::fs::read_to_string(&backup).unwrap();
         assert!(bak_content.contains("\"existing\""));
+    }
+
+    #[test]
+    fn test_patch_adds_cursor_mcp_server() {
+        // Cursor uses mcp.json with mcpServers; make sure the MCP path
+        // is taken and the entry carries the _ntk marker for uninstall.
+        let (_dir, path) = temp_settings("{}");
+        patch_settings(&path, true, EditorTarget::Cursor).unwrap();
+        let content = std::fs::read_to_string(&path).unwrap();
+        assert!(
+            content.contains("mcpServers"),
+            "cursor path must write mcpServers: {content}"
+        );
+        assert!(
+            content.contains("mcp-server"),
+            "cursor entry must register ntk mcp-server: {content}"
+        );
+        assert!(
+            content.contains(NTK_HOOK_MARKER),
+            "_ntk marker missing from cursor entry: {content}"
+        );
+        // Must NOT write a PostToolUse hook into Cursor's mcp.json.
+        assert!(
+            !content.contains("PostToolUse"),
+            "cursor must not get a PostToolUse hook: {content}"
+        );
+    }
+
+    #[test]
+    fn test_uninstall_removes_cursor_mcp_entry() {
+        let (_dir, path) = temp_settings("{}");
+        patch_settings(&path, true, EditorTarget::Cursor).unwrap();
+        let content = std::fs::read_to_string(&path).unwrap();
+        let cleaned = remove_ntk_hook_from_json(&content).unwrap();
+        assert!(
+            !cleaned.contains(NTK_HOOK_MARKER),
+            "marker still present: {cleaned}"
+        );
     }
 
     #[test]
