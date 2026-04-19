@@ -36,6 +36,7 @@ fn test_server_with_token(token: &str) -> TestServer {
         backend_name: "test".to_string(),
         model_info: String::new(),
         auth_token: Arc::new(token.to_string()),
+        spec_rules: Arc::new(Vec::new()),
     };
     let router = build_router(state);
     TestServer::new(router).expect("test server")
@@ -129,6 +130,7 @@ async fn test_compress_rejects_oversized_input() {
         backend_name: "test".to_string(),
         model_info: String::new(),
         auth_token: Arc::new(String::new()),
+        spec_rules: Arc::new(Vec::new()),
     };
     let server = TestServer::new(build_router(state)).expect("test server");
 
@@ -201,6 +203,7 @@ async fn test_audit_log_appends_record_when_enabled() {
         backend_name: "test".to_string(),
         model_info: String::new(),
         auth_token: Arc::new(String::new()),
+        spec_rules: Arc::new(Vec::new()),
     };
     let server = TestServer::new(build_router(state)).expect("test server");
 
@@ -414,6 +417,7 @@ async fn test_audit_log_silent_when_disabled() {
         backend_name: "test".to_string(),
         model_info: String::new(),
         auth_token: Arc::new(String::new()),
+        spec_rules: Arc::new(Vec::new()),
     };
     let server = TestServer::new(build_router(state)).expect("test server");
 
