@@ -1097,14 +1097,15 @@ fn run_test_compress(
             None,
         );
         let l1_lines = l1.output.lines().count();
-        let l1_note = if l1.rtk_pre_filtered {
-            Some(format!(
-                "RTK pre-filtered; {} lines removed",
-                l1.lines_removed
-            ))
+        let l1_applied = if l1.applied_rules.is_empty() {
+            "none".to_string()
         } else {
-            Some(format!("{} lines removed", l1.lines_removed))
+            l1.applied_rules.join(", ")
         };
+        let l1_note = Some(format!(
+            "Applied: {l1_applied} · {} lines removed total",
+            l1.lines_removed
+        ));
         print_verbose_section(
             "L1 output (regex/filter)",
             &l1.output,
@@ -1115,6 +1116,11 @@ fn run_test_compress(
             l1_note,
         );
         let l2_lines = l2.output.lines().count();
+        let l2_applied = if l2.applied_rules.is_empty() {
+            "none".to_string()
+        } else {
+            l2.applied_rules.join(", ")
+        };
         print_verbose_section(
             "L2 output (tokenizer)",
             &l2.output,
@@ -1122,7 +1128,7 @@ fn run_test_compress(
             Some(l1_tokens),
             l2_lines,
             Some(l2_elapsed),
-            None,
+            Some(format!("Applied: {l2_applied}")),
         );
     } else {
         println!("File:              {}", canonical.display());

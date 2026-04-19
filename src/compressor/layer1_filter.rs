@@ -35,6 +35,11 @@ pub struct Layer1Result {
     pub output: String,
     pub rtk_pre_filtered: bool,
     pub lines_removed: usize,
+    /// Human-readable list of pipeline stages that actually modified the
+    /// input. Populated in-order, e.g. `["ansi_strip(142 chars)",
+    /// "progress_removed(4 lines)", "template_dedup(3 groups)"]`. Safe to
+    /// ignore; only consumed by `ntk test-compress --verbose`.
+    pub applied_rules: Vec<String>,
 }
 
 // ---------------------------------------------------------------------------
@@ -51,17 +56,66 @@ pub fn filter(input: &str) -> Layer1Result {
         input
     };
 
+    let mut applied_rules: Vec<String> = Vec::new();
+
     let stripped = strip_ansi(input);
+    if stripped.len() < input.len() {
+        let chars = input.len().saturating_sub(stripped.len());
+        applied_rules.push(format!("ansi_strip({chars} chars)"));
+    }
     let rtk_pre_filtered = detect_rtk_output(&stripped);
+    if rtk_pre_filtered {
+        applied_rules.push("rtk_pre_filtered".to_string());
+    }
 
     let original_line_count = stripped.lines().count();
 
     let after_progress = remove_progress_bars(&stripped);
+    let progress_removed = stripped
+        .lines()
+        .count()
+        .saturating_sub(after_progress.lines().count());
+    if progress_removed > 0 {
+        applied_rules.push(format!("progress_removed({progress_removed} lines)"));
+    }
+
     let after_template_dedup = group_by_template(&after_progress);
+    let dedup_groups = after_template_dedup
+        .matches("[×")
+        .count()
+        .saturating_sub(after_progress.matches("[×").count());
+    if dedup_groups > 0 {
+        applied_rules.push(format!("template_dedup({dedup_groups} groups)"));
+    }
+
     let after_stack_filter = filter_stack_frames(&after_template_dedup);
+    let stack_runs = after_stack_filter.matches("frames omitted").count();
+    if stack_runs > 0 {
+        applied_rules.push(format!("stack_trace_collapse({stack_runs} runs)"));
+    }
+
     let after_prefix = factor_common_prefix(&after_stack_filter);
+    if after_prefix != after_stack_filter {
+        applied_rules.push("common_prefix_factored".to_string());
+    }
+
     let after_test = filter_test_failures(&after_prefix);
+    if after_test.lines().count() < after_prefix.lines().count() {
+        let removed = after_prefix
+            .lines()
+            .count()
+            .saturating_sub(after_test.lines().count());
+        applied_rules.push(format!("test_failure_extracted({removed} lines)"));
+    }
+
     let output = collapse_blank_lines(&after_test);
+    let blanks_collapsed = after_test
+        .lines()
+        .count()
+        .saturating_sub(output.lines().count());
+    if blanks_collapsed > 0 {
+        applied_rules.push(format!("blank_lines_collapsed({blanks_collapsed})"));
+    }
 
     let final_line_count = output.lines().count();
     let lines_removed = original_line_count.saturating_sub(final_line_count);
@@ -70,6 +124,7 @@ pub fn filter(input: &str) -> Layer1Result {
         output,
         rtk_pre_filtered,
         lines_removed,
+        applied_rules,
     }
 }
 
@@ -635,6 +690,34 @@ mod tests {
         let result = filter(input);
         assert_eq!(result.output, "hello world");
         assert!(!result.rtk_pre_filtered);
+    }
+
+    #[test]
+    fn test_applied_rules_records_ansi_and_dedup() {
+        // Input mixes ANSI escapes + 3 identical lines → both stages should fire.
+        let input = "\x1b[32mfoo\x1b[0m\nfoo\nfoo\nother";
+        let result = filter(input);
+        let joined = result.applied_rules.join(",");
+        assert!(
+            joined.contains("ansi_strip"),
+            "expected ansi_strip in applied_rules: {joined}"
+        );
+        assert!(
+            joined.contains("template_dedup"),
+            "expected template_dedup in applied_rules: {joined}"
+        );
+    }
+
+    #[test]
+    fn test_applied_rules_empty_for_clean_input() {
+        // No ANSI, no duplicates, no progress bars → no rules should fire.
+        let input = "line one\nline two\nline three";
+        let result = filter(input);
+        assert!(
+            result.applied_rules.is_empty(),
+            "expected no rules applied, got {:?}",
+            result.applied_rules
+        );
     }
 
     #[test]

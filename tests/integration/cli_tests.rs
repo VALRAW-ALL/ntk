@@ -241,6 +241,13 @@ fn test_ntk_test_compress_verbose_emits_sections() {
         );
     }
 
+    // Applied-rules breakdown must appear for both L1 and L2 (value depends
+    // on fixture — we only check that the label is present).
+    assert!(
+        stdout.matches("Applied:").count() >= 2,
+        "expected at least two 'Applied:' labels (L1 + L2):\n{stdout}"
+    );
+
     // Non-verbose summary lines must NOT appear when --verbose is set.
     assert!(
         !stdout.contains("L1 lines removed:"),

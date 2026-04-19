@@ -27,6 +27,10 @@ pub struct Layer2Result {
     pub output: String,
     pub original_tokens: usize,
     pub compressed_tokens: usize,
+    /// Human-readable list of stages that actually modified the input
+    /// during L2, e.g. `["opaque_normalized", "paths_shortened",
+    /// "whitespace_collapsed"]`. Consumed by `ntk test-compress --verbose`.
+    pub applied_rules: Vec<String>,
 }
 
 // ---------------------------------------------------------------------------
@@ -38,10 +42,24 @@ pub fn process(input: &str) -> Result<Layer2Result> {
 
     let original_tokens = bpe.encode_ordinary(input).len();
 
+    let mut applied_rules: Vec<String> = Vec::new();
+
     let after_normalize = normalize_opaque_tokens(input);
+    if after_normalize != input {
+        applied_rules.push("opaque_normalized".to_string());
+    }
     let after_paths = shorten_paths(&after_normalize);
+    if after_paths != after_normalize {
+        applied_rules.push("paths_shortened".to_string());
+    }
     let after_whitespace = collapse_whitespace(&after_paths);
+    if after_whitespace != after_paths {
+        applied_rules.push("whitespace_collapsed".to_string());
+    }
     let output = consolidate_prefixes(&after_whitespace);
+    if output != after_whitespace {
+        applied_rules.push("prefixes_consolidated".to_string());
+    }
 
     let compressed_tokens = bpe.encode_ordinary(&output).len();
 
@@ -49,6 +67,7 @@ pub fn process(input: &str) -> Result<Layer2Result> {
         output,
         original_tokens,
         compressed_tokens,
+        applied_rules,
     })
 }
 
@@ -383,6 +402,27 @@ mod tests {
         // "hello world" is 2 tokens in cl100k_base.
         let result = process("hello world").unwrap();
         assert_eq!(result.original_tokens, 2);
+    }
+
+    #[test]
+    fn test_applied_rules_records_path_shortening() {
+        let long_path = "src/components/auth/LoginForm/index.tsx:42:10: error TS2345";
+        let result = process(long_path).unwrap();
+        assert!(
+            result.applied_rules.iter().any(|r| r == "paths_shortened"),
+            "expected paths_shortened in applied_rules: {:?}",
+            result.applied_rules
+        );
+    }
+
+    #[test]
+    fn test_applied_rules_empty_for_trivial_input() {
+        let result = process("short").unwrap();
+        assert!(
+            result.applied_rules.is_empty(),
+            "expected no rules applied, got {:?}",
+            result.applied_rules
+        );
     }
 
     #[test]
