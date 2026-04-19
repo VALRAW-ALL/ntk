@@ -321,6 +321,32 @@ async fn async_run_daemon(gpu: bool) -> Result<()> {
     let port = config.daemon.port;
     let addr = format!("{host}:{port}");
 
+    // Security: daemon binds to a loopback address by default. The hook
+    // pipes every Bash tool result — including env vars, secret paths,
+    // and command stdout — into the daemon's /compress endpoint. Exposing
+    // that endpoint to the LAN is a leak channel we refuse by default.
+    //
+    // Opt-out: set NTK_ALLOW_NON_LOOPBACK=1 when you *really* need a
+    // non-loopback bind (containerized daemon, remote dev tunnel).
+    if !ntk::config::is_loopback_host(&host) {
+        let allow = std::env::var("NTK_ALLOW_NON_LOOPBACK")
+            .map(|v| matches!(v.as_str(), "1" | "true" | "TRUE"))
+            .unwrap_or(false);
+        if allow {
+            tracing::warn!(
+                "NTK_ALLOW_NON_LOOPBACK=1 → daemon will bind to non-loopback host {host}. \
+                 Every Bash tool output will be reachable from the network. \
+                 Prefer 127.0.0.1 unless you fully control the interface."
+            );
+        } else {
+            return Err(anyhow!(
+                "refusing to bind NTK daemon to non-loopback host '{host}'. \
+                 Set daemon.host to 127.0.0.1 / localhost / ::1 in ~/.ntk/config.json, \
+                 or export NTK_ALLOW_NON_LOOPBACK=1 to override (not recommended)."
+            ));
+        }
+    }
+
     // Initialize SQLite db if metrics are enabled.
     let db = if config.metrics.enabled {
         let db_path = config.storage_path_expanded();

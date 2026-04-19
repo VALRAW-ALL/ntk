@@ -309,6 +309,31 @@ fn validate(config: &NtkConfig) -> Result<()> {
     Ok(())
 }
 
+/// Security: daemon must bind to a loopback address by default. Binding
+/// to `0.0.0.0` or a public IP exposes every `Bash` tool output the hook
+/// intercepts — including secrets echoed by commands like `env` or
+/// `cat ~/.ssh/id_rsa` — to the local network.
+///
+/// Allowed by default: `127.0.0.1`, `::1`, `localhost`.
+/// Escape hatch: set env `NTK_ALLOW_NON_LOOPBACK=1` (opt-in only).
+pub fn is_loopback_host(host: &str) -> bool {
+    use std::net::IpAddr;
+    let trimmed = host.trim();
+    if trimmed.eq_ignore_ascii_case("localhost") {
+        return true;
+    }
+    // Accept bracketed IPv6 notation `[::1]` as well as bare `::1`.
+    let stripped = trimmed
+        .strip_prefix('[')
+        .and_then(|s| s.strip_suffix(']'))
+        .unwrap_or(trimmed);
+    match stripped.parse::<IpAddr>() {
+        Ok(IpAddr::V4(v4)) => v4.is_loopback(),
+        Ok(IpAddr::V6(v6)) => v6.is_loopback(),
+        Err(_) => false,
+    }
+}
+
 /// Security: ollama_url must point to localhost (SSRF prevention).
 fn validate_ollama_url(raw: &str) -> Result<()> {
     use url::Host;
@@ -437,6 +462,27 @@ mod tests {
         assert!(validate_ollama_url("http://192.168.1.100:11434").is_err());
         assert!(validate_ollama_url("http://ollama.internal:11434").is_err());
         assert!(validate_ollama_url("https://example.com/ollama").is_err());
+    }
+
+    #[test]
+    fn test_is_loopback_host_accepts_loopback_variants() {
+        assert!(is_loopback_host("127.0.0.1"));
+        assert!(is_loopback_host("localhost"));
+        assert!(is_loopback_host("LOCALHOST"));
+        assert!(is_loopback_host("::1"));
+        assert!(is_loopback_host("[::1]"));
+        assert!(is_loopback_host("  127.0.0.1  "));
+    }
+
+    #[test]
+    fn test_is_loopback_host_rejects_non_loopback() {
+        assert!(!is_loopback_host("0.0.0.0"));
+        assert!(!is_loopback_host("::"));
+        assert!(!is_loopback_host("192.168.1.10"));
+        assert!(!is_loopback_host("10.0.0.1"));
+        assert!(!is_loopback_host("example.com"));
+        assert!(!is_loopback_host(""));
+        assert!(!is_loopback_host("not-an-ip"));
     }
 
     #[test]
