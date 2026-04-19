@@ -235,6 +235,68 @@ pub fn apply_rule_file(input: &str, file: &RuleFile) -> ApplyResult {
     }
 }
 
+/// Load every rule file under `path` (file OR directory of *.yaml) and
+/// compose them in filename order. Used by the daemon to hydrate the
+/// experimental `compression.spec_rules_path` config field at startup
+/// so each request doesn't re-parse YAML. Non-fatal on individual
+/// parse errors: a bad file is logged and skipped rather than
+/// crashing the server.
+pub fn load_rules_from_path(path: &Path) -> Result<Vec<RuleFile>> {
+    let metadata = std::fs::metadata(path)
+        .map_err(|e| anyhow::anyhow!("cannot stat {}: {e}", path.display()))?;
+
+    let mut rule_files: Vec<std::path::PathBuf> = if metadata.is_dir() {
+        let mut v: Vec<_> = std::fs::read_dir(path)
+            .map_err(|e| anyhow::anyhow!("reading dir {}: {e}", path.display()))?
+            .filter_map(|e| e.ok())
+            .map(|e| e.path())
+            .filter(|p| p.extension().and_then(|s| s.to_str()) == Some("yaml"))
+            .collect();
+        v.sort();
+        v
+    } else {
+        vec![path.to_path_buf()]
+    };
+
+    if rule_files.is_empty() {
+        return Err(anyhow::anyhow!(
+            "no *.yaml rule files found at {}",
+            path.display()
+        ));
+    }
+
+    let mut out = Vec::with_capacity(rule_files.len());
+    for rf in rule_files.drain(..) {
+        match load_rule_file(&rf) {
+            Ok(file) => out.push(file),
+            Err(e) => {
+                tracing::warn!("spec_loader: skipping {}: {e}", rf.display());
+            }
+        }
+    }
+    Ok(out)
+}
+
+/// Apply every pre-loaded rule file to `input`, composing their
+/// outputs in order. Used by the daemon's L1.5 stage so hot-path
+/// compression doesn't pay YAML parse cost per request.
+pub fn apply_many(input: &str, files: &[RuleFile]) -> ApplyResult {
+    let mut current = input.to_owned();
+    let mut applied = Vec::new();
+    let mut rejected = Vec::new();
+    for f in files {
+        let r = apply_rule_file(&current, f);
+        current = r.output;
+        applied.extend(r.applied);
+        rejected.extend(r.invariant_rejected);
+    }
+    ApplyResult {
+        output: current,
+        applied,
+        invariant_rejected: rejected,
+    }
+}
+
 /// Dispatch one (pattern, transform) pair to its implementation.
 /// Returns (new_text, fired) — `fired=false` means the rule didn't
 /// change anything and its id is not added to `applied`.

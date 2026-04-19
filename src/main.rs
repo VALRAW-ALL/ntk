@@ -600,6 +600,30 @@ async fn async_run_daemon(gpu: bool) -> Result<()> {
         t
     };
 
+    // Experimental: pre-load the POC spec rulesets if the operator
+    // pointed us at a rules path. `NTK_SPEC_RULES` overrides the
+    // config field for A/B experimentation without editing JSON.
+    let spec_rules = match ntk::server::resolve_spec_rules_path(&config) {
+        Some(path) => match ntk::compressor::spec_loader::load_rules_from_path(&path) {
+            Ok(files) => {
+                tracing::info!(
+                    "spec_rules: loaded {} ruleset(s) from {}",
+                    files.len(),
+                    path.display()
+                );
+                files
+            }
+            Err(e) => {
+                tracing::warn!(
+                    "spec_rules: path {} unusable, falling back to hardcoded L1 only: {e}",
+                    path.display()
+                );
+                Vec::new()
+            }
+        },
+        None => Vec::new(),
+    };
+
     let state = ntk::server::AppState {
         config: Arc::new(config),
         metrics: Arc::clone(&metrics),
@@ -611,6 +635,7 @@ async fn async_run_daemon(gpu: bool) -> Result<()> {
         backend_name: backend_name.clone(),
         model_info: model_info.clone(),
         auth_token: Arc::new(auth_token),
+        spec_rules: Arc::new(spec_rules),
     };
 
     let router = ntk::server::build_router(state);
@@ -1312,8 +1337,8 @@ fn run_test_compress_spec(
     let mut total_applied: Vec<String> = Vec::new();
     let mut total_rejected: Vec<String> = Vec::new();
     for rf in &rule_files {
-        let loaded = spec_loader::load_rule_file(rf)
-            .map_err(|e| anyhow!("{}: {e}", rf.display()))?;
+        let loaded =
+            spec_loader::load_rule_file(rf).map_err(|e| anyhow!("{}: {e}", rf.display()))?;
         let result = spec_loader::apply_rule_file(&current, &loaded);
         current = result.output;
         total_applied.extend(result.applied);
@@ -1341,7 +1366,10 @@ fn run_test_compress_spec(
             if rule_files.len() == 1 { "" } else { "s" }
         );
         println!("Original tokens:    {original_tokens}");
-        println!("After spec tokens:  {after_spec_tokens}  ({} ms)", spec_elapsed.as_millis());
+        println!(
+            "After spec tokens:  {after_spec_tokens}  ({} ms)",
+            spec_elapsed.as_millis()
+        );
         println!(
             "After L2 tokens:    {} ({} ms)",
             l2.compressed_tokens,
