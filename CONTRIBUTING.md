@@ -127,6 +127,14 @@ Force-regenerate on intentional algorithm change:
 INSTA_UPDATE=always cargo test --test snapshots_per_layer
 ```
 
+## Adding editor integrations
+
+`ntk init -g` supports Claude Code and OpenCode natively because both
+implement the same PostToolUse hook JSON schema. Other editors
+(Cursor, Continue, Aider, Zed) need adapters. See
+[`docs/editor-integrations.md`](docs/editor-integrations.md) for the
+per-editor integration shape and contribution guidance.
+
 ## Licensing
 
 NTK is released under the MIT License. By submitting a PR you agree

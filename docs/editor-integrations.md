@@ -1,0 +1,148 @@
+# Editor integration guide
+
+NTK's PostToolUse hook spec follows Claude Code's:
+
+```json
+{
+  "session_id": "...", "transcript_path": "...", "cwd": "...",
+  "tool_name": "Bash",
+  "tool_input":    { "command": "...", "description": "..." },
+  "tool_response": { "output": "...", "exit_code": 0 }
+}
+```
+
+The hook reads that from stdin, POSTs to the daemon's `/compress`, and
+emits Claude Code's `hookSpecificOutput.additionalContext` JSON back to
+stdout. Any editor that implements that exact protocol gets NTK "for
+free" via `ntk init -g`.
+
+**Native support** (today):
+
+| Editor | Config file | Status |
+|---|---|---|
+| Claude Code | `~/.claude/settings.json` | ✅ `ntk init -g` |
+| OpenCode | `~/.opencode/settings.json` | ✅ `ntk init -g --opencode` |
+
+Everything below needs an adapter because the editor uses a different
+integration model. Each section documents the concrete shape; a
+contributor picks one, reads the editor's docs, and opens a PR adding
+a new `EditorTarget` variant.
+
+---
+
+## Cursor
+
+**Hook model:** none (as of 2026). Cursor's agent uses its own
+ReAct loop without a user-extensible PostToolUse.
+
+**Workable path — MCP server:**
+- Cursor consumes MCP servers via `~/.cursor/mcp.json`
+- NTK would expose itself as an MCP server that provides a
+  `compress_output` tool the agent can call before showing long
+  command results
+- Implementation cost: add JSON-RPC handler to NTK (stdio-based),
+  ~300 LOC. New `ntk mcp-server` subcommand spawned by Cursor.
+
+**Example `~/.cursor/mcp.json` stanza (when shipped):**
+
+```json
+{
+  "mcpServers": {
+    "ntk": {
+      "command": "ntk",
+      "args": ["mcp-server"]
+    }
+  }
+}
+```
+
+Tracked as follow-up issue.
+
+---
+
+## Continue (VS Code extension)
+
+**Hook model:** tool plugin API via `~/.continue/config.json`.
+Continue calls tools after the model invokes them; the extension
+can wrap tool outputs in custom post-processors, but the API is
+JavaScript.
+
+**Workable path — Continue plugin:**
+- Package a tiny JS plugin that calls the NTK daemon before
+  returning tool output to the model
+- The plugin posts to `http://127.0.0.1:8765/compress` with the
+  same payload the Claude Code hook uses
+- Distributes as `ntk-continue` npm package or inline snippet
+
+**Example plugin call (pseudo, to be written):**
+
+```javascript
+// ~/.continue/plugins/ntk.js
+export async function postProcess(toolName, output) {
+  if (toolName !== 'Bash') return output;
+  const token = fs.readFileSync(path.join(os.homedir(), '.ntk/.token'), 'utf8').trim();
+  const r = await fetch('http://127.0.0.1:8765/compress', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'X-NTK-Token': token },
+    body: JSON.stringify({ output, command: '', cwd: process.cwd() }),
+  });
+  const body = await r.json();
+  return body.compressed;
+}
+```
+
+Tracked as follow-up issue.
+
+---
+
+## Aider
+
+**Hook model:** `--lint-cmd` / `--test-cmd` flags in `.aider.conf.yml`,
+but these are *pre*-command validators, not *post*-output filters.
+Aider does not expose a post-tool-response hook.
+
+**Workable path — wrapper CLI:**
+- Ship `ntk-aider` as a shell wrapper that spawns `aider` with its
+  stdout piped through a small NTK filter process
+- Compression happens at the terminal-output layer, not the model
+  context — less precise but works today
+
+**Alternative — patch Aider upstream:**
+- Aider accepts PRs that add a `--post-tool-cmd` hook. A well-scoped
+  PR there would make native NTK integration possible.
+
+Tracked as follow-up issue.
+
+---
+
+## Zed
+
+**Hook model:** Zed agent panel has no public hook API. Zed's
+extension API is Rust (WASM) and limited to editor-side surfaces
+(completions, diagnostics), not agent tool outputs.
+
+**Workable path — Zed extension:**
+- Not viable today with the public extension API. Upstream support
+  is needed.
+
+**Alternative — MCP bridge:**
+- Zed gained MCP server support in late 2025; same integration as
+  Cursor above would work transparently once NTK ships an MCP server.
+
+Tracked as follow-up issue.
+
+---
+
+## Adding your editor
+
+Opening a PR for a new editor should touch:
+
+1. `src/installer.rs` — new `EditorTarget` variant + `editor_settings_path` arm
+2. `src/main.rs` — new CLI flag routing to the variant
+3. `tests/integration/cli_tests.rs` — `test_ntk_install_creates_hook` variant
+4. This file — add a section above the "Adding your editor" heading
+
+Before opening the PR, **verify the editor actually has a hook
+point** that can carry the Claude Code PostToolUse JSON. If it
+doesn't, the right path is an adapter (MCP / wrapper / plugin) —
+open a discussion issue first so we agree on the integration shape.
