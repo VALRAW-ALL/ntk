@@ -230,16 +230,16 @@ impl Default for DisplayConfig {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+/// Deprecated. The telemetry feature was removed in #19 — NTK no longer
+/// collects or sends any usage data. This struct is kept in the config
+/// schema so existing `~/.ntk/config.json` files continue to parse (the
+/// field is ignored at runtime). Safe to delete from your config.
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 #[serde(default)]
 pub struct TelemetryConfig {
+    /// Ignored. Retained for schema-backward-compat only.
+    #[serde(default)]
     pub enabled: bool,
-}
-
-impl Default for TelemetryConfig {
-    fn default() -> Self {
-        Self { enabled: true }
-    }
 }
 
 /// Deterministic cache for Layer 3 inference results.

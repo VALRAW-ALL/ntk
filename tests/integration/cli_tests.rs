@@ -233,7 +233,13 @@ fn test_ntk_bench_submit_emits_valid_json() {
         .expect("payloads array");
     assert!(!payloads.is_empty(), "payloads should not be empty");
     let first = &payloads[0];
-    for field in &["label", "tokens_in", "tokens_out_l2", "ratio_pct", "latency_us"] {
+    for field in &[
+        "label",
+        "tokens_in",
+        "tokens_out_l2",
+        "ratio_pct",
+        "latency_us",
+    ] {
         assert!(first.get(field).is_some(), "payload missing {field}");
     }
 }

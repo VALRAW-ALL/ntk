@@ -956,52 +956,22 @@ document the "how we do it here" conventions.
 
 ## Privacy Policy
 
-NTK collects **anonymous, aggregated** usage metrics. No code, file contents, command arguments, paths, or personally identifiable information is ever collected.
+**NTK does not collect any telemetry.** The daemon never contacts any
+server other than the inference backend you explicitly configure
+(Ollama on `localhost`, or the llama-server subprocess you launched
+yourself). No pings, no usage metrics, no device fingerprint.
 
-### What is collected (once per day, opt-in by default)
+Removed in #19 — earlier drafts planned an anonymous opt-in telemetry
+feature but the endpoint was never deployed, so the code was shipped
+dead. Removing it is simpler and safer than maintaining unused
+infrastructure.
 
-| Field | Description |
-|---|---|
-| `device_hash` | SHA-256(random_salt + machine_id) - not reversible to any personal identifier |
-| `ntk_version` | Installed NTK version |
-| `os` | Operating system name (`linux`, `macos`, `windows`) |
-| `arch` | CPU architecture (`x86_64`, `aarch64`) |
-| `compressions_24h` | Number of compressions in the last 24 hours |
-| `top_commands` | Most-used command **names only** (e.g. `["cargo", "git"]`) - no arguments, no paths |
-| `avg_savings_pct` | Average token savings percentage |
-| `layer_pct` | Layer distribution: how often L1, L2, L3 produced the final output |
-| `gpu_backend` | Backend used (e.g. `cuda`, `cpu`) |
+The only data stored anywhere lives on disk on your own machine:
 
-### What is NOT collected
+- `~/.ntk/metrics.db` — local SQLite with per-compression records (visible via `ntk metrics`, prunable via `ntk prune`)
+- `~/.ntk/audit.log` — optional, opt-in (`config.security.audit_log: true`), SHA-256 of output only
 
-- Source code or file contents
-- Command arguments or flags (e.g. `cargo test --test foo` → only `cargo` is stored)
-- File paths, directory names, or project names
-- Environment variables or secrets
-- IP addresses or network information (telemetry endpoint receives only the JSON payload)
-- Any information from the compressed or uncompressed tool outputs
-
-### How the device hash works
-
-A random UUID (salt) is generated once and stored locally in `~/.ntk/.telemetry_salt` with mode `600` (readable only by the file owner on Unix). The salt is combined with a non-personal machine identifier and hashed with SHA-256. The salt is **never sent** - only the hash is. The hash cannot be reversed to identify the machine or the user.
-
-### Opt-out
-
-Telemetry can be disabled in two ways:
-
-```bash
-# Environment variable - add to ~/.bashrc or ~/.zshrc for permanent opt-out
-export NTK_TELEMETRY_DISABLED=1
-```
-
-```json
-// ~/.ntk/config.json
-{
-  "telemetry": { "enabled": false }
-}
-```
-
-When telemetry is disabled, **no network requests are made** and no payload is constructed.
+Both are read-only to other users on the system (Unix: the `.ntk` directory inherits `$HOME` perms; Windows: ACL of your user profile).
 
 ---
 
