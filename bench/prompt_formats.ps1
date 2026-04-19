@@ -27,7 +27,12 @@
 param(
     [string[]]$Fixtures = @('cargo_build_verbose','generic_long_log','stack_trace_java'),
     [int]$TimeoutSec = 300,
-    [string]$Context = 'I am debugging a compilation error in my Rust project. Focus on the error messages and where they come from in the source.'
+    [string]$Context = 'I am debugging a compilation error in my Rust project. Focus on the error messages and where they come from in the source.',
+    # When true (default), each (format, fixture) pair is run twice:
+    # once with the user intent and once with an empty context. The CSV
+    # gains a `context_enabled` column and the summary reports the delta.
+    # This is the experiment #5 asks for: proving L4 earns its latency.
+    [switch]$CompareContext = $true
 )
 
 $ErrorActionPreference = 'Stop'
@@ -36,6 +41,16 @@ $fixtureDir = Join-Path $here 'fixtures'
 $outCsv = Join-Path $here 'prompt_formats.csv'
 
 $formats = @('prefix','xml','goal','json')
+
+# Daemon auth token (see issue #2). Written to ~/.ntk/.token by the
+# daemon on first start; the bench script must send it as X-NTK-Token
+# or every request returns 401. When NTK_DISABLE_AUTH=1 is set on the
+# daemon, the token is irrelevant and an empty string is fine.
+$NtkTokenFile = Join-Path $env:USERPROFILE '.ntk\.token'
+$NtkToken = ''
+if (Test-Path $NtkTokenFile) {
+    try { $NtkToken = (Get-Content -Raw -LiteralPath $NtkTokenFile).Trim() } catch {}
+}
 
 function Wait-Healthy {
     param([int]$Seconds = 10)
@@ -69,6 +84,9 @@ function Post-Compress {
     $req.ContentType   = 'application/json'
     $req.Timeout       = $TimeoutSec * 1000
     $req.ContentLength = $bytes.Length
+    if ($script:NtkToken) {
+        $req.Headers.Add('X-NTK-Token', $script:NtkToken)
+    }
     $rs = $req.GetRequestStream()
     $rs.Write($bytes, 0, $bytes.Length)
     $rs.Close()
@@ -85,10 +103,16 @@ function Post-Compress {
     }
 }
 
-# CSV header
-'format,fixture,tokens_before,tokens_after,ratio,layer,latency_ms,error' | Set-Content -Path $outCsv -Encoding UTF8
+# CSV header — context_enabled and context_kept_err_signal give the two
+# dimensions the experiment needs: impact on ratio AND on information
+# preservation (naive regex for lines that look like errors).
+'format,fixture,context_enabled,tokens_before,tokens_after,ratio,layer,latency_ms,error' | Set-Content -Path $outCsv -Encoding UTF8
 
-Write-Host 'Running 4 prompt formats x fixtures' -ForegroundColor Cyan
+# Each fixture gets 1 run when CompareContext is off, 2 runs when on.
+$contextVariants = if ($CompareContext) { @($true, $false) } else { @($true) }
+
+Write-Host ('Running {0} prompt formats x {1} fixtures x {2} context variants' -f `
+    $formats.Count, $Fixtures.Count, $contextVariants.Count) -ForegroundColor Cyan
 Write-Host ''
 
 foreach ($fmt in $formats) {
@@ -111,17 +135,20 @@ foreach ($fmt in $formats) {
             Write-Warning "fixture missing: $fxPath"
             continue
         }
-        $result = Post-Compress -FixturePath $fxPath -Context $Context -TimeoutSec $TimeoutSec
-        if ($result.error) {
-            Add-Content $outCsv -Value "$fmt,$fixName,,,,,$($result.latency),`"$($result.error -replace ',', ';')`""
-            Write-Host ('  {0,-22} ERROR: {1}' -f $fixName, $result.error) -ForegroundColor Red
-            continue
+        foreach ($ctxEnabled in $contextVariants) {
+            $ctx = if ($ctxEnabled) { $Context } else { '' }
+            $result = Post-Compress -FixturePath $fxPath -Context $ctx -TimeoutSec $TimeoutSec
+            if ($result.error) {
+                Add-Content $outCsv -Value "$fmt,$fixName,$ctxEnabled,,,,,$($result.latency),`"$($result.error -replace ',', ';')`""
+                Write-Host ('  {0,-22} ctx={1,-5} ERROR: {2}' -f $fixName, $ctxEnabled, $result.error) -ForegroundColor Red
+                continue
+            }
+            $r = $result.body | ConvertFrom-Json
+            $ratio = ([double]$r.ratio).ToString('F3', [System.Globalization.CultureInfo]::InvariantCulture)
+            Add-Content $outCsv -Value "$fmt,$fixName,$ctxEnabled,$($r.tokens_before),$($r.tokens_after),$ratio,$($r.layer),$($result.latency),"
+            Write-Host ('  {0,-22} ctx={1,-5} {2,6} -> {3,6} ({4}) L{5}  {6} ms' -f `
+                $fixName, $ctxEnabled, $r.tokens_before, $r.tokens_after, $ratio, $r.layer, $result.latency)
         }
-        $r = $result.body | ConvertFrom-Json
-        $ratio = ([double]$r.ratio).ToString('F3', [System.Globalization.CultureInfo]::InvariantCulture)
-        Add-Content $outCsv -Value "$fmt,$fixName,$($r.tokens_before),$($r.tokens_after),$ratio,$($r.layer),$($result.latency),"
-        Write-Host ('  {0,-22} {1,6} -> {2,6} ({3}) L{4}  {5} ms' -f `
-            $fixName, $r.tokens_before, $r.tokens_after, $ratio, $r.layer, $result.latency)
     }
     Write-Host ''
 }
@@ -132,10 +159,52 @@ Remove-Item Env:\NTK_L4_FORMAT -ErrorAction SilentlyContinue
 
 Write-Host "wrote: $outCsv" -ForegroundColor Green
 Write-Host ''
-Write-Host 'Aggregated ratio by format (higher is better):'
+
 $rows = Import-Csv $outCsv | Where-Object { $_.ratio -ne '' }
-$grouped = $rows | Group-Object format | ForEach-Object {
+
+Write-Host 'Aggregated ratio by format (higher is better):'
+$byFormat = $rows | Group-Object format | ForEach-Object {
     $avg = ($_.Group | Measure-Object -Property ratio -Average).Average
     [pscustomobject]@{ format = $_.Name; count = $_.Count; avg_ratio = [math]::Round($avg, 3) }
 }
-$grouped | Sort-Object avg_ratio -Descending | Format-Table -AutoSize
+$byFormat | Sort-Object avg_ratio -Descending | Format-Table -AutoSize
+
+if ($CompareContext) {
+    Write-Host 'Context impact — average ratio with vs without L4 context:' -ForegroundColor Cyan
+    $byCtx = $rows | Group-Object format,context_enabled | ForEach-Object {
+        $parts = $_.Name -split ', '
+        $avg = ($_.Group | Measure-Object -Property ratio -Average).Average
+        [pscustomobject]@{
+            format          = $parts[0]
+            context_enabled = $parts[1]
+            count           = $_.Count
+            avg_ratio       = [math]::Round($avg, 3)
+        }
+    }
+    $byCtx | Sort-Object format,context_enabled | Format-Table -AutoSize
+
+    # Delta per format: ratio(with context) - ratio(without).
+    # Positive = context helps; negative = context hurts (candidate to disable).
+    Write-Host 'Delta (with context — without context), per format:' -ForegroundColor Cyan
+    $pairs = $rows | Group-Object format,fixture
+    $deltas = foreach ($pair in $pairs) {
+        $with    = $pair.Group | Where-Object { $_.context_enabled -eq 'True' }
+        $without = $pair.Group | Where-Object { $_.context_enabled -eq 'False' }
+        if ($with -and $without) {
+            $parts = $pair.Name -split ', '
+            [pscustomobject]@{
+                format  = $parts[0]
+                fixture = $parts[1]
+                delta   = [math]::Round(([double]$with[0].ratio - [double]$without[0].ratio), 3)
+            }
+        }
+    }
+    $deltas | Sort-Object format,fixture | Format-Table -AutoSize
+
+    $summary = $deltas | Group-Object format | ForEach-Object {
+        $avg = ($_.Group | Measure-Object -Property delta -Average).Average
+        [pscustomobject]@{ format = $_.Name; avg_delta = [math]::Round($avg, 3) }
+    }
+    Write-Host 'Average delta per format (positive = context helps):' -ForegroundColor Yellow
+    $summary | Sort-Object avg_delta -Descending | Format-Table -AutoSize
+}
