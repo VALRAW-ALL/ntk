@@ -1,0 +1,50 @@
+spec_version: 0.1
+category: stack_trace
+language: kotlin
+frameworks: [androidx, kotlinx-coroutines, android, dalvik]
+rules:
+  # androidx — Jetpack libraries, Fragment / Lifecycle.
+  - id: kotlin.stack.androidx
+    pattern:
+      kind: frame-run
+      classifier: starts_with
+      values:
+        - 'at androidx.'
+    transform:
+      kind: collapse-run
+      min_run: 3
+      replacement: '\tat ... [{n} AndroidX frames omitted]'
+    severity: lossy-safe
+    invariants: [preserve_first_frame, preserve_last_frame, preserve_errors]
+
+  # kotlinx.coroutines — Dispatched tasks, continuations.
+  - id: kotlin.stack.coroutines
+    pattern:
+      kind: frame-run
+      classifier: starts_with
+      values:
+        - 'at kotlinx.coroutines.'
+    transform:
+      kind: collapse-run
+      min_run: 3
+      replacement: '\tat ... [{n} kotlinx.coroutines frames omitted]'
+    severity: lossy-safe
+    invariants: [preserve_first_frame, preserve_last_frame, preserve_errors]
+
+  # Platform Android + Dalvik zygote — universally at trace bottom.
+  - id: kotlin.stack.android_platform
+    pattern:
+      kind: frame-run
+      classifier: starts_with
+      values:
+        - 'at com.android.internal.'
+        - 'at com.android.'
+        - 'at dalvik.system.'
+        - 'at android.os.'
+        - 'at android.app.'
+    transform:
+      kind: collapse-run
+      min_run: 3
+      replacement: '\tat ... [{n} Android platform frames omitted]'
+    severity: lossy-safe
+    invariants: [preserve_first_frame, preserve_last_frame, preserve_errors]

@@ -1,0 +1,54 @@
+spec_version: 0.1
+category: stack_trace
+language: go
+frameworks: [runtime, net/http, gin, fiber]
+rules:
+  # Go runtime machinery — goroutines, scheduler, panic unwinding.
+  # Go emits each frame as TWO lines: header `func(args)` + body
+  # `\t/path/file.go:N +offset`. Uses unit=2.
+  - id: go.stack.runtime
+    pattern:
+      kind: frame-run
+      classifier: contains
+      values:
+        - 'runtime.'
+      unit: 2
+    transform:
+      kind: collapse-run
+      min_run: 3
+      replacement: '... [{n} Go runtime frames omitted]'
+    severity: lossy-safe
+    invariants: [preserve_first_frame, preserve_last_frame, preserve_errors]
+
+  # net/http stdlib frames.
+  - id: go.stack.net_http
+    pattern:
+      kind: frame-run
+      classifier: contains
+      values:
+        - 'net/http.'
+        - 'net/http/internal/'
+      unit: 2
+    transform:
+      kind: collapse-run
+      min_run: 3
+      replacement: '... [{n} net/http frames omitted]'
+    severity: lossy-safe
+    invariants: [preserve_first_frame, preserve_last_frame, preserve_errors]
+
+  # Gin / Fiber web-framework middleware chains.
+  - id: go.stack.web_frameworks
+    pattern:
+      kind: frame-run
+      classifier: contains
+      values:
+        - '/gin-gonic/gin@'
+        - '/gofiber/fiber/'
+        - '/labstack/echo/'
+      unit: 2
+    transform:
+      kind: collapse-run
+      min_run: 3
+      replacement: '... [{n} Go web-framework frames omitted]'
+    severity: lossy-safe
+    invariants: [preserve_first_frame, preserve_last_frame, preserve_errors]

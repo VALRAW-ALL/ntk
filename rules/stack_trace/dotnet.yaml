@@ -1,0 +1,50 @@
+spec_version: 0.1
+category: stack_trace
+language: csharp
+frameworks: [aspnetcore, system-threading-tasks, ef-core]
+rules:
+  # ASP.NET Core request pipeline.
+  - id: csharp.stack.aspnet_core
+    pattern:
+      kind: frame-run
+      classifier: starts_with
+      values:
+        - 'at Microsoft.AspNetCore.'
+        - 'at Microsoft.Extensions.Hosting.'
+        - 'at Microsoft.Extensions.DependencyInjection.'
+    transform:
+      kind: collapse-run
+      min_run: 3
+      replacement: '   at ... [{n} ASP.NET Core pipeline frames omitted]'
+    severity: lossy-safe
+    invariants: [preserve_first_frame, preserve_last_frame, preserve_errors]
+
+  # System.Threading.Tasks — Task continuations, async state machines.
+  - id: csharp.stack.task_machinery
+    pattern:
+      kind: frame-run
+      classifier: starts_with
+      values:
+        - 'at System.Threading.Tasks.'
+        - 'at System.Runtime.CompilerServices.'
+        - 'at System.Runtime.ExceptionServices.'
+    transform:
+      kind: collapse-run
+      min_run: 3
+      replacement: '   at ... [{n} Task/async machinery frames omitted]'
+    severity: lossy-safe
+    invariants: [preserve_first_frame, preserve_last_frame, preserve_errors]
+
+  # Entity Framework Core.
+  - id: csharp.stack.ef_core
+    pattern:
+      kind: frame-run
+      classifier: starts_with
+      values:
+        - 'at Microsoft.EntityFrameworkCore.'
+    transform:
+      kind: collapse-run
+      min_run: 3
+      replacement: '   at ... [{n} EF Core frames omitted]'
+    severity: lossy-safe
+    invariants: [preserve_first_frame, preserve_last_frame, preserve_errors]

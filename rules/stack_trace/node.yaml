@@ -1,0 +1,53 @@
+spec_version: 0.1
+category: stack_trace
+language: javascript
+frameworks: [node, express, webpack, react-dom, zone]
+rules:
+  # Node.js internal modules — 'at ... (node:internal/...:N:N)'.
+  - id: node.stack.internal
+    pattern:
+      kind: frame-run
+      classifier: contains
+      values:
+        - '(node:internal/'
+        - 'at node:internal/'
+    transform:
+      kind: collapse-run
+      min_run: 3
+      replacement: '    at ... [{n} Node internal frames omitted]'
+    severity: lossy-safe
+    invariants: [preserve_first_frame, preserve_last_frame, preserve_errors]
+
+  # Express middleware chain.
+  - id: node.stack.express
+    pattern:
+      kind: frame-run
+      classifier: contains
+      values:
+        - '/node_modules/express/'
+        - '/node_modules/body-parser/'
+        - '/node_modules/cors/'
+    transform:
+      kind: collapse-run
+      min_run: 3
+      replacement: '    at ... [{n} Express middleware frames omitted]'
+    severity: lossy-safe
+    invariants: [preserve_first_frame, preserve_last_frame, preserve_errors]
+
+  # React DOM / webpack bundled frames — noise in browser stack traces.
+  - id: node.stack.webpack_react
+    pattern:
+      kind: frame-run
+      classifier: contains
+      values:
+        - '/node_modules/react-dom/'
+        - '/node_modules/react/'
+        - 'webpack://'
+        - 'webpack-internal:'
+        - '/node_modules/zone.js/'
+    transform:
+      kind: collapse-run
+      min_run: 3
+      replacement: '    at ... [{n} React/webpack frames omitted]'
+    severity: lossy-safe
+    invariants: [preserve_first_frame, preserve_last_frame, preserve_errors]

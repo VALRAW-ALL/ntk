@@ -605,11 +605,61 @@ fn apply_prefix_factor(
 // Invariant check: error signal preserved
 // ---------------------------------------------------------------------------
 
+// Tightened error-signal regex (2026-04-19).
+//
+// The first draft matched any occurrence of 'error' / 'Exception' /
+// 'warning' anywhere in the text — including false positives like
+// `/django/core/handlers/exception.py` path components. When a
+// stack-trace collapse removed such a frame from the middle of a run,
+// the count dropped by 1 and the invariant check wrongly rejected the
+// transform. Anchoring to line-start or whitespace + requiring the
+// trailing ':' eliminates the path-component false positives without
+// missing legit errors like `ValueError:`, `panic:`, `Traceback ...`.
 #[allow(clippy::expect_used)]
 static RE_ERROR_SIGNAL: Lazy<Regex> = Lazy::new(|| {
-    Regex::new(
-        r"(?i)(error:|ERROR|FAILED|panic:|Caused by|Traceback|Exception|fatal|warning:|E0[0-9]{3}:)",
-    )
+    // Requirements the regex must satisfy:
+    // - Match typed exception classes ending in Error: / Exception:
+    //   (ValueError:, RuntimeException:, NullPointerException:) when
+    //   followed by whitespace or end-of-line.
+    // - Match bare error: / warning: / panic: / fatal: after whitespace
+    //   or line-start.
+    // - Match uppercase FAILED / ERROR / CRITICAL / PANIC word tokens.
+    // - Match Rust compiler error codes E0001:–E9999:.
+    // - Match Python Traceback / Java 'Caused by:'.
+    //
+    // Must NOT false-match path components like
+    // `/django/core/handlers/exception.py` (lowercase + no colon) —
+    // every alternative anchors on either uppercase class-prefix or
+    // a colon-then-whitespace contract.
+    Regex::new(concat!(
+        r"(?m)",
+        r"(",
+        // Typed class: ValueError:, RuntimeException: — uppercase start,
+        // trailing colon + whitespace/EOL. Excludes lowercase path
+        // components like "/exception.py".
+        r"[A-Z][A-Za-z0-9_]*(?:Error|Exception):(?:\s|$)",
+        r"|",
+        // Bare Error: / Exception: at line-start or after whitespace
+        // with trailing whitespace/EOL.
+        r"(?:^|\s)(?:Error|Exception):(?:\s|$)",
+        r"|",
+        // Uppercase error tokens as whole words.
+        r"\b(?:ERROR|FAILED|CRITICAL|PANIC)\b",
+        r"|",
+        // Lowercase-colon forms used by many toolchains: error:, panic:,
+        // fatal:, warning:. Anchored to avoid spurious substring hits.
+        r"(?:^|\s)(?:error|panic|fatal|warning):\s",
+        r"|",
+        // Python prefix that always opens a trace.
+        r"\bTraceback\b",
+        r"|",
+        // Rust compiler error codes (E0001 through E9999).
+        r"\bE0\d{3}:",
+        r"|",
+        // Java 'Caused by:' chain separator.
+        r"\bCaused by:",
+        r")",
+    ))
     .expect("error-signal regex must compile")
 });
 
@@ -867,6 +917,35 @@ rules:
             r.output
         );
         assert!(!r.applied.is_empty());
+    }
+
+    #[test]
+    fn test_invariant_regex_ignores_path_components() {
+        // Regression guard for the false-positive class discovered
+        // while building the corpus integration test: a rule that
+        // collapses Python site-packages frames must not be rejected
+        // because the collapsed frames contained paths like
+        // `/django/core/handlers/exception.py`. The tightened regex
+        // requires `Error:` / `Exception:` to be followed by whitespace
+        // or line-end and to either start with an uppercase class
+        // prefix or sit at a word boundary — so `/exception.py` never
+        // counts.
+        let with_path = "  File \"/django/core/handlers/exception.py\", line 47";
+        let with_real_error = "ValueError: something broke";
+        let with_caused_by = "Caused by: SomeException: details";
+        assert_eq!(
+            RE_ERROR_SIGNAL.find_iter(with_path).count(),
+            0,
+            "path component must not count as error signal"
+        );
+        assert!(
+            RE_ERROR_SIGNAL.find_iter(with_real_error).count() >= 1,
+            "typed-class error must match"
+        );
+        assert!(
+            RE_ERROR_SIGNAL.find_iter(with_caused_by).count() >= 1,
+            "'Caused by:' must match"
+        );
     }
 
     #[test]
