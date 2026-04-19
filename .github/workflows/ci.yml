@@ -160,12 +160,50 @@ jobs:
         run: cargo deny --all-features check sources
 
   # ---------------------------------------------------------------------------
-  # Benchmark smoke test (does not compare numbers, just ensures no panic)
+  # Benchmark ratio regression gate (#22)
+  #
+  # This is a REAL gate, not a smoke test: the ratio produced by L1+L2 is
+  # a pure function of the fixture bytes — identical on every machine —
+  # so we can assert it stays above the `min_ratio` floor declared in
+  # each fixture's .meta.json. GitHub runners are noisy on *latency*,
+  # but not on ratios, so this CI path is deterministic.
+  #
+  # Latency benchmarks (`cargo bench`) run in the smoke step below for
+  # observability only; they never fail CI.
+  # ---------------------------------------------------------------------------
+
+  bench-regression:
+    name: Bench ratio regression (deterministic)
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ubuntu-bench-ratio-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Check every bench/fixtures/*.txt meets its min_ratio floor
+        run: cargo test --test bench_ratios_regression --release
+
+  # ---------------------------------------------------------------------------
+  # Benchmark smoke test — informational only, never fails CI.
+  # Noisy latency on shared runners can't be a contract; for reliable
+  # hardware baselines, users submit `ntk bench --submit` JSON reports.
   # ---------------------------------------------------------------------------
 
   bench-smoke:
-    name: Benchmark smoke test
+    name: Benchmark smoke test (informational)
     runs-on: ubuntu-latest
+    continue-on-error: true  # never gate merge on latency variance
 
     steps:
       - uses: actions/checkout@v4
@@ -182,5 +220,5 @@ jobs:
             target
           key: ubuntu-bench-${{ hashFiles('**/Cargo.lock') }}
 
-      - name: Run benchmarks (1 sample — smoke only)
+      - name: Run benchmarks (informational — does not gate merges)
         run: cargo bench -- --sample-size 10 2>&1 | tail -20

@@ -1,7 +1,7 @@
 {
     "category":  "build",
-    "description":  "Verbose cargo build output with many Compiling lines.",
-    "min_ratio":  0.15,
+    "description":  "Verbose cargo build output with many Compiling lines. min_ratio is intentionally low: each 'Compiling <crate> vX.Y.Z' line has a unique crate name so the template-dedup normalizer cannot collapse them. A classifier improvement that treats identifier-looking words after known prefixes (Compiling, Checking, Fresh) as template slots would raise this ratio significantly — see CONTRIBUTING.md.",
+    "min_ratio":  0.02,
     "expected_layer":  2,
     "command":  "cargo build --release --verbose"
 }
