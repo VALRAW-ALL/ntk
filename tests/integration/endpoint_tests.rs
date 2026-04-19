@@ -227,6 +227,28 @@ async fn test_audit_log_appends_record_when_enabled() {
     );
 }
 
+// --- Dashboard HTML (#12) -------------------------------------------------
+
+#[tokio::test]
+async fn test_dashboard_serves_html_without_token() {
+    // The HTML page itself is not a secret — it prompts for the token
+    // client-side and uses it from the browser to fetch /metrics. So
+    // /dashboard must respond 200 without a token.
+    let server = test_server_with_token("s3cret-token");
+    let resp = server.get("/dashboard").await;
+    resp.assert_status_ok();
+    let body = resp.text();
+    assert!(
+        body.contains("<title>NTK Dashboard</title>"),
+        "missing title: {}",
+        &body[..200.min(body.len())]
+    );
+    assert!(
+        body.contains("X-NTK-Token"),
+        "dashboard must reference the auth header"
+    );
+}
+
 // --- L3 cache (SQLite-backed) ---------------------------------------------
 
 #[tokio::test]

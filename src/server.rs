@@ -141,9 +141,129 @@ pub fn build_router(state: AppState) -> Router {
 
     Router::new()
         .route("/health", get(handle_health))
+        .route("/dashboard", get(handle_dashboard))
         .merge(protected)
         .with_state(state)
 }
+
+/// Serves a self-contained HTML dashboard page. The page itself carries
+/// no secrets — it prompts the user for the X-NTK-Token (same value
+/// stored at `~/.ntk/.token`) and uses it from the browser to poll
+/// `/metrics` every 5 s. Token stays in `sessionStorage` only; no cookies.
+///
+/// The route is unprotected so the user can load it without already
+/// having the token in a header; the data behind it stays protected via
+/// the existing /metrics gate.
+async fn handle_dashboard() -> axum::response::Html<&'static str> {
+    axum::response::Html(DASHBOARD_HTML)
+}
+
+/// Inline single-page dashboard. Kept minimal: no build step, no
+/// external JS/CSS — works offline, bypasses CSP on air-gapped hosts.
+const DASHBOARD_HTML: &str = r##"<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>NTK Dashboard</title>
+<style>
+  :root { --bg:#0f1419; --fg:#e0e0e0; --muted:#8a9199; --accent:#7c4dff; --ok:#4caf50; --warn:#ff9800; }
+  * { box-sizing: border-box }
+  body { margin:0; font-family: ui-monospace, 'Cascadia Code', Menlo, Consolas, monospace; background:var(--bg); color:var(--fg); padding:1.5rem; line-height:1.4 }
+  h1 { margin:0 0 1rem; font-size:1.2rem; font-weight:600; color:var(--accent) }
+  .meta { color: var(--muted); font-size:0.85rem; margin-bottom:1.5rem }
+  .grid { display:grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap:1rem; margin-bottom:1.5rem }
+  .card { background:rgba(124,77,255,0.06); border:1px solid rgba(124,77,255,0.2); border-radius:6px; padding:1rem }
+  .card .label { font-size:0.75rem; color:var(--muted); text-transform:uppercase; letter-spacing:0.05em }
+  .card .value { font-size:1.4rem; font-weight:600; margin-top:0.3rem }
+  .card .sub { font-size:0.8rem; color:var(--muted); margin-top:0.2rem }
+  h2 { font-size:1rem; margin:1.5rem 0 0.8rem; color:var(--accent) }
+  table { width:100%; border-collapse:collapse; font-size:0.88rem }
+  th,td { text-align:left; padding:0.4rem 0.6rem; border-bottom:1px solid rgba(255,255,255,0.06) }
+  th { color:var(--muted); font-weight:500; font-size:0.75rem; text-transform:uppercase }
+  td.num { text-align:right; font-variant-numeric: tabular-nums }
+  .token-form { max-width:480px }
+  .token-form input { width:100%; padding:0.6rem; background:rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.1); border-radius:4px; color:var(--fg); font-family:inherit }
+  .token-form button { margin-top:0.6rem; padding:0.5rem 1rem; background:var(--accent); border:none; border-radius:4px; color:white; cursor:pointer; font-family:inherit }
+  .error { color:#ff5555; margin-top:0.8rem }
+  .layer-bar { display:flex; height:20px; border-radius:4px; overflow:hidden; background:rgba(255,255,255,0.05) }
+  .layer-bar span { display:block; font-size:0.7rem; text-align:center; line-height:20px; color:white }
+  .l1 { background:#4caf50 } .l2 { background:#2196f3 } .l3 { background:#ff9800 }
+</style>
+</head>
+<body>
+  <h1>NTK Dashboard</h1>
+  <div class="meta" id="meta">loading…</div>
+  <div id="content"></div>
+
+  <script>
+    // Read stored token from sessionStorage; prompt for one if absent.
+    const KEY = 'ntk_token';
+    let token = sessionStorage.getItem(KEY);
+    const content = document.getElementById('content');
+    const meta = document.getElementById('meta');
+
+    function renderTokenForm(err) {
+      content.innerHTML = `
+        <h2>Authentication required</h2>
+        <p>Paste the daemon's shared secret (from <code>~/.ntk/.token</code>):</p>
+        <div class="token-form">
+          <input id="tok" placeholder="X-NTK-Token value" autocomplete="off" />
+          <button id="save">Connect</button>
+          ${err ? `<div class="error">${err}</div>` : ''}
+        </div>`;
+      document.getElementById('save').onclick = () => {
+        const v = document.getElementById('tok').value.trim();
+        if (v) { sessionStorage.setItem(KEY, v); token = v; poll(); }
+      };
+    }
+
+    async function poll() {
+      if (!token) return renderTokenForm();
+      try {
+        const r = await fetch('/metrics', { headers: { 'X-NTK-Token': token } });
+        if (r.status === 401) { sessionStorage.removeItem(KEY); token = null; return renderTokenForm('invalid token'); }
+        if (!r.ok) throw new Error('HTTP ' + r.status);
+        const d = await r.json();
+        render(d);
+      } catch (e) {
+        meta.textContent = 'error: ' + e.message + ' — retrying in 5s';
+      }
+    }
+
+    function render(d) {
+      const total = d.total_compressions || 0;
+      const saved = d.total_tokens_saved || 0;
+      const avg = ((d.average_ratio || 0) * 100).toFixed(1);
+      const rtk = d.rtk_pre_filtered_count || 0;
+      const layers = d.layer_counts || [0,0,0];
+      const layerTotal = layers[0] + layers[1] + layers[2] || 1;
+      const pct = i => Math.round((layers[i] / layerTotal) * 100);
+
+      meta.textContent = `refreshed ${new Date().toLocaleTimeString()} — polling every 5s`;
+      content.innerHTML = `
+        <div class="grid">
+          <div class="card"><div class="label">Compressions</div><div class="value">${total.toLocaleString()}</div></div>
+          <div class="card"><div class="label">Tokens saved</div><div class="value">${saved.toLocaleString()}</div><div class="sub">across all sessions</div></div>
+          <div class="card"><div class="label">Avg ratio</div><div class="value">${avg}%</div></div>
+          <div class="card"><div class="label">RTK pre-filtered</div><div class="value">${rtk.toLocaleString()}</div><div class="sub">hook ran after RTK</div></div>
+        </div>
+        <h2>Layer distribution</h2>
+        <div class="layer-bar">
+          ${pct(0) > 0 ? `<span class="l1" style="width:${pct(0)}%">L1 ${pct(0)}%</span>` : ''}
+          ${pct(1) > 0 ? `<span class="l2" style="width:${pct(1)}%">L2 ${pct(1)}%</span>` : ''}
+          ${pct(2) > 0 ? `<span class="l3" style="width:${pct(2)}%">L3 ${pct(2)}%</span>` : ''}
+        </div>
+        <p class="meta">L1: ${layers[0]} · L2: ${layers[1]} · L3: ${layers[2]}</p>`;
+    }
+
+    // Kick off.
+    poll();
+    setInterval(poll, 5000);
+  </script>
+</body>
+</html>
+"##;
 
 /// Rejects requests to privileged routes that lack a matching
 /// `X-NTK-Token` header. Bypass only via `NTK_DISABLE_AUTH=1`.
