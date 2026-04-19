@@ -23,6 +23,7 @@ These rules are loaded automatically when you work on matching files:
 
 | Rule | Triggers on |
 |---|---|
+| `implementation-gate.md` | **every code change** — security, memory, quality, issue fidelity checklist |
 | `clippy-gate.md` | any Rust change — the CI clippy flags that must pass locally |
 | `cuda-ci.md` | edits to `.github/workflows/release.yml` with CUDA steps |
 | `gpu-vendor.md` | `src/gpu.rs`, `src/config.rs`, `src/main.rs` setup wizard, `layer3_llamacpp.rs` |
