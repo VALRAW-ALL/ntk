@@ -10,7 +10,7 @@
 // ---------------------------------------------------------------------------
 
 use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion};
-use ntk::compressor::{layer1_filter, layer2_tokenizer};
+use ntk::compressor::{layer1_filter, layer2_tokenizer, spec_loader};
 use std::time::Duration;
 
 // ---------------------------------------------------------------------------
@@ -158,6 +158,47 @@ fn bench_full_pipeline_fixtures(c: &mut Criterion) {
 // Criterion groups
 // ---------------------------------------------------------------------------
 
+// ---------------------------------------------------------------------------
+// POC #24 — hardcoded vs YAML-spec overhead comparison
+//
+// Answers the kill-criterion from RFC-0001 §16 step 2: a YAML ruleset
+// must stay within +20% of the hardcoded path for the abstraction to
+// be worth shipping. Benchmarks the same Python-trace fixture through
+// both engines on identical input.
+// ---------------------------------------------------------------------------
+
+fn bench_spec_vs_hardcoded_python(c: &mut Criterion) {
+    let input = fixture_bench("python_django_trace.txt");
+    let rule_path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("rules")
+        .join("stack_trace")
+        .join("python.yaml");
+    let rule_file = spec_loader::load_rule_file(&rule_path).expect("load python.yaml");
+
+    let mut group = c.benchmark_group("poc_spec_vs_hardcoded");
+    group.bench_function("hardcoded_l1_python", |b| {
+        b.iter(|| layer1_filter::filter(black_box(&input)))
+    });
+    group.bench_function("spec_loader_python", |b| {
+        b.iter(|| spec_loader::apply_rule_file(black_box(&input), black_box(&rule_file)))
+    });
+    group.finish();
+}
+
+fn fixture_bench(name: &str) -> String {
+    // The spec-vs-hardcoded bench reuses bench/fixtures/ (richer Python
+    // traces live there) rather than tests/fixtures/. Fall back cleanly
+    // when the bench fixture is absent so the benchmark still runs.
+    let bench_path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("bench")
+        .join("fixtures")
+        .join(name);
+    if bench_path.exists() {
+        return std::fs::read_to_string(&bench_path).unwrap_or_default();
+    }
+    fixture(name)
+}
+
 criterion_group!(
     benches,
     bench_layer1_1kb,
@@ -167,5 +208,6 @@ criterion_group!(
     bench_layer2_count_tokens,
     bench_full_pipeline_no_inference,
     bench_full_pipeline_fixtures,
+    bench_spec_vs_hardcoded_python,
 );
 criterion_main!(benches);
