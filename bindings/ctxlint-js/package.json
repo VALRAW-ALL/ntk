@@ -1,0 +1,23 @@
+{
+  "name": "@ctxlint/core",
+  "version": "0.1.0-poc",
+  "description": "Reference JavaScript/TypeScript implementation of RFC-0001 Context Linter Spec — second-runtime binding (#26) for the NTK Rust reference.",
+  "type": "module",
+  "main": "index.js",
+  "types": "index.d.ts",
+  "exports": {
+    ".": "./index.js"
+  },
+  "scripts": {
+    "test": "node --test test.js"
+  },
+  "dependencies": {
+    "yaml": "^2.3.0"
+  },
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/VALRAW-ALL/ntk"
+  },
+  "keywords": ["ntk", "context-linter", "rfc-0001", "llm", "compression"]
+}
