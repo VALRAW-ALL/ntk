@@ -176,6 +176,23 @@ static PROGRESS_PATTERNS: &[&str] = &[
     " Downloading ",
 ];
 
+// Cargo/rustc status markers. `contains` is too lax for these (a log
+// line that quotes cargo output would be eaten), so they're matched
+// against the trimmed prefix only. Cargo always emits them with a
+// right-aligned verb followed by a space.
+//
+// These carry no signal on success — the final `Finished` line gives
+// the verdict, and on failure the actual error follows below with the
+// crate name included anyway.
+static CARGO_PROGRESS_PREFIXES: &[&str] = &[
+    "Compiling ",
+    "Checking ",
+    "Building ",
+    "Fresh ",
+    "Installing ",
+    "Updating ",
+];
+
 fn remove_progress_bars(input: &str) -> String {
     let mut out: Vec<&str> = Vec::with_capacity(input.lines().count());
 
@@ -184,13 +201,39 @@ fn remove_progress_bars(input: &str) -> String {
         if trimmed.is_empty() && line.contains('\r') {
             continue;
         }
-        let is_progress = PROGRESS_PATTERNS.iter().any(|pat| trimmed.contains(pat));
-        if !is_progress {
-            out.push(line);
+        if PROGRESS_PATTERNS.iter().any(|pat| trimmed.contains(pat)) {
+            continue;
         }
+        if is_cargo_progress(trimmed) {
+            continue;
+        }
+        out.push(line);
     }
 
     out.join("\n")
+}
+
+fn is_cargo_progress(line: &str) -> bool {
+    // Cargo right-aligns verbs to column 12 with a 3-4 space left pad.
+    // Require the pad so a user-authored `Compiling X` line without
+    // indentation never matches. Also require a version-or-path tail
+    // (cargo always adds one) so a bare "   Compiling this manually"
+    // comment-like line stays.
+    let bytes = line.as_bytes();
+    if bytes.len() < 4 || bytes[0] != b' ' {
+        return false;
+    }
+    let trimmed = line.trim_start();
+    if !CARGO_PROGRESS_PREFIXES
+        .iter()
+        .any(|p| trimmed.starts_with(p))
+    {
+        return false;
+    }
+    // `xxx v1.2.3` or `xxx (path)` — both forms have either `v<digit>`
+    // or `(` after the word. Cheap substring check; the leading pad +
+    // verb check already locked this to real cargo output.
+    trimmed.contains(" v") || trimmed.contains(" (")
 }
 
 // ---------------------------------------------------------------------------
@@ -1179,6 +1222,48 @@ index abc1234..def5678 100644
         // which file changed and where.
         assert!(result.output.contains("diff --git a/src/server.rs"));
         assert!(result.output.contains("@@ -45"));
+    }
+
+    #[test]
+    fn test_cargo_progress_lines_removed() {
+        // Cargo right-aligns verbs with 3-4 leading spaces. We build
+        // the input with explicit \n so the Rust string-continuation
+        // escape doesn't eat our indentation.
+        let input = [
+            "   Compiling serde v1.0.0",
+            "   Compiling tokio v1.35.0",
+            "   Compiling axum v0.7.4",
+            "    Checking ntk v0.2.28 (/home/user/ntk)",
+            "    Building [===================>] 42/50",
+            "    Finished `release` profile [optimized] target(s) in 1m 03s",
+        ]
+        .join("\n");
+        let result = filter(&input);
+        assert!(
+            !result.output.contains("Compiling serde"),
+            "cargo Compiling lines must be dropped: {}",
+            result.output
+        );
+        assert!(
+            !result.output.contains("Compiling tokio"),
+            "cargo Compiling lines must be dropped"
+        );
+        assert!(
+            !result.output.contains("Checking ntk"),
+            "cargo Checking must be dropped"
+        );
+        // The final Finished line is informational and carries the
+        // success verdict — we do NOT drop it.
+        assert!(result.output.contains("Finished"));
+    }
+
+    #[test]
+    fn test_cargo_progress_does_not_drop_unindented_compiling_in_prose() {
+        // A user-authored log line that happens to start with
+        // "Compiling" but has no indent MUST NOT be filtered.
+        let input = "Compiling the shader took 3 seconds.\n";
+        let result = filter(input);
+        assert!(result.output.contains("Compiling the shader"));
     }
 
     #[test]

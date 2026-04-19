@@ -1,12 +1,12 @@
 ---
 source: tests/integration/snapshot_tests.rs
+assertion_line: 56
 expression: result
 ---
 # fixture: cargo_test_output.txt
-# tokens: 208 -> 204
-# lines_removed: 46
+# tokens: 192 -> 189
+# lines_removed: 47
 ---
-   Compiling ntk v0.1.0 (user/project)
     Finished test [unoptimized + debuginfo] target(s) in 4.23s
     Running unittests src/lib.rs (deps/ntk-a1b2c3d4e5f6)
 

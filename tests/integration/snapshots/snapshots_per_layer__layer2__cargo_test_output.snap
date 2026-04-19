@@ -1,14 +1,14 @@
 ---
 source: tests/integration/snapshots_per_layer.rs
+assertion_line: 121
 expression: "layer2_snapshot(\"cargo_test_output.txt\")"
 ---
 # fixture: cargo_test_output.txt
 # layer: 2
-# tokens_in: 208
-# tokens_out: 204
+# tokens_in: 192
+# tokens_out: 189
 # applied_rules: ["paths_shortened", "whitespace_collapsed"]
 ---
-   Compiling ntk v0.1.0 (user/project)
     Finished test [unoptimized + debuginfo] target(s) in 4.23s
     Running unittests src/lib.rs (deps/ntk-a1b2c3d4e5f6)
 
