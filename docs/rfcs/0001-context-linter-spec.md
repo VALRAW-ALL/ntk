@@ -1,8 +1,14 @@
 # RFC-0001 — Context Linter Spec
 
-**Status:** draft · **Authors:** NTK maintainers + community
+**Status:** draft (POC shipped on branch `poc/context-linter-spec`) · **Authors:** NTK maintainers + community
 **Supersedes:** —
 **Obsoletes:** —
+
+**POC status (2026-04-19):**
+- Rust reference impl: `src/compressor/spec_loader.rs` (all 4 primitives, 10 unit tests passing)
+- JS second binding: `bindings/ctxlint-js/` (9 parity tests passing)
+- Bench vs hardcoded: **4.5× faster** on Python fixture (28 µs vs 127 µs) — well inside the +20 % kill criterion from §16 step 2
+- Gate for publishing to the wider community still stands: ≥100 stars or ≥5 external contributors before opening the 30-day comment window
 
 > **Reading note.** This RFC is the foundation for issues #23, #24,
 > #25, #26. It is published as a design document only — the gate for
