@@ -1,7 +1,7 @@
 {
     "category":  "stack_trace",
     "description":  "Django request handler stack trace with asgiref/gunicorn framework frames.",
-    "min_ratio":  0.30,
+    "min_ratio":  0.55,
     "expected_layer":  2,
     "command":  "python manage.py runserver"
 }

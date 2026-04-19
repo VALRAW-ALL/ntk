@@ -26,7 +26,10 @@ impl TokenizerKind {
     /// default instead of breaking the compression pipeline.
     pub fn from_config_str(s: &str) -> Self {
         let lower = s.to_ascii_lowercase();
-        let normalized = lower.replace('-', "_").replace('.', "_");
+        let normalized: String = lower
+            .chars()
+            .map(|c| if c == '-' || c == '.' { '_' } else { c })
+            .collect();
         match normalized.as_str() {
             "o200k" | "o200k_base" | "gpt4o" | "claude35" | "claude_3_5" | "claude_4" => {
                 Self::O200k

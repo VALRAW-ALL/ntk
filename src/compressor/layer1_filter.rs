@@ -366,12 +366,32 @@ fn is_framework_frame(line: &str) -> bool {
     }
 
     // --- PHP / Symfony / Laravel ---
+    // Classic "#N /path/..." trace frames.
     if t.starts_with("#")
         && (t.contains("/vendor/symfony/")
             || t.contains("/vendor/laravel/")
             || t.contains("/vendor/illuminate/")
             || t.contains("\\vendor\\symfony\\")
             || t.contains("\\vendor\\laravel\\"))
+    {
+        return true;
+    }
+    // Class-prefix frames that PHP emits in "at Namespace\Class->method()"
+    // format (no path, no leading #). Symfony and Laravel's core vendor
+    // frames collapse safely.
+    if t.starts_with("at Symfony\\")
+        || t.starts_with("at Illuminate\\")
+        || t.starts_with("at Laravel\\")
+    {
+        return true;
+    }
+    // Inline-path continuation lines under an "at" frame:
+    // "     (/app/vendor/symfony/event-dispatcher/...)" — carry no user
+    // signal, they just echo the vendor path of the preceding "at" line.
+    if t.starts_with('(')
+        && (t.contains("/vendor/symfony/")
+            || t.contains("/vendor/laravel/")
+            || t.contains("/vendor/illuminate/"))
     {
         return true;
     }
@@ -973,6 +993,38 @@ TypeError: Cannot read properties of null (reading 'x')
         assert!(result.output.contains("TypeError"));
         // User frame (Modal.tsx) must survive; react-dom and zone frames can be collapsed.
         assert!(result.output.contains("Modal.tsx"));
+    }
+
+    #[test]
+    fn test_stack_trace_php_symfony_class_prefix_filter() {
+        // Regression guard for #21: PHP/Symfony traces now emit frames in
+        // two forms NTK must collapse — the classic "#N /vendor/..."
+        // format AND Symfony's "at Namespace\Class->method()" format with
+        // no path, plus the indented "(/vendor/...)" continuation lines.
+        let input = "\
+Symfony\\Component\\HttpKernel\\Exception\\NotFoundHttpException: No route
+  at MyApp\\Controller\\UserController->show()
+  at Symfony\\Component\\HttpKernel\\EventListener\\RouterListener->onKernelRequest()
+     (/app/vendor/symfony/event-dispatcher/EventDispatcher.php:270)
+  at Symfony\\Component\\EventDispatcher\\EventDispatcher->callListeners()
+     (/app/vendor/symfony/http-kernel/HttpKernel.php:139)
+  at Illuminate\\Foundation\\Http\\Kernel->sendRequestThroughRouter()
+  at Laravel\\Lumen\\Application->dispatch()
+";
+        let result = filter(input);
+        // Error header + user frame survive.
+        assert!(result.output.contains("NotFoundHttpException"));
+        assert!(
+            result.output.contains("UserController->show"),
+            "user frame lost: {}",
+            result.output
+        );
+        // At least one framework-collapse marker fires.
+        assert!(
+            result.output.contains("framework frames omitted"),
+            "expected collapse on Symfony+Illuminate+Laravel frames: {}",
+            result.output
+        );
     }
 
     #[test]
