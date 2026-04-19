@@ -137,6 +137,9 @@
           <p class="step-desc" data-i18n="how.l4_desc">Reads the Claude Code transcript and prepends your most recent intent to the L3 prompt. Plain-string prefix, works with any LLM.</p>
         </div>
       </div>
+      <p style="text-align:center;margin-top:2rem;color:var(--color-texto-terciario);font-size:0.875rem;line-height:1.7;max-width:720px;margin-left:auto;margin-right:auto" data-i18n="how.rfc_callout">
+        <strong>Experimental:</strong> An opt-in <a href="https://github.com/VALRAW-ALL/ntk/blob/master/docs/rfcs/0001-context-linter-spec.md" style="color:var(--color-primaria-clara)">YAML rule engine (RFC-0001)</a> lets the community ship language collapses without writing Rust. 13 rulesets ship today (Python, Java, Go, Node, Ruby, PHP, .NET, Kotlin, Rust, Swift, Elixir, Docker, kubectl) and a <a href="https://github.com/VALRAW-ALL/ntk/tree/master/bindings/ctxlint-js" style="color:var(--color-primaria-clara)">JS reference runtime</a> mirrors the Rust engine for non-Rust agents. Activate with <code style="font-family:var(--font-mono)">NTK_SPEC_RULES=…</code>.
+      </p>
     </div>
   </section>
 

@@ -84,6 +84,29 @@ Bash tool output
 
 If the daemon is unreachable, the hook falls back gracefully to the original output - NTK never blocks a command.
 
+### Experimental: YAML rule engine (RFC-0001)
+
+NTK ships an opt-in declarative rule engine that lets the community add new
+language/framework collapses without writing Rust. Rules live in `rules/*.yaml`
+and cover Python, Java, Go, Node, Ruby, PHP, .NET, Kotlin, Rust, Swift, Elixir,
+Docker, and kubectl. Activation is one line of config or one env var:
+
+```bash
+# All shipped rulesets, composed in filename order
+export NTK_SPEC_RULES="$(realpath rules/stack_trace)"
+ntk start
+
+# Or persist via ~/.ntk/config.json:
+#   { "compression": { "spec_rules_path": "~/.ntk/rules" } }
+```
+
+The engine runs as an L1.5 stage between L1 and L2 with a built-in
+`preserve_errors` invariant — any rule whose transform would lose error
+signal is dropped at runtime, so worst-case the stage is a pass-through.
+Full schema: [`docs/rfcs/0001-context-linter-spec.md`](docs/rfcs/0001-context-linter-spec.md).
+A second-runtime JS reference (`@ctxlint/core` + `ctxlint` CLI shim) lives at
+[`bindings/ctxlint-js/`](bindings/ctxlint-js/) for non-Rust agents.
+
 ---
 
 ## Requirements
@@ -464,7 +487,8 @@ NTK merges configuration from two sources, in order:
     "preserve_first_stacktrace": true,
     "preserve_error_counts": true,
     "context_max_messages": 3,
-    "tokenizer": "cl100k_base"
+    "tokenizer": "cl100k_base",
+    "spec_rules_path": null
   },
   "model": {
     "provider": "ollama",
@@ -513,6 +537,7 @@ NTK merges configuration from two sources, in order:
 | `model.backend_chain` | `[]` | Ordered fallback chain of inference backends. E.g. `["ollama", "candle"]` tries Ollama first, falls back to Candle on failure. Empty = single backend from `provider`. |
 | `compression.context_max_messages` | `3` | Layer 4 — how many recent user messages to fold into the intent prefix (decay-weighted: most recent 60%, next 25%, etc). `1` = legacy single-message. |
 | `compression.tokenizer` | `"cl100k_base"` | BPE family for token counting. `"o200k_base"` for Claude 3.5+ / GPT-4o accuracy. Unknown values fall back to `cl100k_base` with a warn log. |
+| `compression.spec_rules_path` | `null` | (Experimental, RFC-0001) Path to a YAML rule file or directory of `*.yaml` rules applied as an extra L1.5 stage between L1 and L2. `NTK_SPEC_RULES=<path>` env var overrides at runtime. Default `null` = behaviour unchanged. The `preserve_errors` invariant guarantees worst-case is a pass-through, never a regression. See `rules/` for shipped rulesets (Python, Java, Go, Node, Ruby, PHP, .NET, Kotlin, Rust, Swift, Elixir, Docker, kubectl). |
 | `security.audit_log` | `false` | Opt-in: append one JSONL line per `/compress` call to `audit_log_path`. SHA-256 of the output only — raw output never stored. |
 | `security.audit_log_path` | `"~/.ntk/audit.log"` | Destination for the audit JSONL when `audit_log=true`. |
 | `l3_cache.enabled` | `true` | Memoize L3 inference results keyed by `SHA-256(l2_output + context + model + prompt_format)`. Cache hit = <5 ms vs fresh L3 at 50-800 ms. |

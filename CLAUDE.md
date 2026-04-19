@@ -259,12 +259,14 @@ src/
   server.rs            — Routes: /compress, /metrics, /health
   installer.rs         — ntk init: idempotent patch of editor settings.json + hook copy
   compressor/
-    layer1_filter.rs   — Regex rules, ANSI stripping, line deduplication
+    layer1_filter.rs   — ANSI strip, progress bars, diagnostic noise (TS underlines + git index/+++/--- headers), template dedup, stack-trace collapse, prefix factoring, test-failure extraction, blank-line collapse
     layer2_tokenizer.rs — tiktoken-rs integration, BPE path reformatting
     layer3_backend.rs  — BackendKind abstraction: Ollama | Candle | LlamaCpp
-    layer3_inference.rs — Ollama HTTP client, type-specific prompts
+    layer3_inference.rs — Ollama HTTP client, type-specific prompts (test/build/log/diff/generic, embedded fallbacks)
     layer3_candle.rs   — In-process inference via HuggingFace Candle (CPU/CUDA/Metal)
     layer3_llamacpp.rs — llama.cpp server client with auto-start
+    layer4_context.rs  — Transcript intent extraction + prompt-prefix formatting (Prefix / XmlWrap / Goal / Json)
+    spec_loader.rs     — RFC-0001 YAML rule engine (frame-run / line-match / template-dedup / prefix-factor primitives + preserve_errors invariant). Used by `--spec` CLI and the experimental L1.5 daemon stage.
   detector.rs          — Output type detection: test | build | log | diff | generic
   metrics.rs           — In-memory + SQLite (sqlx) persistence
   config.rs            — Deserializes ~/.ntk/config.json + .ntk.json overrides
@@ -331,6 +333,7 @@ tests/
 Global config at `~/.ntk/config.json`. Per-project overrides at `.ntk.json` in project root (merged at runtime). Key settings:
 
 - `compression.inference_threshold_tokens` (default: 300) — Layer 3 activation threshold
+- `compression.spec_rules_path` (default: `null`) — RFC-0001 experimental L1.5 stage. Path to a YAML rule file or directory of `*.yaml` rules; composed in filename order. Env var `NTK_SPEC_RULES=<path>` overrides at runtime. Built-in `preserve_errors` invariant guarantees worst-case is a pass-through. Shipped rulesets: `rules/stack_trace/{python,java,go,node,ruby,php,dotnet,kotlin,rust,swift,elixir}.yaml`, `rules/container_log/{docker,kubectl}.yaml`.
 - `model.provider` — `"ollama"` | `"candle"` | `"llama_cpp"`
 - `model.quantization` — `"q4_k_m"` | `"q5_k_m"` | `"q6_k"` (default: `"q5_k_m"`)
 - `model.fallback_to_layer1_on_timeout` — graceful degradation if Ollama is unavailable
