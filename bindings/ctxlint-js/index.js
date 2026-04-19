@@ -344,10 +344,37 @@ function applyPrefixFactor(input, minShare, minLines, replacement) {
 // Invariant check: error signal preserved
 // ---------------------------------------------------------------------------
 
-const ERROR_RE =
-  /(error:|ERROR|FAILED|panic:|Caused by|Traceback|Exception|fatal|warning:|E0[0-9]{3}:)/gi;
+// Parity with src/compressor/spec_loader.rs::RE_ERROR_SIGNAL. The naive
+// /error/i pattern false-matched path components like
+// `/django/core/handlers/exception.py`, causing every framework-collapse
+// rule on a Python fixture to be rejected. Each alternative anchors on
+// either an uppercase class-prefix or a `:<whitespace>` contract.
+const ERROR_RE = new RegExp(
+  [
+    // Typed class: ValueError:, RuntimeException: — uppercase start,
+    // trailing colon + whitespace/EOL. Excludes lowercase path components.
+    '[A-Z][A-Za-z0-9_]*(?:Error|Exception):(?:\\s|$)',
+    // Bare Error: / Exception: at line-start or after whitespace.
+    '(?:^|\\s)(?:Error|Exception):(?:\\s|$)',
+    // Uppercase error tokens as whole words.
+    '\\b(?:ERROR|FAILED|CRITICAL|PANIC)\\b',
+    // Lowercase-colon forms: error: / panic: / fatal: / warning:.
+    '(?:^|\\s)(?:error|panic|fatal|warning):\\s',
+    // Python prefix that always opens a trace.
+    '\\bTraceback\\b',
+    // Rust compiler error codes (E0001 through E9999).
+    '\\bE0\\d{3}:',
+    // Java 'Caused by:' chain separator.
+    '\\bCaused by:',
+  ].join('|'),
+  'gm',
+);
 
 function preservesErrorSignal(before, after) {
-  const count = (s) => (s.match(ERROR_RE) || []).length;
+  const count = (s) => {
+    // Reset lastIndex since ERROR_RE has the /g flag (stateful).
+    ERROR_RE.lastIndex = 0;
+    return (s.match(ERROR_RE) || []).length;
+  };
   return count(after) >= count(before);
 }

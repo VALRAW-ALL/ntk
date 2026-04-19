@@ -189,6 +189,34 @@ rules:
   assert.ok(r.applied.length > 0);
 });
 
+// Regression: ERROR_RE must not false-match path components containing
+// `exception` / `error` substrings (e.g. `/django/core/handlers/exception.py`).
+// A false match was blocking every Django stack-trace rule by spuriously
+// bumping the "error count" in the pre-transform input, so collapse
+// would be flagged as losing an error signal. Parity with the Rust
+// regression test `test_invariant_regex_ignores_path_components`.
+test('invariant regex ignores path components', () => {
+  const file = loadRuleFile(PYTHON_YAML);
+  const input = [
+    'Traceback (most recent call last):',
+    '  File "/app/views/users.py", line 1, in x',
+    '    pass',
+    '  File "/usr/local/lib/python3.11/site-packages/django/core/handlers/exception.py", line 47, in inner',
+    '    response = get_response(request)',
+    '  File "/usr/local/lib/python3.11/site-packages/django/core/handlers/base.py", line 181, in _get_response',
+    '    response = wrapped_callback(request, *args, **kwargs)',
+    '  File "/usr/local/lib/python3.11/site-packages/django/db/models/manager.py", line 85, in manager_method',
+    '    return getattr(self.get_queryset(), name)(*args, **kwargs)',
+    'ValueError: bad input',
+  ].join('\n');
+  const r = applyRuleFile(input, file);
+  assert.ok(
+    r.output.includes('frames omitted'),
+    `expected collapse marker, got:\n${r.output}\nrejected: ${r.invariantRejected}`,
+  );
+  assert.deepStrictEqual(r.invariantRejected, []);
+});
+
 test('invariant preserves error lines', () => {
   const file = loadRuleFile(PYTHON_YAML);
   const input = [
