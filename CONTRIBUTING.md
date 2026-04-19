@@ -87,6 +87,29 @@ Be kind. Assume good intent. Critique ideas, not people. If you can't
 write a review comment that a stranger would read as constructive, sleep
 on it and try again the next day.
 
+## Snapshot tests
+
+NTK keeps two layers of snapshots in `tests/integration/snapshots/`:
+
+- `snapshot_tests__<fixture>.snap` — full L1+L2 pipeline output.
+- `snapshots_per_layer__layerN__<fixture>.snap` — per-layer output.
+  If only `layer1__...` diffs on a PR, the change is L1-only; if
+  `layer2__...` also diffs, it's a downstream L1 effect.
+
+Workflow when you change L1 or L2 logic:
+
+```bash
+cargo test --test snapshots_per_layer  # diff surfaces here
+cargo insta review                       # inspect + approve diffs
+git add tests/integration/snapshots/     # commit approved snapshots
+```
+
+Force-regenerate on intentional algorithm change:
+
+```bash
+INSTA_UPDATE=always cargo test --test snapshots_per_layer
+```
+
 ## Licensing
 
 NTK is released under the MIT License. By submitting a PR you agree

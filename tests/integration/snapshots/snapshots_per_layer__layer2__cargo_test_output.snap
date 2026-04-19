@@ -1,0 +1,29 @@
+---
+source: tests/integration/snapshots_per_layer.rs
+expression: "layer2_snapshot(\"cargo_test_output.txt\")"
+---
+# fixture: cargo_test_output.txt
+# layer: 2
+# tokens_in: 208
+# tokens_out: 204
+# applied_rules: ["paths_shortened", "whitespace_collapsed"]
+---
+   Compiling ntk v0.1.0 (user/project)
+    Finished test [unoptimized + debuginfo] target(s) in 4.23s
+    Running unittests src/lib.rs (deps/ntk-a1b2c3d4e5f6)
+
+running 47 tests
+test detector::tests::test_detects_git_diff ... FAILED
+
+failures:
+
+---- detector::tests::test_detects_git_diff stdout ----
+thread 'detector::tests::test_detects_git_diff' panicked at 'assertion `left == right` failed
+  left: Generic
+ right: Diff', src/detector.rs:48:5
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+failures:
+    detector::tests::test_detects_git_diff
+
+test result: FAILED. 46 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.08s

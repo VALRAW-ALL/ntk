@@ -119,6 +119,10 @@ path = "tests/proptest/compression_invariants.rs"
 name = "snapshot_tests"
 path = "tests/integration/snapshot_tests.rs"
 
+[[test]]
+name = "snapshots_per_layer"
+path = "tests/integration/snapshots_per_layer.rs"
+
 [[bench]]
 name = "compression_bench"
 path = "tests/benchmarks/compression_bench.rs"
