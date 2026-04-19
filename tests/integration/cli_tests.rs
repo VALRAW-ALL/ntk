@@ -276,10 +276,11 @@ fn test_ntk_diff_emits_unified_diff() {
         "missing L1 header in diff output:\n{stdout}"
     );
     // At least one deletion line (L1 removes ANSI/progress/duplicates) —
-    // cargo_test_output.txt reliably produces some.
+    // cargo_test_output.txt reliably produces some. Deletions render as
+    // "<old_ln> <new_ln> -- <text>" (sign="-" + prefix="- " = "-- ").
     assert!(
-        stdout.lines().any(|l| l.contains("- -")) || stdout.lines().any(|l| l.contains(" -  ")),
-        "expected at least one '-' line (removal) in diff:\n{stdout}"
+        stdout.lines().any(|l| l.contains(" -- ")),
+        "expected at least one '-- ' line (removal) in diff:\n{stdout}"
     );
     assert!(
         !stdout.contains("thread 'main' panicked"),
