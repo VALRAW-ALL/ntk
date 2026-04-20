@@ -90,6 +90,7 @@ fixture IS the contract — if compression worsens, extend the classifier.
 
 ## Languages currently supported
 
+**Hardcoded in `is_framework_frame` / `is_framework_frame_unit`:**
 Java (Spring/Tomcat/CGLIB), Python (Django/site-packages/gunicorn/
 asgiref/werkzeug), Ruby (actionpack/activesupport/railties/rack),
 Node.js (Express/node:internal), Go (runtime.*), PHP
@@ -98,3 +99,16 @@ Node.js (Express/node:internal), Go (runtime.*), PHP
 System.Runtime.ExceptionServices), JavaScript/TypeScript browser
 (webpack / react-dom / zone.js), React Native (metro / Libraries),
 Kotlin/Android (androidx / kotlinx.coroutines / com.android / dalvik).
+
+**Also available via the RFC-0001 YAML spec_loader** (opt-in runtime
+gate, `compression.spec_rules_path` or `NTK_SPEC_RULES`): Swift
+(UIKit/Foundation/dyld/libsystem), Elixir (Phoenix/Plug/Ecto/OTP),
+plus `rules/container_log/{docker,kubectl}.yaml` for non-stack-trace
+output types.
+
+When adding hardcoded coverage for a language already shipped via
+spec_loader (e.g. porting Swift into `is_framework_frame`), raise
+the matching fixture's `min_ratio` in `bench_ratios_regression` at
+the same time — L1+L2 now owns the ratio floor. Until then, the
+fixture's floor stays low and the spec_loader spot-check carries
+the correctness contract.

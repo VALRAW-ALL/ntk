@@ -38,8 +38,31 @@ catch most via the snapshot tests, but some need dedicated unit tests.
      the output.
   2. **Negative**: an input that *looks* similar but must NOT be touched
      (e.g. short hex like git SHAs, version strings, etc).
-- Run `cargo test --lib compressor` locally before commit — L1 has 14
+- Run `cargo test --lib compressor` locally before commit — L1 has 25
   tests, L2 has 12, L4 has 10. If you add a new pattern, bump the totals.
+
+## L1 stage order (do NOT reorder casually)
+
+The order below is load-bearing. Moving stages up/down changes what
+the next stage sees and can break idempotency (invariant #5) or the
+first/last-frame guarantees (#3).
+
+1. `strip_ansi` — must run first; everything else assumes plain text.
+2. `detect_rtk_output` — sets `rtk_pre_filtered` for metrics only.
+3. `remove_progress_bars` — also drops cargo/rustc status lines
+   (`   Compiling <crate> v<N>.<N>.<N>`, `Checking`, `Building`,
+   `Fresh`, `Installing`, `Updating`) via `is_cargo_progress()`.
+   The final `Finished` verdict line intentionally stays.
+4. `remove_diagnostic_noise` — drops TS/Rust/Elm wavy underline rows
+   (`~~~~~~^^^`) and git porcelain per-file metadata (`index abc..def`,
+   `--- a/path`, `+++ b/path`). Line-conservative: any non-noise
+   content on the line keeps it alive.
+5. `group_by_template` — template-dedup runs AFTER diagnostic noise
+   so the template pool isn't polluted by wavy rows and index SHAs.
+6. `filter_stack_frames` — stack-trace run collapse.
+7. `factor_common_prefix` — `[prefix: …]` summarization.
+8. `filter_test_failures` — extract FAILED blocks when present.
+9. `collapse_blank_lines` — always last; never interleave with dedup.
 
 ## When modifying stack-trace filter
 
@@ -52,6 +75,17 @@ Multi-language matrix — must pass after any change:
 | Go | `go_panic_trace` | 40% |
 | Node | `node_express_trace` | 70% |
 | PHP | `php_symfony_trace` | 20% |
+| Ruby | `ruby_rails_trace` | 5% (spec_loader adds the real win) |
+| Elixir | `elixir_phoenix_trace` | 5% (spec_loader) |
+| Swift | `swift_uikit_crash` | 0% (spec_loader only) |
+| kubectl | `kubectl_describe_pod` | 0% (spec_loader only) |
+
+The last four fixtures have min_ratio set low on purpose: L1
+hardcoded has no coverage for those ecosystems, so the real
+compression is asserted by `tests/integration/spec_corpus_integration.rs`
+spot-checks (`*_ruleset_collapses_on_*_fixture`) rather than
+`bench_ratios_regression`. Do NOT raise those min_ratio values
+unless you also port the language into `filter_stack_frames`.
 
 Run `pwsh bench/replay.ps1 -TimeoutSec 10` to confirm none regresses
 below the `min_ratio` in the corresponding `.meta.json`. Adjust the

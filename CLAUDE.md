@@ -456,6 +456,35 @@ NTK auto-detects the best inference backend at startup:
 | Error information preservation | 100% of fixtures |
 | Graceful fallback (no Ollama/GPU) | L1+L2 only, no crash |
 
+### Current measured ratios (L1+L2 only, 2026-04-19 baseline)
+
+These are the numbers the `bench_ratios_regression` test locks in.
+Update alongside any change to L1/L2 that affects them.
+
+| Fixture | L1+L2 ratio |
+|---|---:|
+| `cargo_build_verbose` | 67% |
+| `cargo_test_failures` | 68% |
+| `docker_logs_repetitive` | 84% |
+| `git_diff_large` | 29% |
+| `tsc_errors_node_modules` | 25% |
+| `python_django_trace` | 55% |
+
+Fixtures covered only by the opt-in `spec_loader` (Elixir, Swift,
+kubectl, Ruby error-page format) have `min_ratio ≤ 0.05` at the
+L1+L2 bench gate on purpose — their compression asserts land in
+`tests/integration/spec_corpus_integration.rs` instead. When
+porting one of those into hardcoded L1, raise the corresponding
+`bench/fixtures/*.meta.json` `min_ratio` in the same PR.
+
+### L3 measured latency on AMD ROCm (RX 580, llama.cpp Q5_K_M)
+
+Fresh inference ~9-12s for 3-5k-token inputs; cache-hit <40ms.
+L3 cache key is `SHA-256(l2_output + context_prefix + backend + prompt_format)`,
+so an identical input fed with the same L4 intent never re-runs
+inference. Tune `inference_threshold_tokens` (default 300) per
+hardware — higher on slow GPUs to avoid the L3 tax on short outputs.
+
 ## Profiling Workflow
 
 ```bash

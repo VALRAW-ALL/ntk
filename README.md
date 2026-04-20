@@ -55,14 +55,18 @@ Every time Claude Code runs a Bash command, the output is fed back into the mode
 
 NTK intercepts those outputs via the `PostToolUse` hook, compresses them semantically, and returns a compact version that preserves all errors, warnings, and actionable information. Claude sees less noise, responds faster, and stays focused longer.
 
-**Typical savings:**
+**Typical savings** (measured on the shipped `bench/fixtures/` corpus at
+L1+L2 only; L3 adds another 30–80 pp on top when its token threshold
+triggers):
 
 | Output type | Example | Savings |
 |---|---|---|
-| `cargo test` (many passing) | 47 ok + 1 failure | ~85% |
-| `tsc` errors | 16 errors in 7 files | ~5% (already dense) |
-| Docker logs | Repeated warnings | ~70% |
-| Generic command output | Mixed | ~60% |
+| `cargo build --verbose` | 30+ `Compiling X v1.2.3` lines | ~67% |
+| `cargo test` (many passing) | 47 ok + 1 failure | ~68% |
+| Docker logs | Repeated warnings | ~84% |
+| `git diff` (many hunks) | Multi-file diff with index/+++/--- noise | ~29% |
+| `tsc` errors | 10 errors in 10 files with wavy underlines | ~25% |
+| Python Django stack trace | site-packages / gunicorn / asgiref frames | ~55% |
 
 ---
 
@@ -74,7 +78,7 @@ NTK runs as a local daemon (`127.0.0.1:8765`) and processes output through three
 Bash tool output
   → PostToolUse hook (ntk-hook.sh / ntk-hook.ps1)
   → HTTP POST /compress  (:8765)
-    → Layer 1: Fast Filter       (<1ms)   - ANSI removal, line deduplication, blank-line collapse
+    → Layer 1: Fast Filter       (<1ms)   - ANSI strip, progress bars (cargo Compiling/Checking/etc), diagnostic noise (TS wavy underlines, git index/---/+++ metadata), template dedup, stack-trace collapse, prefix factoring, test-failure extraction, blank-line collapse
     → Layer 2: Tokenizer-Aware   (<5ms)   - BPE path shortening, prefix consolidation (cl100k_base)
     → Layer 3: Local Inference   (opt.)   - Ollama/Phi-3 Mini; only activates above token threshold
   → Compressed output → Claude Code context
