@@ -1,0 +1,12 @@
+# cargo-fuzz build artifacts + libfuzzer runtime state.
+target/
+artifacts/
+corpus/
+coverage/
+
+# Cargo.lock for the fuzz crate is an internal build detail. The
+# parent workspace's Cargo.lock is what reproducibly pins the ntk
+# library; the fuzz crate depends on the library via path, so its
+# own lockfile only pins libfuzzer-sys + arbitrary which are
+# test-only and uninteresting for reproducibility.
+Cargo.lock
