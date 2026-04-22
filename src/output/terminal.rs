@@ -54,7 +54,7 @@ fn windows_is_tty() -> bool {
     use windows_sys::Win32::System::Console::{GetConsoleMode, GetStdHandle, STD_OUTPUT_HANDLE};
     unsafe {
         let handle = GetStdHandle(STD_OUTPUT_HANDLE);
-        if handle == 0 || handle == usize::MAX as isize {
+        if handle.is_null() || handle == windows_sys::Win32::Foundation::INVALID_HANDLE_VALUE {
             return false;
         }
         let mut mode = 0u32;
@@ -70,7 +70,7 @@ fn enable_windows_ansi() {
     };
     unsafe {
         let handle = GetStdHandle(STD_OUTPUT_HANDLE);
-        if handle == 0 {
+        if handle.is_null() || handle == windows_sys::Win32::Foundation::INVALID_HANDLE_VALUE {
             return;
         }
         let mut mode = 0u32;

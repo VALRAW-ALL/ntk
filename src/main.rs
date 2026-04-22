@@ -740,7 +740,7 @@ fn run_stop() -> Result<()> {
                 OpenProcess, TerminateProcess, PROCESS_TERMINATE,
             };
             let handle = OpenProcess(PROCESS_TERMINATE, 0, pid);
-            if handle == 0 {
+            if handle.is_null() {
                 return Err(anyhow!(
                     "cannot open process (PID {pid}) — already stopped?"
                 ));
