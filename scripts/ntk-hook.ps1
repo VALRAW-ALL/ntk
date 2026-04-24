@@ -56,7 +56,9 @@ if ($hook.tool_name -ne "Bash") {
     exit 0
 }
 
-$output         = if ($hook.tool_response.output) { $hook.tool_response.output } else { "" }
+$output         = if ($hook.tool_response.output) { $hook.tool_response.output }
+                  elseif ($hook.tool_response.stdout) { $hook.tool_response.stdout }
+                  else { "" }
 $command        = if ($hook.tool_input.command)   { $hook.tool_input.command }   else { "" }
 $cwd            = if ($hook.cwd)                  { $hook.cwd }                  else { "" }
 $transcriptPath = if ($hook.transcript_path)      { $hook.transcript_path }      else { "" }

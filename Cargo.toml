@@ -6,7 +6,7 @@ exclude = ["fuzz"]
 
 [package]
 name = "ntk"
-version = "0.2.30"
+version = "0.2.31"
 edition = "2021"
 description = "Neural Token Killer — semantic compression proxy for Claude Code"
 license = "MIT"
@@ -143,6 +143,10 @@ path = "tests/integration/snapshots_per_layer.rs"
 [[test]]
 name = "bench_ratios_regression"
 path = "tests/integration/bench_ratios_regression.rs"
+
+[[test]]
+name = "hook_script_field_tests"
+path = "tests/unit/hook_script_field_tests.rs"
 
 [[test]]
 name = "spec_corpus_integration"
