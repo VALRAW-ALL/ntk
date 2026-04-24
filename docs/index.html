@@ -443,9 +443,16 @@ claude --version</pre>
           <pre>curl -fsSL https://ntk.valraw.com/install.sh | sh</pre>
         </div>
         <div class="code-block">
-          <div class="code-block-header"><span>PowerShell - Windows</span><button class="copy-btn" onclick="copyCode(this)"><i class="ph-bold ph-copy"></i> copy</button></div>
-          <pre>irm https://ntk.valraw.com/install.ps1 | iex</pre>
+          <div class="code-block-header"><span>PowerShell - Windows (recommended)</span><button class="copy-btn" onclick="copyCode(this)"><i class="ph-bold ph-copy"></i> copy</button></div>
+          <pre>$tmp = "$env:TEMP\ntk-install.ps1"
+irm https://ntk.valraw.com/install.ps1 -OutFile $tmp
+powershell -ExecutionPolicy Bypass -File $tmp</pre>
         </div>
+        <p style="font-size:.85rem;color:var(--color-texto-mutado);margin:.4rem 0 .6rem">
+          The one-liner <code>irm ... | iex</code> works only when you preset
+          <code>$env:NTK_INSTALL_PLATFORM = 'nvidia' | 'amd' | 'cpu'</code> —
+          otherwise the GPU picker prompt is lost in the pipe buffering.
+        </p>
         <p data-i18n="gs.step2_alt">Or install from source:</p>
         <div class="code-block">
           <div class="code-block-header"><span>bash - from source</span><button class="copy-btn" onclick="copyCode(this)"><i class="ph-bold ph-copy"></i> copy</button></div>

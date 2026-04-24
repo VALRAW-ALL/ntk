@@ -167,7 +167,20 @@ and can be overridden with `NTK_INSTALL_PLATFORM=nvidia|amd|cpu`.
 
 ### Option 3 - PowerShell installer (Windows)
 
+Recommended (works around `Read-Host` losing the GPU prompt under
+`irm | iex` pipe buffering):
+
 ```powershell
+$tmp = "$env:TEMP\ntk-install.ps1"
+irm https://ntk.valraw.com/install.ps1 -OutFile $tmp
+powershell -ExecutionPolicy Bypass -File $tmp
+```
+
+One-liner alternative (only works if you don't need the interactive
+GPU picker — set `$env:NTK_INSTALL_PLATFORM` first):
+
+```powershell
+$env:NTK_INSTALL_PLATFORM = 'nvidia'   # or 'amd' | 'cpu'
 irm https://ntk.valraw.com/install.ps1 | iex
 ```
 
