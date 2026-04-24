@@ -197,7 +197,12 @@ LATEST=$(curl -sSf "https://api.github.com/repos/${REPO}/releases/latest" \
 
 ARTIFACT="ntk-${OS}-${ARCH}-${SUFFIX}"
 URL="https://github.com/${REPO}/releases/download/${LATEST}/${ARTIFACT}"
-DEST="/usr/local/bin/ntk"
+
+# Single source of truth for the installed binary: ~/.ntk/bin/ntk.
+# This matches `ntk init -g`'s install path; we no longer copy to
+# /usr/local/bin to avoid two binaries diverging on update.
+CANONICAL_DIR="$HOME/.ntk/bin"
+DEST="$CANONICAL_DIR/ntk"
 
 # Show current version if already installed
 CURRENT=""
@@ -213,23 +218,31 @@ else
 fi
 echo "  Downloading ${ARTIFACT}…"
 
-if ! curl -sSfL "$URL" -o /tmp/ntk_new; then
+# Download to a throwaway temp file. We invoke that exe to run `init -g`,
+# which is what actually installs the binary into ~/.ntk/bin/.
+TMP=$(mktemp -t ntk_installer.XXXXXX) || { echo "mktemp failed" >&2; exit 1; }
+if ! curl -sSfL "$URL" -o "$TMP"; then
     echo "  Download failed." >&2
     echo "  URL: $URL" >&2
     echo "  This variant may not exist for your platform — try another choice." >&2
+    rm -f "$TMP"
     exit 1
 fi
-chmod +x /tmp/ntk_new
+chmod +x "$TMP"
 
-# Atomically replace the existing binary (works even while ntk is running)
-if [ -w /usr/local/bin ]; then
-    mv /tmp/ntk_new "$DEST"
-else
-    sudo mv /tmp/ntk_new "$DEST"
+# ---------------------------------------------------------------------------
+# Cleanup — remove stale NTK installs from previous installer revisions
+# ---------------------------------------------------------------------------
+# Old install.sh placed the binary at /usr/local/bin/ntk. Now that the
+# canonical location is ~/.ntk/bin/ntk, remove the legacy copy so the
+# system doesn't keep resolving to a stale binary on PATH.
+if [ -f /usr/local/bin/ntk ] && [ "$(readlink -f /usr/local/bin/ntk 2>/dev/null || echo /usr/local/bin/ntk)" != "$DEST" ]; then
+    if [ -w /usr/local/bin ]; then
+        rm -f /usr/local/bin/ntk && echo "  Removed legacy install: /usr/local/bin/ntk"
+    else
+        sudo rm -f /usr/local/bin/ntk && echo "  Removed legacy install: /usr/local/bin/ntk"
+    fi
 fi
-
-echo "  ✓ NTK ${LATEST} installed to ${DEST}"
-echo ""
 
 if [ "${POST_INSTALL_NOTE:-}" = "AMD" ]; then
     echo "  ⚠  AMD GPU note: inference uses llama-server + Vulkan (external)."
@@ -241,11 +254,27 @@ if [ "${POST_INSTALL_NOTE:-}" = "AMD" ]; then
 fi
 
 # ---------------------------------------------------------------------------
-# Step 1 — ntk init -g  (register PostToolUse hook in Claude Code)
+# Step 1 — ntk init -g  (installs binary to ~/.ntk/bin and registers hook)
 # ---------------------------------------------------------------------------
-echo "  ── Step 1/2: Initializing NTK hook (ntk init -g) ──"
+echo "  ── Step 1/2: Installing NTK binary + Claude Code hook (ntk init -g) ──"
 echo ""
-ntk init -g
+"$TMP" init -g
+INIT_EXIT=$?
+echo ""
+
+# Cleanup the throwaway downloader.
+rm -f "$TMP"
+
+if [ "$INIT_EXIT" -ne 0 ]; then
+    echo "  ntk init -g failed (exit $INIT_EXIT). Aborting." >&2
+    exit "$INIT_EXIT"
+fi
+
+# Refresh current shell PATH so subsequent calls in this script find ntk.
+PATH="$PATH:$CANONICAL_DIR"
+export PATH
+
+echo "  ✓ NTK ${LATEST} installed to ${DEST}"
 echo ""
 
 # ---------------------------------------------------------------------------
@@ -253,7 +282,7 @@ echo ""
 # ---------------------------------------------------------------------------
 echo "  ── Step 2/2: Configuring inference backend (ntk model setup) ──"
 echo ""
-ntk model setup
+"$DEST" model setup
 echo ""
 echo "  ✓ Installation complete. Run  ntk start  to launch the daemon."
 echo ""
