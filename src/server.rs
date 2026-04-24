@@ -8,9 +8,9 @@ use crate::output::dashboard::{WarnBuffer, WarnEntry};
 use crate::security;
 use axum::{
     extract::{Json, State},
-    http::{Request, StatusCode},
+    http::{Method, Request, StatusCode},
     middleware::{self, Next},
-    response::{Json as RespJson, Response},
+    response::{IntoResponse, Json as RespJson, Redirect, Response},
     routing::{get, post},
     Router,
 };
@@ -163,7 +163,14 @@ pub fn build_router(state: AppState) -> Router {
         .route("/health", get(handle_health))
         .route("/dashboard", get(handle_dashboard))
         .merge(protected)
+        .fallback(redirect_to_dashboard)
         .with_state(state)
+}
+
+/// Catch-all for unmapped paths — sends the browser to /dashboard so
+/// hitting `/` or a typo doesn't dead-end on a 404.
+async fn redirect_to_dashboard() -> Redirect {
+    Redirect::temporary("/dashboard")
 }
 
 /// Serves a self-contained HTML dashboard page. The page itself carries
@@ -187,67 +194,418 @@ const DASHBOARD_HTML: &str = r##"<!doctype html>
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>NTK Dashboard</title>
 <style>
-  :root { --bg:#0f1419; --fg:#e0e0e0; --muted:#8a9199; --accent:#7c4dff; --ok:#4caf50; --warn:#ff9800; }
-  * { box-sizing: border-box }
-  body { margin:0; font-family: ui-monospace, 'Cascadia Code', Menlo, Consolas, monospace; background:var(--bg); color:var(--fg); padding:1.5rem; line-height:1.4 }
-  h1 { margin:0 0 1rem; font-size:1.2rem; font-weight:600; color:var(--accent) }
-  .meta { color: var(--muted); font-size:0.85rem; margin-bottom:1.5rem }
-  .grid { display:grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap:1rem; margin-bottom:1.5rem }
-  .card { background:rgba(124,77,255,0.06); border:1px solid rgba(124,77,255,0.2); border-radius:6px; padding:1rem }
-  .card .label { font-size:0.75rem; color:var(--muted); text-transform:uppercase; letter-spacing:0.05em }
-  .card .value { font-size:1.4rem; font-weight:600; margin-top:0.3rem }
-  .card .sub { font-size:0.8rem; color:var(--muted); margin-top:0.2rem }
-  h2 { font-size:1rem; margin:1.5rem 0 0.8rem; color:var(--accent) }
-  table { width:100%; border-collapse:collapse; font-size:0.88rem }
-  th,td { text-align:left; padding:0.4rem 0.6rem; border-bottom:1px solid rgba(255,255,255,0.06) }
-  th { color:var(--muted); font-weight:500; font-size:0.75rem; text-transform:uppercase }
-  td.num { text-align:right; font-variant-numeric: tabular-nums }
-  .token-form { max-width:480px }
-  .token-form input { width:100%; padding:0.6rem; background:rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.1); border-radius:4px; color:var(--fg); font-family:inherit }
-  .token-form button { margin-top:0.6rem; padding:0.5rem 1rem; background:var(--accent); border:none; border-radius:4px; color:white; cursor:pointer; font-family:inherit }
-  .error { color:#ff5555; margin-top:0.8rem }
-  .layer-bar { display:flex; height:20px; border-radius:4px; overflow:hidden; background:rgba(255,255,255,0.05) }
-  .layer-bar span { display:block; font-size:0.7rem; text-align:center; line-height:20px; color:white }
-  .l1 { background:#4caf50 } .l2 { background:#2196f3 } .l3 { background:#ff9800 }
+  :root {
+    --bg-0: #0a0e14;
+    --bg-1: #0f1419;
+    --bg-2: #161b22;
+    --surface: rgba(124, 77, 255, 0.04);
+    --surface-hi: rgba(124, 77, 255, 0.10);
+    --border: rgba(124, 77, 255, 0.18);
+    --border-hi: rgba(124, 77, 255, 0.35);
+    --fg: #e6e8eb;
+    --fg-dim: #b3b9c2;
+    --muted: #6e7681;
+    --accent: #7c4dff;
+    --accent-hi: #9575ff;
+    --ok: #4caf50;
+    --warn: #ff9800;
+    --err: #ef5350;
+    --l1: #4caf50;
+    --l2: #2196f3;
+    --l3: #ff9800;
+    --shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+    --radius: 10px;
+    --radius-sm: 6px;
+    --mono: ui-monospace, 'JetBrains Mono', 'Cascadia Code', Menlo, Consolas, monospace;
+    --sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  }
+
+  * { box-sizing: border-box; }
+
+  html, body { height: 100%; }
+
+  body {
+    margin: 0;
+    font-family: var(--sans);
+    background: radial-gradient(ellipse at top, #1a1530 0%, var(--bg-0) 60%);
+    background-attachment: fixed;
+    color: var(--fg);
+    line-height: 1.5;
+    min-height: 100vh;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .shell {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: clamp(1rem, 3vw, 2.5rem) clamp(1rem, 4vw, 2rem);
+  }
+
+  /* ---------- Header ---------- */
+  header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 1rem;
+    margin-bottom: 2rem;
+    padding-bottom: 1.25rem;
+    border-bottom: 1px solid var(--border);
+  }
+  .brand {
+    display: flex;
+    align-items: center;
+    gap: 0.85rem;
+  }
+  .logo {
+    width: 38px; height: 38px;
+    border-radius: 9px;
+    background: linear-gradient(135deg, var(--accent) 0%, #4d2bff 100%);
+    display: flex; align-items: center; justify-content: center;
+    font-family: var(--mono);
+    font-weight: 700;
+    color: white;
+    font-size: 0.9rem;
+    box-shadow: 0 4px 14px rgba(124, 77, 255, 0.4);
+  }
+  .title-block h1 {
+    margin: 0;
+    font-size: 1.15rem;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+  }
+  .title-block .sub {
+    font-size: 0.78rem;
+    color: var(--muted);
+    margin-top: 1px;
+  }
+  .status-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.4rem 0.85rem;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    font-family: var(--mono);
+    font-size: 0.75rem;
+    color: var(--fg-dim);
+  }
+  .status-dot {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: var(--ok);
+    box-shadow: 0 0 0 3px rgba(76, 175, 80, 0.18);
+    animation: pulse 2.4s ease-in-out infinite;
+  }
+  .status-dot.err { background: var(--err); box-shadow: 0 0 0 3px rgba(239, 83, 80, 0.18); animation: none; }
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.45; }
+  }
+
+  /* ---------- KPI cards ---------- */
+  .kpi-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1rem;
+    margin-bottom: 2rem;
+  }
+  .kpi {
+    background: linear-gradient(180deg, var(--surface-hi) 0%, var(--surface) 100%);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 1.25rem 1.4rem;
+    transition: border-color 0.2s, transform 0.2s;
+    position: relative;
+    overflow: hidden;
+  }
+  .kpi:hover { border-color: var(--border-hi); transform: translateY(-2px); }
+  .kpi::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 2px;
+    background: linear-gradient(90deg, var(--accent), transparent);
+    opacity: 0.6;
+  }
+  .kpi .label {
+    font-size: 0.72rem;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    font-weight: 500;
+  }
+  .kpi .value {
+    font-family: var(--mono);
+    font-size: clamp(1.5rem, 3vw, 1.9rem);
+    font-weight: 600;
+    margin-top: 0.45rem;
+    color: var(--fg);
+    letter-spacing: -0.02em;
+  }
+  .kpi .sub {
+    font-size: 0.78rem;
+    color: var(--muted);
+    margin-top: 0.4rem;
+  }
+
+  /* ---------- Sections ---------- */
+  section {
+    background: var(--bg-1);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 1.5rem;
+    margin-bottom: 1.25rem;
+    box-shadow: var(--shadow);
+  }
+  section h2 {
+    font-size: 0.9rem;
+    font-weight: 600;
+    margin: 0 0 1rem;
+    color: var(--accent-hi);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+  }
+
+  /* ---------- Layer bar ---------- */
+  .layer-bar {
+    display: flex;
+    height: 28px;
+    border-radius: var(--radius-sm);
+    overflow: hidden;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+  }
+  .layer-bar span {
+    display: flex; align-items: center; justify-content: center;
+    font-family: var(--mono);
+    font-size: 0.72rem;
+    color: white;
+    font-weight: 500;
+    transition: filter 0.2s;
+  }
+  .layer-bar span:hover { filter: brightness(1.15); }
+  .layer-bar .l1 { background: linear-gradient(180deg, #5fcc63 0%, var(--l1) 100%); }
+  .layer-bar .l2 { background: linear-gradient(180deg, #42a5f5 0%, var(--l2) 100%); }
+  .layer-bar .l3 { background: linear-gradient(180deg, #ffa726 0%, var(--l3) 100%); }
+  .layer-legend {
+    display: flex;
+    gap: 1.25rem;
+    margin-top: 0.85rem;
+    font-family: var(--mono);
+    font-size: 0.78rem;
+    color: var(--fg-dim);
+    flex-wrap: wrap;
+  }
+  .layer-legend .swatch {
+    display: inline-block;
+    width: 10px; height: 10px;
+    border-radius: 2px;
+    margin-right: 0.4rem;
+    vertical-align: middle;
+  }
+
+  /* ---------- Footer ---------- */
+  footer {
+    text-align: center;
+    color: var(--muted);
+    font-size: 0.75rem;
+    margin-top: 2rem;
+    padding-top: 1rem;
+    border-top: 1px solid var(--border);
+  }
+  footer a { color: var(--accent-hi); text-decoration: none; }
+  footer a:hover { text-decoration: underline; }
+
+  /* ---------- Auth screen ---------- */
+  .auth-wrap {
+    min-height: calc(100vh - 6rem);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .auth-card {
+    width: 100%;
+    max-width: 420px;
+    background: var(--bg-1);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 2rem;
+    box-shadow: var(--shadow);
+    text-align: center;
+  }
+  .auth-card .lock {
+    width: 56px; height: 56px;
+    margin: 0 auto 1rem;
+    border-radius: 50%;
+    background: linear-gradient(135deg, var(--accent) 0%, #4d2bff 100%);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 1.4rem;
+    box-shadow: 0 6px 20px rgba(124, 77, 255, 0.35);
+  }
+  .auth-card h2 {
+    font-size: 1.05rem;
+    margin: 0 0 0.4rem;
+    color: var(--fg);
+    text-transform: none;
+    letter-spacing: 0;
+  }
+  .auth-card p {
+    color: var(--fg-dim);
+    font-size: 0.85rem;
+    margin: 0 0 1.5rem;
+  }
+  .auth-card code {
+    background: rgba(255, 255, 255, 0.06);
+    padding: 0.1rem 0.4rem;
+    border-radius: 3px;
+    font-family: var(--mono);
+    font-size: 0.8rem;
+  }
+  .input {
+    width: 100%;
+    padding: 0.75rem 0.95rem;
+    background: var(--bg-2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    color: var(--fg);
+    font-family: var(--mono);
+    font-size: 0.85rem;
+    transition: border-color 0.15s, box-shadow 0.15s;
+  }
+  .input:focus {
+    outline: none;
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px rgba(124, 77, 255, 0.15);
+  }
+  .btn {
+    width: 100%;
+    margin-top: 0.75rem;
+    padding: 0.75rem 1rem;
+    background: linear-gradient(180deg, var(--accent-hi) 0%, var(--accent) 100%);
+    border: none;
+    border-radius: var(--radius-sm);
+    color: white;
+    cursor: pointer;
+    font-family: var(--sans);
+    font-size: 0.9rem;
+    font-weight: 600;
+    letter-spacing: 0.01em;
+    transition: filter 0.15s, transform 0.05s;
+  }
+  .btn:hover { filter: brightness(1.1); }
+  .btn:active { transform: translateY(1px); }
+  .error {
+    color: var(--err);
+    background: rgba(239, 83, 80, 0.08);
+    border: 1px solid rgba(239, 83, 80, 0.25);
+    border-radius: var(--radius-sm);
+    padding: 0.6rem 0.8rem;
+    margin-top: 0.85rem;
+    font-size: 0.82rem;
+  }
+
+  /* ---------- Skeleton ---------- */
+  .skeleton {
+    background: linear-gradient(90deg, var(--surface) 0%, var(--surface-hi) 50%, var(--surface) 100%);
+    background-size: 200% 100%;
+    animation: shimmer 1.5s infinite linear;
+    border-radius: var(--radius-sm);
+  }
+  @keyframes shimmer {
+    0% { background-position: 200% 0; }
+    100% { background-position: -200% 0; }
+  }
+
+  /* ---------- Responsive tweaks ---------- */
+  @media (max-width: 600px) {
+    header { flex-direction: column; align-items: flex-start; }
+    .kpi { padding: 1rem 1.1rem; }
+    section { padding: 1.1rem; }
+  }
 </style>
 </head>
 <body>
-  <h1>NTK Dashboard</h1>
-  <div class="meta" id="meta">loading…</div>
-  <div id="content"></div>
+  <div class="shell">
+    <header>
+      <div class="brand">
+        <div class="logo">NTK</div>
+        <div class="title-block">
+          <h1>Neural Token Killer</h1>
+          <div class="sub">live compression dashboard</div>
+        </div>
+      </div>
+      <div class="status-pill" id="status">
+        <span class="status-dot" id="dot"></span>
+        <span id="status-text">connecting…</span>
+      </div>
+    </header>
+
+    <main id="content">
+      <div class="kpi-grid">
+        <div class="kpi"><div class="label">loading</div><div class="value skeleton" style="height: 1.9rem; width: 60%;">&nbsp;</div></div>
+        <div class="kpi"><div class="label">loading</div><div class="value skeleton" style="height: 1.9rem; width: 60%;">&nbsp;</div></div>
+        <div class="kpi"><div class="label">loading</div><div class="value skeleton" style="height: 1.9rem; width: 60%;">&nbsp;</div></div>
+        <div class="kpi"><div class="label">loading</div><div class="value skeleton" style="height: 1.9rem; width: 60%;">&nbsp;</div></div>
+      </div>
+    </main>
+
+    <footer>
+      polling every 5 s · <a href="https://github.com/VALRAW-ALL/ntk" target="_blank" rel="noopener">github.com/VALRAW-ALL/ntk</a>
+    </footer>
+  </div>
 
   <script>
-    // Read stored token from sessionStorage; prompt for one if absent.
     const KEY = 'ntk_token';
     let token = sessionStorage.getItem(KEY);
     const content = document.getElementById('content');
-    const meta = document.getElementById('meta');
+    const dot = document.getElementById('dot');
+    const statusText = document.getElementById('status-text');
+
+    function setStatus(text, ok = true) {
+      statusText.textContent = text;
+      dot.classList.toggle('err', !ok);
+    }
 
     function renderTokenForm(err) {
       content.innerHTML = `
-        <h2>Authentication required</h2>
-        <p>Paste the daemon's shared secret (from <code>~/.ntk/.token</code>):</p>
-        <div class="token-form">
-          <input id="tok" placeholder="X-NTK-Token value" autocomplete="off" />
-          <button id="save">Connect</button>
-          ${err ? `<div class="error">${err}</div>` : ''}
+        <div class="auth-wrap">
+          <div class="auth-card">
+            <div class="lock">🔒</div>
+            <h2>Authentication required</h2>
+            <p>Paste the daemon's shared secret from <code>~/.ntk/.token</code></p>
+            <input id="tok" class="input" placeholder="X-NTK-Token" autocomplete="off" autofocus />
+            <button id="save" class="btn">Connect</button>
+            ${err ? `<div class="error">${err}</div>` : ''}
+          </div>
         </div>`;
-      document.getElementById('save').onclick = () => {
+      const submit = () => {
         const v = document.getElementById('tok').value.trim();
         if (v) { sessionStorage.setItem(KEY, v); token = v; poll(); }
       };
+      document.getElementById('save').onclick = submit;
+      document.getElementById('tok').addEventListener('keydown', e => {
+        if (e.key === 'Enter') submit();
+      });
     }
 
     async function poll() {
-      if (!token) return renderTokenForm();
+      if (!token) { setStatus('awaiting token', false); return renderTokenForm(); }
       try {
         const r = await fetch('/metrics', { headers: { 'X-NTK-Token': token } });
-        if (r.status === 401) { sessionStorage.removeItem(KEY); token = null; return renderTokenForm('invalid token'); }
+        if (r.status === 401) {
+          sessionStorage.removeItem(KEY);
+          token = null;
+          setStatus('invalid token', false);
+          return renderTokenForm('Invalid token. Check ~/.ntk/.token and try again.');
+        }
         if (!r.ok) throw new Error('HTTP ' + r.status);
         const d = await r.json();
+        setStatus(`live · last sync ${new Date().toLocaleTimeString()}`, true);
         render(d);
       } catch (e) {
-        meta.textContent = 'error: ' + e.message + ' — retrying in 5s';
+        setStatus('error: ' + e.message, false);
       }
     }
 
@@ -256,28 +614,48 @@ const DASHBOARD_HTML: &str = r##"<!doctype html>
       const saved = d.total_tokens_saved || 0;
       const avg = ((d.average_ratio || 0) * 100).toFixed(1);
       const rtk = d.rtk_pre_filtered_count || 0;
-      const layers = d.layer_counts || [0,0,0];
+      const layers = d.layer_counts || [0, 0, 0];
       const layerTotal = layers[0] + layers[1] + layers[2] || 1;
       const pct = i => Math.round((layers[i] / layerTotal) * 100);
 
-      meta.textContent = `refreshed ${new Date().toLocaleTimeString()} — polling every 5s`;
       content.innerHTML = `
-        <div class="grid">
-          <div class="card"><div class="label">Compressions</div><div class="value">${total.toLocaleString()}</div></div>
-          <div class="card"><div class="label">Tokens saved</div><div class="value">${saved.toLocaleString()}</div><div class="sub">across all sessions</div></div>
-          <div class="card"><div class="label">Avg ratio</div><div class="value">${avg}%</div></div>
-          <div class="card"><div class="label">RTK pre-filtered</div><div class="value">${rtk.toLocaleString()}</div><div class="sub">hook ran after RTK</div></div>
+        <div class="kpi-grid">
+          <div class="kpi">
+            <div class="label">Compressions</div>
+            <div class="value">${total.toLocaleString()}</div>
+            <div class="sub">total runs</div>
+          </div>
+          <div class="kpi">
+            <div class="label">Tokens Saved</div>
+            <div class="value">${saved.toLocaleString()}</div>
+            <div class="sub">across all sessions</div>
+          </div>
+          <div class="kpi">
+            <div class="label">Avg Ratio</div>
+            <div class="value">${avg}%</div>
+            <div class="sub">compression efficiency</div>
+          </div>
+          <div class="kpi">
+            <div class="label">RTK Pre-filtered</div>
+            <div class="value">${rtk.toLocaleString()}</div>
+            <div class="sub">hook ran after RTK</div>
+          </div>
         </div>
-        <h2>Layer distribution</h2>
-        <div class="layer-bar">
-          ${pct(0) > 0 ? `<span class="l1" style="width:${pct(0)}%">L1 ${pct(0)}%</span>` : ''}
-          ${pct(1) > 0 ? `<span class="l2" style="width:${pct(1)}%">L2 ${pct(1)}%</span>` : ''}
-          ${pct(2) > 0 ? `<span class="l3" style="width:${pct(2)}%">L3 ${pct(2)}%</span>` : ''}
-        </div>
-        <p class="meta">L1: ${layers[0]} · L2: ${layers[1]} · L3: ${layers[2]}</p>`;
+        <section>
+          <h2>Layer Distribution</h2>
+          <div class="layer-bar">
+            ${pct(0) > 0 ? `<span class="l1" style="width:${pct(0)}%" title="L1: fast filter">L1 ${pct(0)}%</span>` : ''}
+            ${pct(1) > 0 ? `<span class="l2" style="width:${pct(1)}%" title="L2: tokenizer-aware">L2 ${pct(1)}%</span>` : ''}
+            ${pct(2) > 0 ? `<span class="l3" style="width:${pct(2)}%" title="L3: neural inference">L3 ${pct(2)}%</span>` : ''}
+          </div>
+          <div class="layer-legend">
+            <span><span class="swatch" style="background: var(--l1)"></span>L1 fast filter · ${layers[0].toLocaleString()}</span>
+            <span><span class="swatch" style="background: var(--l2)"></span>L2 tokenizer · ${layers[1].toLocaleString()}</span>
+            <span><span class="swatch" style="background: var(--l3)"></span>L3 inference · ${layers[2].toLocaleString()}</span>
+          </div>
+        </section>`;
     }
 
-    // Kick off.
     poll();
     setInterval(poll, 5000);
   </script>
@@ -310,10 +688,16 @@ async fn require_token(
         .and_then(|v| v.to_str().ok())
         .unwrap_or("");
     if security::constant_time_eq(expected, presented) {
-        Ok(next.run(req).await)
-    } else {
-        Err((StatusCode::UNAUTHORIZED, "missing or invalid X-NTK-Token"))
+        return Ok(next.run(req).await);
     }
+    // Browser-style GET with no token at all → bounce to /dashboard so the
+    // user lands on the auth-prompt UI instead of a raw 401 page.
+    // Anything with a (wrong) token, or any non-GET method (the dashboard
+    // JS / hooks), still gets a clean 401 so callers can react.
+    if req.method() == Method::GET && presented.is_empty() {
+        return Ok(Redirect::temporary("/dashboard").into_response());
+    }
+    Err((StatusCode::UNAUTHORIZED, "missing or invalid X-NTK-Token"))
 }
 
 // ---------------------------------------------------------------------------
