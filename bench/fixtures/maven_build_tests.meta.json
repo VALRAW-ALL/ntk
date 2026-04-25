@@ -1,0 +1,7 @@
+{
+    "category": "build",
+    "description": "Multi-module Maven build with [INFO] prefix on every line plus per-module repeated plugin invocations. Strong candidate for prefix factoring + block dedup across modules.",
+    "min_ratio": 0.5,
+    "expected_layer": 2,
+    "command": "mvn clean install"
+}

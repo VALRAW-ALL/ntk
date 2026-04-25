@@ -7,3 +7,5 @@
 cc 7660161fcb99a540ece6b37af40facc618dde00c0eaa9d4da4066a166182c34d # shrinks to input = "\n\n_\n"
 cc 5dfebf50a0c043139a6629434b9962dc6c90f2a0419d62ff8b65c4b772f837b6 # shrinks to input = "\n\n\n"
 cc 2a7e7efacd4deaf3193e830079b761d9fee7b0a4a94040156d43b1b136c3ab54 # shrinks to input = "a\n\n\n\n"
+cc a96671d9653cbacc49ce4b87f0d2c26475695e0bbf3f0d0195238a06b702d90b # shrinks to input = "/home/user/project/src/main.rs:10:5\nwarning: unused variable `x` --> src/lib.rs:42:9\n/home/user/project/src/main.rs:10:5\nwarning: unused variable `x` --> src/lib.rs:42:9\n/home/user/project/src/main.rs:10:5\nwarning: unused variable `x` --> src/lib.rs:42:9\n"
+cc 814f49feb0187c78899ff58710cd2f626b71a1ba26e836ba84f29f6badd1cb8e # shrinks to input = "\ntest module::test_fn ... ok\n\n\ntest module::test_fn ... ok\n\ntest module::test_fn ... ok\n"

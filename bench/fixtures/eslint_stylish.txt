@@ -1,0 +1,31 @@
+
+src/components/Header.tsx
+    12:5    warning  'logoUrl' is defined but never used                                     no-unused-vars
+    28:13   error    React Hook useEffect has a missing dependency: 'theme'                  react-hooks/exhaustive-deps
+    47:9    warning  Unexpected console statement                                            no-console
+
+src/components/Footer.tsx
+     8:5    warning  'links' is defined but never used                                       no-unused-vars
+    23:11   error    `'` can be escaped with `&apos;`                                        react/no-unescaped-entities
+
+src/pages/Home.tsx
+     4:8    warning  There should be at least one empty line between import groups           import/order
+    31:5    warning  'fetchData' is defined but never used                                   no-unused-vars
+    89:13   error    React Hook 'useState' is called conditionally                           react-hooks/rules-of-hooks
+   112:9    warning  Unexpected console statement                                            no-console
+
+src/pages/Settings.tsx
+    15:5    warning  'theme' is defined but never used                                       no-unused-vars
+    44:11   error    Missing 'key' prop for element in iterator                              react/jsx-key
+
+src/hooks/useAuth.ts
+    19:5    warning  'token' is defined but never used                                       no-unused-vars
+    38:9    error    Unexpected any. Specify a different type                                @typescript-eslint/no-explicit-any
+    52:9    warning  Unexpected console statement                                            no-console
+
+src/utils/format.ts
+     8:5    warning  'options' is defined but never used                                     no-unused-vars
+    23:5    warning  'locale' is defined but never used                                      no-unused-vars
+
+✖ 24 problems (8 errors, 16 warnings)
+  0 errors and 5 warnings potentially fixable with the `--fix` option.

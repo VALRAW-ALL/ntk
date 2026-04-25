@@ -1,0 +1,7 @@
+{
+    "category": "build",
+    "description": "Next.js production build with route table. Mostly box-drawn unicode + paths sharing '/api/' or '/blog/' prefix. Prefix factor + path shortening yield wins.",
+    "min_ratio": 0.04,
+    "expected_layer": 2,
+    "command": "next build"
+}

@@ -1,0 +1,7 @@
+{
+    "category": "build",
+    "description": "terraform plan with 10 nearly-identical aws_instance.app[N] resource blocks. Block dedup across resources is the canonical win \u2014 current L1 sees them as distinct.",
+    "min_ratio": 0.83,
+    "expected_layer": 2,
+    "command": "terraform plan"
+}

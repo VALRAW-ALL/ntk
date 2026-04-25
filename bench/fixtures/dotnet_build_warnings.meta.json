@@ -1,0 +1,7 @@
+{
+    "category": "build",
+    "description": "dotnet build emitting CS8618/CS8602 nullability warnings across many .cs files. Each warning row shares the same suffix (rule + message); template dedup with file-path normalization is the win.",
+    "min_ratio": 0.56,
+    "expected_layer": 2,
+    "command": "dotnet build"
+}

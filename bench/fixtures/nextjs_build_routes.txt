@@ -1,0 +1,40 @@
+▲ Next.js 14.2.0
+
+Creating an optimized production build ...
+ ✓ Compiled successfully
+   Linting and checking validity of types  ...
+   Collecting page data  ...
+   Generating static pages (124/124)
+   Collecting build traces  ...
+   Finalizing page optimization  ...
+
+Route (app)                                Size     First Load JS
++ o /                                      4.21 kB        92.4 kB
++ o /_not-found                            893 B          88.3 kB
++ o /about                                 2.14 kB        90.1 kB
++ o /contact                               1.89 kB        89.8 kB
++ f /api/health                            0 B            0 B
++ f /api/users                             0 B            0 B
++ f /api/users/[id]                        0 B            0 B
++ f /api/orders                            0 B            0 B
++ f /api/orders/[id]                       0 B            0 B
++ f /api/payments                          0 B            0 B
++ * /blog/[slug]                           3.12 kB        91.2 kB
++   + /blog/intro-to-rust
++   + /blog/zero-cost-abstractions
++   + /blog/async-in-rust
++   + [+57 more paths]
++ * /docs/[[...slug]]                      4.41 kB        93.1 kB
++ * /products/[id]                         5.12 kB        94.2 kB
+    + /products/widget-1
+    + /products/widget-2
+    + /products/widget-3
+    + [+22 more paths]
++ First Load JS shared by all              87.4 kB
+  + chunks/framework-c3a1b2d4e5f6.js       45.1 kB
+  + chunks/main-app-a1b2c3d4e5f6.js        31.2 kB
+  + other shared chunks (total)            11.1 kB
+
+○  (Static)   prerendered as static content
+ƒ  (Dynamic)  server-rendered on demand
+●  (SSG)      prerendered as static HTML (uses getStaticProps)

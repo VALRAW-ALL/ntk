@@ -1,0 +1,7 @@
+{
+    "category": "build",
+    "description": "Multi-module Gradle build with many '> Task :module:taskname' lines per module. L1 currently treats each as unique; a normalizer for the '> Task :' prefix would collapse runs.",
+    "min_ratio": 0.85,
+    "expected_layer": 2,
+    "command": "./gradlew build"
+}

@@ -1,0 +1,39 @@
+LAST SEEN   TYPE      REASON              OBJECT                                  MESSAGE
+1m          Normal    Scheduled           pod/api-server-7d9c4b8f6c-2x8jk         Successfully assigned default/api-server-7d9c4b8f6c-2x8jk to node-1
+2m          Normal    Pulling             pod/api-server-7d9c4b8f6c-2x8jk         Pulling image "registry.example.com/api:1.4.2"
+3m          Normal    Pulled              pod/api-server-7d9c4b8f6c-2x8jk         Successfully pulled image "registry.example.com/api:1.4.2" in 2.341s
+4m          Normal    Created             pod/api-server-7d9c4b8f6c-2x8jk         Created container api
+5m          Normal    Started             pod/api-server-7d9c4b8f6c-2x8jk         Started container api
+6m          Normal    Scheduled           pod/api-server-7d9c4b8f6c-h7m4p         Successfully assigned default/api-server-7d9c4b8f6c-h7m4p to node-1
+7m          Normal    Pulling             pod/api-server-7d9c4b8f6c-h7m4p         Pulling image "registry.example.com/api:1.4.2"
+8m          Normal    Pulled              pod/api-server-7d9c4b8f6c-h7m4p         Successfully pulled image "registry.example.com/api:1.4.2" in 2.341s
+9m          Normal    Created             pod/api-server-7d9c4b8f6c-h7m4p         Created container api
+10m         Normal    Started             pod/api-server-7d9c4b8f6c-h7m4p         Started container api
+11m         Normal    Scheduled           pod/api-server-7d9c4b8f6c-9xqz4         Successfully assigned default/api-server-7d9c4b8f6c-9xqz4 to node-1
+12m         Normal    Pulling             pod/api-server-7d9c4b8f6c-9xqz4         Pulling image "registry.example.com/api:1.4.2"
+13m         Normal    Pulled              pod/api-server-7d9c4b8f6c-9xqz4         Successfully pulled image "registry.example.com/api:1.4.2" in 2.341s
+14m         Normal    Created             pod/api-server-7d9c4b8f6c-9xqz4         Created container api
+15m         Normal    Started             pod/api-server-7d9c4b8f6c-9xqz4         Started container api
+16m         Normal    Scheduled           pod/worker-5b8d9c7f6c-r4t8m             Successfully assigned default/worker-5b8d9c7f6c-r4t8m to node-1
+17m         Normal    Pulling             pod/worker-5b8d9c7f6c-r4t8m             Pulling image "registry.example.com/api:1.4.2"
+18m         Normal    Pulled              pod/worker-5b8d9c7f6c-r4t8m             Successfully pulled image "registry.example.com/api:1.4.2" in 2.341s
+19m         Normal    Created             pod/worker-5b8d9c7f6c-r4t8m             Created container api
+20m         Normal    Started             pod/worker-5b8d9c7f6c-r4t8m             Started container api
+21m         Normal    Scheduled           pod/worker-5b8d9c7f6c-k2n9p             Successfully assigned default/worker-5b8d9c7f6c-k2n9p to node-1
+22m         Normal    Pulling             pod/worker-5b8d9c7f6c-k2n9p             Pulling image "registry.example.com/api:1.4.2"
+23m         Normal    Pulled              pod/worker-5b8d9c7f6c-k2n9p             Successfully pulled image "registry.example.com/api:1.4.2" in 2.341s
+24m         Normal    Created             pod/worker-5b8d9c7f6c-k2n9p             Created container api
+25m         Normal    Started             pod/worker-5b8d9c7f6c-k2n9p             Started container api
+26m         Normal    Scheduled           pod/scheduler-6c4d8e9b7c-2j7k4          Successfully assigned default/scheduler-6c4d8e9b7c-2j7k4 to node-1
+27m         Normal    Pulling             pod/scheduler-6c4d8e9b7c-2j7k4          Pulling image "registry.example.com/api:1.4.2"
+28m         Normal    Pulled              pod/scheduler-6c4d8e9b7c-2j7k4          Successfully pulled image "registry.example.com/api:1.4.2" in 2.341s
+29m         Normal    Created             pod/scheduler-6c4d8e9b7c-2j7k4          Created container api
+30m         Normal    Started             pod/scheduler-6c4d8e9b7c-2j7k4          Started container api
+31m         Normal    Scheduled           pod/metrics-aggregator-9c8d7e6b5c-x4n2k Successfully assigned default/metrics-aggregator-9c8d7e6b5c-x4n2k to node-1
+32m         Normal    Pulling             pod/metrics-aggregator-9c8d7e6b5c-x4n2k Pulling image "registry.example.com/api:1.4.2"
+33m         Normal    Pulled              pod/metrics-aggregator-9c8d7e6b5c-x4n2k Successfully pulled image "registry.example.com/api:1.4.2" in 2.341s
+34m         Normal    Created             pod/metrics-aggregator-9c8d7e6b5c-x4n2k Created container api
+35m         Normal    Started             pod/metrics-aggregator-9c8d7e6b5c-x4n2k Started container api
+3m          Warning   Unhealthy           pod/worker-5b8d9c7f6c-r4t8m             Liveness probe failed: HTTP probe failed with statuscode: 503
+3m          Warning   BackOff             pod/worker-5b8d9c7f6c-r4t8m             Back-off restarting failed container
+2m          Warning   FailedScheduling    pod/batch-job-2026-04-25-x9k4m         0/3 nodes are available: 3 Insufficient memory

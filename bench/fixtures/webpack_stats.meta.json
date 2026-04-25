@@ -1,0 +1,7 @@
+{
+    "category": "build",
+    "description": "Webpack stats output with module path table. Lots of repeated 'modules by path ./node_modules/' and './src/' prefixes \u2014 strong prefix-factor candidate.",
+    "min_ratio": 0.28,
+    "expected_layer": 2,
+    "command": "npx webpack --stats normal"
+}

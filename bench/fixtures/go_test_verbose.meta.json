@@ -1,0 +1,7 @@
+{
+    "category": "test",
+    "description": "go test -v output: pairs of '=== RUN TestX' / '--- PASS: TestX (Ns)' for many tests. Block dedup across test pairs + numeric duration normalization unlock most of the savings.",
+    "min_ratio": 0.11,
+    "expected_layer": 2,
+    "command": "go test -v ./..."
+}

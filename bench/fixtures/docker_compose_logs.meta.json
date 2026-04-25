@@ -1,0 +1,7 @@
+{
+    "category": "container_log",
+    "description": "docker compose logs interleaving multiple services with '<service> | <iso-ts> <level> <msg>' format. Service prefix repeats; timestamp normalization + per-service grouping unlock big wins.",
+    "min_ratio": 0.25,
+    "expected_layer": 2,
+    "command": "docker compose logs --tail=200"
+}

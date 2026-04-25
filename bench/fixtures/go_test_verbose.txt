@@ -1,0 +1,56 @@
+=== RUN   TestSetup
+--- PASS: TestSetup (0.00s)
+=== RUN   TestUserCreate
+--- PASS: TestUserCreate (0.01s)
+=== RUN   TestUserRead
+--- PASS: TestUserRead (0.00s)
+=== RUN   TestUserUpdate
+--- PASS: TestUserUpdate (0.01s)
+=== RUN   TestUserDelete
+--- PASS: TestUserDelete (0.00s)
+=== RUN   TestUserList
+--- PASS: TestUserList (0.02s)
+=== RUN   TestUserSearch
+--- PASS: TestUserSearch (0.03s)
+=== RUN   TestUserAuth
+--- PASS: TestUserAuth (0.04s)
+=== RUN   TestUserSession
+--- PASS: TestUserSession (0.01s)
+=== RUN   TestUserToken
+--- PASS: TestUserToken (0.00s)
+=== RUN   TestOrderCreate
+--- PASS: TestOrderCreate (0.02s)
+=== RUN   TestOrderRead
+--- PASS: TestOrderRead (0.01s)
+=== RUN   TestOrderUpdate
+--- PASS: TestOrderUpdate (0.01s)
+=== RUN   TestOrderDelete
+--- PASS: TestOrderDelete (0.01s)
+=== RUN   TestOrderList
+--- PASS: TestOrderList (0.03s)
+=== RUN   TestOrderTotal
+--- PASS: TestOrderTotal (0.00s)
+=== RUN   TestPaymentCharge
+--- PASS: TestPaymentCharge (0.05s)
+=== RUN   TestPaymentRefund
+--- PASS: TestPaymentRefund (0.04s)
+=== RUN   TestPaymentVoid
+--- PASS: TestPaymentVoid (0.02s)
+=== RUN   TestPaymentList
+--- PASS: TestPaymentList (0.03s)
+=== RUN   TestNotifyEmail
+--- PASS: TestNotifyEmail (0.01s)
+=== RUN   TestNotifySms
+--- PASS: TestNotifySms (0.02s)
+=== RUN   TestNotifyPush
+--- PASS: TestNotifyPush (0.03s)
+=== RUN   TestApiHealthz
+--- PASS: TestApiHealthz (0.00s)
+=== RUN   TestApiRoot
+--- PASS: TestApiRoot (0.00s)
+=== RUN   TestPaymentRetry
+    payment_test.go:142: expected 3 retries, got 1
+--- FAIL: TestPaymentRetry (0.01s)
+FAIL
+exit status 1
+FAIL	github.com/example/proj	0.512s

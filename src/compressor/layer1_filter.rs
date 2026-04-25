@@ -103,27 +103,52 @@ pub fn filter(input: &str) -> Layer1Result {
         applied_rules.push(format!("stack_trace_collapse({stack_runs} runs)"));
     }
 
-    let after_prefix = factor_common_prefix(&after_stack_filter);
-    if after_prefix != after_stack_filter {
-        applied_rules.push("common_prefix_factored".to_string());
-    }
-
-    let after_test = filter_test_failures(&after_prefix);
-    if after_test.lines().count() < after_prefix.lines().count() {
-        let removed = after_prefix
+    // filter_test_failures must run BEFORE factor_common_prefix: it drops the
+    // bulk of `test foo ... ok` lines when the suite reports FAILED, and the
+    // factor stage would otherwise turn that bulk into `↳` rows that survive
+    // the test-failure extractor (which keys on the original line shape).
+    let after_test = filter_test_failures(&after_stack_filter);
+    if after_test.lines().count() < after_stack_filter.lines().count() {
+        let removed = after_stack_filter
             .lines()
             .count()
             .saturating_sub(after_test.lines().count());
         applied_rules.push(format!("test_failure_extracted({removed} lines)"));
     }
 
-    let output = collapse_blank_lines(&after_test);
+    // collapse_blank_lines runs BEFORE block_dedup and factor_common_prefix
+    // so those stages see a regularized blank-line structure on every pass.
+    // Without this, pass 1 sees uneven blanks (no block match), pass 2 sees
+    // regular blanks (block fires) and idempotency is broken.
+    let after_blanks = collapse_blank_lines(&after_test);
     let blanks_collapsed = after_test
         .lines()
         .count()
-        .saturating_sub(output.lines().count());
+        .saturating_sub(after_blanks.lines().count());
     if blanks_collapsed > 0 {
         applied_rules.push(format!("blank_lines_collapsed({blanks_collapsed})"));
+    }
+
+    let after_blocks = collapse_repeated_blocks(&after_blanks);
+    let block_markers = after_blocks.matches(BLOCK_MARKER_PREFIX).count();
+    if block_markers > 0 {
+        applied_rules.push(format!("block_dedup({block_markers} runs)"));
+    }
+
+    // Suffix factor BEFORE prefix factor: suffix catches longer trailing
+    // strings (e.g. dotnet warning rule + message ~150 chars) which beats
+    // the shared file-path prefix on most fixtures. Trade-off: docker-style
+    // service-prefix outputs lose some compression (per-service prefix can
+    // no longer cluster after the ↰ markers absorb the bulk). Net across
+    // the corpus is strongly positive (+95pp vs. prefix-first ordering).
+    let after_suffix = factor_common_suffix(&after_blocks);
+    if after_suffix != after_blocks {
+        applied_rules.push("common_suffix_factored".to_string());
+    }
+
+    let output = factor_common_prefix(&after_suffix);
+    if output != after_suffix {
+        applied_rules.push("common_prefix_factored".to_string());
     }
 
     let final_line_count = output.lines().count();
@@ -346,16 +371,59 @@ static RE_LONG_HEX: Lazy<Regex> =
 
 #[allow(clippy::expect_used)]
 static RE_PLAIN_INT: Lazy<Regex> =
-    Lazy::new(|| Regex::new(r"(^|[^\w.])(\d{2,})").expect("integer regex must compile"));
+    Lazy::new(|| Regex::new(r"(^|[^\w.])(\d+)").expect("integer regex must compile"));
+
+// Kubernetes-style replica suffix: appears immediately after a long hex hash
+// that LONG_HEX has already collapsed. e.g. `api-server-7d9c4b8f6c-2x8jk`
+// becomes `api-server-<HEX>-2x8jk` after LONG_HEX, and this rule turns the
+// trailing 5-char alphanumeric pod hash into `<POD>`. Anchored to `<HEX>-`
+// so it cannot fire on arbitrary 5-char words like "hello".
+#[allow(clippy::expect_used)]
+static RE_REPLICA_POD: Lazy<Regex> = Lazy::new(|| {
+    Regex::new(r"<HEX>-[a-z0-9]{5}\b").expect("replica pod regex must compile")
+});
+
+// Package + semver inline: `react 18.2.0`, `@types/node 20.11.30`,
+// `Compiling foo v0.1.0`. Replaces both the identifier AND the version with
+// placeholders so `+ react 18.2.0` and `+ vue 3.4.21` collapse to the same
+// template `+ <PKG> <VER>`. The leading boundary char is preserved.
+#[allow(clippy::expect_used)]
+static RE_PKG_VER: Lazy<Regex> = Lazy::new(|| {
+    Regex::new(
+        r"(?P<pre>(?:^|[\s+(\[]))(?P<pkg>@?[a-zA-Z][\w@/.-]*?)\s+v?\d+\.\d+\.\d+(?:\.\d+)?(?:-[\w.]+)?",
+    )
+    .expect("package-version regex must compile")
+});
+
+// Bare semver (no preceding identifier): `Building 1.4.2`, `release v0.2.33`.
+// Runs after PKG_VER so the package-aware rule wins when both could match.
+#[allow(clippy::expect_used)]
+static RE_VER: Lazy<Regex> = Lazy::new(|| {
+    Regex::new(r"\bv?\d+\.\d+\.\d+(?:\.\d+)?(?:-[\w.]+)?\b").expect("version regex must compile")
+});
+
+// Gradle task header: `> Task :module:subproject:taskName` with optional
+// trailing status like ` UP-TO-DATE`, ` SKIPPED`, ` FROM-CACHE`. Different
+// modules/tasks should collapse into one template so consecutive task lines
+// dedup. Anchored at line start so it cannot fire mid-message.
+#[allow(clippy::expect_used)]
+static RE_GRADLE_TASK: Lazy<Regex> = Lazy::new(|| {
+    Regex::new(r"^(> Task :)\S+(?: [A-Z][A-Z\-]+)?$").expect("gradle task regex must compile")
+});
 
 fn normalize_to_template(line: &str) -> String {
-    // Order matters: timestamps must run before long-hex (they share digits).
+    // Order matters: timestamps must run before long-hex (they share digits);
+    // LONG_HEX must run before REPLICA_POD (which keys on the <HEX> placeholder);
+    // PKG_VER must run before VER and PLAIN_INT so the contextual match wins.
     let step1 = RE_TS_ISO.replace_all(line, "<TS>");
     let step2 = RE_UUID.replace_all(&step1, "<UUID>");
     let step3 = RE_LONG_HEX.replace_all(&step2, "<HEX>");
-    // RE_PLAIN_INT captures (prefix)(digits) so we restore the prefix.
-    let step4 = RE_PLAIN_INT.replace_all(&step3, "${1}<N>");
-    step4.into_owned()
+    let step4 = RE_REPLICA_POD.replace_all(&step3, "<HEX>-<POD>");
+    let step5 = RE_PKG_VER.replace_all(&step4, "$pre<PKG> <VER>");
+    let step6 = RE_VER.replace_all(&step5, "<VER>");
+    let step7 = RE_PLAIN_INT.replace_all(&step6, "${1}<N>");
+    let step8 = RE_GRADLE_TASK.replace_all(&step7, "${1}<TASK>");
+    step8.into_owned()
 }
 
 fn group_by_template(input: &str) -> String {
@@ -374,6 +442,16 @@ fn group_by_template(input: &str) -> String {
         // collapse stage later. Grouping them here would produce marker lines
         // like "[×2] " that violate invariant #2 (exemplar must be readable).
         if current.trim().is_empty() {
+            out.push(current.to_owned());
+            idx = idx.saturating_add(1);
+            continue;
+        }
+
+        // Idempotency: rows emitted by any later compression stage must
+        // pass through untouched. Otherwise the digit/path placeholders
+        // inside the marker become normalize-targets and re-running the
+        // pipeline would over-collapse them — invariant #5.
+        if is_already_processed_marker(current) {
             out.push(current.to_owned());
             idx = idx.saturating_add(1);
             continue;
@@ -722,6 +800,284 @@ fn longest_common_prefix(lines: &[&str]) -> String {
     first[..end].to_owned()
 }
 
+const PREFIX_HEADER_MARKER: &str = "── common prefix:";
+const PREFIX_SUFFIX_MARKER: &str = "↳ ";
+const SUFFIX_HEADER_MARKER: &str = "── common suffix:";
+const SUFFIX_LEFT_MARKER: &str = "↰ ";
+
+fn longest_common_suffix(lines: &[&str]) -> String {
+    if lines.is_empty() {
+        return String::new();
+    }
+    let first_chars: Vec<char> = lines[0].chars().collect();
+    let mut max_chars = first_chars.len();
+
+    for other in lines.iter().skip(1) {
+        let other_chars: Vec<char> = other.chars().collect();
+        let min_len = max_chars.min(other_chars.len());
+        let mut match_chars = 0usize;
+        for i in 1..=min_len {
+            let f = first_chars[first_chars.len().saturating_sub(i)];
+            let o = other_chars[other_chars.len().saturating_sub(i)];
+            if f == o {
+                match_chars = i;
+            } else {
+                break;
+            }
+        }
+        max_chars = max_chars.min(match_chars);
+        if max_chars == 0 {
+            break;
+        }
+    }
+    if max_chars == 0 {
+        return String::new();
+    }
+    let start = lines[0]
+        .char_indices()
+        .rev()
+        .take(max_chars)
+        .last()
+        .map(|(i, _)| i)
+        .unwrap_or(0);
+    lines[0][start..].to_owned()
+}
+
+/// Mirror of `factor_common_prefix`. Discovers shared trailing substrings
+/// (≥ `MIN_PREFIX_LEN` chars, ≥ `MIN_CLUSTER_LINES` rows) and emits:
+///
+///   ── common suffix: <suffix> ──
+///   ↰ <prefix-only>
+///   ↰ <prefix-only>
+///
+/// Targets dotnet/eslint-style outputs where every row ends with the same
+/// rule + message but starts with a unique file path. Runs BEFORE
+/// `factor_common_prefix` so the residual `↰ <prefix-only>` rows can also
+/// have their common leading file-path factored.
+fn factor_common_suffix(input: &str) -> String {
+    let lines: Vec<&str> = input.lines().collect();
+    let non_blank: Vec<&str> = lines
+        .iter()
+        .copied()
+        .filter(|l| !l.trim().is_empty())
+        .collect();
+
+    if non_blank.len() < MIN_CLUSTER_LINES {
+        return input.to_owned();
+    }
+
+    let processable: Vec<&str> = non_blank
+        .iter()
+        .copied()
+        .filter(|l| !is_already_processed_marker(l))
+        .collect();
+    if processable.len() < MIN_CLUSTER_LINES {
+        return input.to_owned();
+    }
+
+    // Sort by reversed string so common-suffix lines cluster contiguously.
+    let mut sorted = processable.clone();
+    sorted.sort_unstable_by(|a, b| {
+        let a_rev: String = a.chars().rev().collect();
+        let b_rev: String = b.chars().rev().collect();
+        a_rev.cmp(&b_rev)
+    });
+
+    let mut clusters: Vec<String> = Vec::new();
+    let mut claimed: Vec<bool> = vec![false; sorted.len()];
+
+    while clusters.len() < MAX_PREFIX_CLUSTERS {
+        let unclaimed: Vec<usize> = (0..sorted.len()).filter(|i| !claimed[*i]).collect();
+        if unclaimed.len() < MIN_CLUSTER_LINES {
+            break;
+        }
+
+        let mut best_suffix = String::new();
+        let mut best_savings: usize = 0;
+
+        let max_start = unclaimed.len().saturating_sub(MIN_CLUSTER_LINES);
+        for ws in 0..=max_start {
+            let window: Vec<&str> = unclaimed[ws..ws.saturating_add(MIN_CLUSTER_LINES)]
+                .iter()
+                .map(|&i| sorted[i])
+                .collect();
+            let lcs = longest_common_suffix(&window);
+            if lcs.len() < MIN_PREFIX_LEN {
+                continue;
+            }
+
+            let mut end = ws.saturating_add(MIN_CLUSTER_LINES);
+            while end < unclaimed.len() && sorted[unclaimed[end]].ends_with(&lcs) {
+                end = end.saturating_add(1);
+            }
+            let count = end.saturating_sub(ws);
+            let savings = lcs.len().saturating_mul(count);
+            let header_cost = lcs.len().saturating_add(PREFIX_HEADER_OVERHEAD);
+            if savings <= header_cost {
+                continue;
+            }
+            if savings > best_savings {
+                best_savings = savings;
+                best_suffix = lcs;
+            }
+        }
+
+        if best_suffix.is_empty() {
+            break;
+        }
+
+        for &i in &unclaimed {
+            if sorted[i].ends_with(&best_suffix) {
+                claimed[i] = true;
+            }
+        }
+        clusters.push(best_suffix);
+    }
+
+    if clusters.is_empty() {
+        return input.to_owned();
+    }
+
+    clusters.sort_by_key(|s| std::cmp::Reverse(s.len()));
+
+    let mut header_emitted: Vec<bool> = vec![false; clusters.len()];
+    let mut out: Vec<String> =
+        Vec::with_capacity(lines.len().saturating_add(clusters.len()));
+
+    for line in &lines {
+        if is_already_processed_marker(line) {
+            out.push((*line).to_owned());
+            continue;
+        }
+        let mut handled = false;
+        for (idx, suffix) in clusters.iter().enumerate() {
+            if line.ends_with(suffix.as_str()) {
+                if !header_emitted[idx] {
+                    out.push(format!("{SUFFIX_HEADER_MARKER} {suffix} ──"));
+                    header_emitted[idx] = true;
+                }
+                let cut = line.len().saturating_sub(suffix.len());
+                let prefix_part = &line[..cut];
+                out.push(format!("{SUFFIX_LEFT_MARKER}{prefix_part}"));
+                handled = true;
+                break;
+            }
+        }
+        if !handled {
+            out.push((*line).to_owned());
+        }
+    }
+
+    out.join("\n")
+}
+// Block-dedup marker uses `──` framing (NOT `[×`) so the proptest
+// `prop_dedup_keeps_real_exemplar` doesn't expect an exemplar body after the
+// marker — the preceding emitted block IS the exemplar.
+const BLOCK_MARKER_PREFIX: &str = "── ×";
+
+/// N-gram block deduplication. Detects runs of ≥ BLOCK_MIN_RUN consecutive
+/// blocks of identical normalized templates and replaces all but the first
+/// with a `[×K more identical N-line block(s) omitted]` marker.
+///
+/// Targets multi-line repeats that single-line `group_by_template` cannot
+/// handle: terraform `+ resource` blocks, repeated maven plugin invocations
+/// per module, repeated bazel compile/link pairs. Runs after the per-line
+/// stages so each line is already in its smallest representative form.
+/// Lines emitted by an earlier compression stage (template dedup, prefix
+/// factor, block dedup itself, stack-trace collapse) must never be folded
+/// into a new block — they have already abstracted the underlying repeat,
+/// and re-collapsing them violates idempotency (invariant #5).
+fn is_already_processed_marker(line: &str) -> bool {
+    line.starts_with(PREFIX_HEADER_MARKER)
+        || line.starts_with(PREFIX_SUFFIX_MARKER)
+        || line.starts_with(SUFFIX_HEADER_MARKER)
+        || line.starts_with(SUFFIX_LEFT_MARKER)
+        || line.starts_with(BLOCK_MARKER_PREFIX)
+        || line.starts_with("[×")
+        || line.contains("frames omitted]")
+}
+
+fn collapse_repeated_blocks(input: &str) -> String {
+    let lines: Vec<&str> = input.lines().collect();
+    if lines.len() < BLOCK_MIN_SIZE.saturating_mul(BLOCK_MIN_RUN) {
+        return input.to_owned();
+    }
+
+    // Pre-compute normalized templates; same shape ↔ block-equivalent.
+    let templates: Vec<String> = lines.iter().map(|l| normalize_to_template(l)).collect();
+    let processed: Vec<bool> = lines.iter().map(|l| is_already_processed_marker(l)).collect();
+
+    let mut out: Vec<String> = Vec::with_capacity(lines.len());
+    let mut i = 0usize;
+
+    while i < lines.len() {
+        // Markers from earlier stages are barriers: never start a block here
+        // and never include them in block content.
+        if processed[i] {
+            out.push(lines[i].to_owned());
+            i = i.saturating_add(1);
+            continue;
+        }
+
+        let mut best_n = 0usize;
+        let mut best_count = 0usize;
+        let mut best_savings = 0usize;
+
+        let remaining = lines.len().saturating_sub(i);
+        let max_n = remaining.min(BLOCK_MAX_SIZE);
+
+        for n in BLOCK_MIN_SIZE..=max_n {
+            // Disallow any candidate block that contains a barrier marker.
+            if (0..n).any(|k| processed[i.saturating_add(k)]) {
+                break;
+            }
+            // Count consecutive identical blocks of size n starting at i.
+            let mut count = 1usize;
+            loop {
+                let next_start = i.saturating_add(n.saturating_mul(count));
+                let next_end = next_start.saturating_add(n);
+                if next_end > lines.len() {
+                    break;
+                }
+                if templates[i..i.saturating_add(n)] == templates[next_start..next_end] {
+                    count = count.saturating_add(1);
+                } else {
+                    break;
+                }
+            }
+            if count >= BLOCK_MIN_RUN {
+                // (count-1) blocks of n lines each are dropped; subtract 1
+                // for the marker line we add.
+                let savings = count
+                    .saturating_sub(1)
+                    .saturating_mul(n)
+                    .saturating_sub(1);
+                if savings > best_savings {
+                    best_savings = savings;
+                    best_n = n;
+                    best_count = count;
+                }
+            }
+        }
+
+        if best_n > 0 {
+            for k in 0..best_n {
+                out.push(lines[i.saturating_add(k)].to_owned());
+            }
+            let extra = best_count.saturating_sub(1);
+            out.push(format!(
+                "{BLOCK_MARKER_PREFIX}{extra} more {best_n}-line block(s) omitted ──"
+            ));
+            i = i.saturating_add(best_n.saturating_mul(best_count));
+        } else {
+            out.push(lines[i].to_owned());
+            i = i.saturating_add(1);
+        }
+    }
+
+    out.join("\n")
+}
+
 fn factor_common_prefix(input: &str) -> String {
     let lines: Vec<&str> = input.lines().collect();
     let non_blank: Vec<&str> = lines
@@ -730,43 +1086,128 @@ fn factor_common_prefix(input: &str) -> String {
         .filter(|l| !l.trim().is_empty())
         .collect();
 
-    if non_blank.len() < 5 {
+    if non_blank.len() < MIN_CLUSTER_LINES {
         return input.to_owned();
     }
 
-    let prefix = longest_common_prefix(&non_blank);
-    if prefix.len() < 8 {
+    // Idempotency: ignore lines that look already-factored when discovering
+    // clusters (and pass them through untouched in the emit phase).
+    let processable: Vec<&str> = non_blank
+        .iter()
+        .copied()
+        .filter(|l| !is_already_processed_marker(l))
+        .collect();
+    if processable.len() < MIN_CLUSTER_LINES {
         return input.to_owned();
     }
 
-    // Threshold: at least 80% of non-blank lines must actually share the prefix
-    // (the LCP is the intersection, but some lines might be shorter; bail if so).
-    let with_prefix = non_blank.iter().filter(|l| l.starts_with(&prefix)).count();
-    let threshold = non_blank.len().saturating_mul(4).saturating_div(5); // 80%
-    if with_prefix < threshold {
+    // Greedy multi-cluster discovery: lex-sorting groups same-prefix lines
+    // into contiguous runs, so for a window of MIN_CLUSTER_LINES sorted lines
+    // the LCP is the longest prefix that ≥ that many lines share. We extend
+    // each candidate cluster to its full lex-adjacent run, score by total
+    // savings, pick the best, mark its lines, and repeat. This subsumes the
+    // older single-cluster behaviour while also catching mixed inputs (e.g.
+    // a Next.js route table with `/api/*` and `/blog/*` clusters at once).
+    let mut sorted = processable.clone();
+    sorted.sort_unstable();
+
+    let mut clusters: Vec<String> = Vec::new();
+    let mut claimed: Vec<bool> = vec![false; sorted.len()];
+
+    while clusters.len() < MAX_PREFIX_CLUSTERS {
+        let unclaimed: Vec<usize> = (0..sorted.len()).filter(|i| !claimed[*i]).collect();
+        if unclaimed.len() < MIN_CLUSTER_LINES {
+            break;
+        }
+
+        let mut best_prefix = String::new();
+        let mut best_savings: usize = 0;
+
+        let max_start = unclaimed.len().saturating_sub(MIN_CLUSTER_LINES);
+        for ws in 0..=max_start {
+            let window: Vec<&str> = unclaimed[ws..ws.saturating_add(MIN_CLUSTER_LINES)]
+                .iter()
+                .map(|&i| sorted[i])
+                .collect();
+            let lcp = longest_common_prefix(&window);
+            if lcp.len() < MIN_PREFIX_LEN {
+                continue;
+            }
+
+            // Extend the cluster across all lex-adjacent siblings that still
+            // start with this prefix.
+            let mut end = ws.saturating_add(MIN_CLUSTER_LINES);
+            while end < unclaimed.len() && sorted[unclaimed[end]].starts_with(&lcp) {
+                end = end.saturating_add(1);
+            }
+            let count = end.saturating_sub(ws);
+            let savings = lcp.len().saturating_mul(count);
+            let header_cost = lcp.len().saturating_add(PREFIX_HEADER_OVERHEAD);
+            if savings <= header_cost {
+                continue;
+            }
+            if savings > best_savings {
+                best_savings = savings;
+                best_prefix = lcp;
+            }
+        }
+
+        if best_prefix.is_empty() {
+            break;
+        }
+
+        for &i in &unclaimed {
+            if sorted[i].starts_with(&best_prefix) {
+                claimed[i] = true;
+            }
+        }
+        clusters.push(best_prefix);
+    }
+
+    if clusters.is_empty() {
         return input.to_owned();
     }
 
-    // Savings check: emit prefix header + one marker worth of bytes; must beat
-    // the per-line prefix cost.
-    let header_cost = prefix.len().saturating_add(16); // "── prefix: ... ──\n"
-    let per_line_savings = prefix.len();
-    let total_savings = per_line_savings.saturating_mul(with_prefix);
-    if total_savings <= header_cost {
-        return input.to_owned();
-    }
+    // Longer prefixes win when a line matches several (e.g. "/api/users/" vs
+    // "/api/"), so the more-specific factoring shows up in the output.
+    clusters.sort_by_key(|p| std::cmp::Reverse(p.len()));
 
-    let mut out: Vec<String> = Vec::with_capacity(lines.len().saturating_add(1));
-    out.push(format!("── common prefix: {prefix} ──"));
+    let mut header_emitted: Vec<bool> = vec![false; clusters.len()];
+    let mut out: Vec<String> =
+        Vec::with_capacity(lines.len().saturating_add(clusters.len()));
+
     for line in &lines {
-        if line.starts_with(&prefix) {
-            out.push(format!("↳ {}", &line[prefix.len()..]));
-        } else {
+        if is_already_processed_marker(line) {
+            out.push((*line).to_owned());
+            continue;
+        }
+        let mut handled = false;
+        for (idx, prefix) in clusters.iter().enumerate() {
+            if line.starts_with(prefix.as_str()) {
+                if !header_emitted[idx] {
+                    out.push(format!("{PREFIX_HEADER_MARKER} {prefix} ──"));
+                    header_emitted[idx] = true;
+                }
+                out.push(format!("{PREFIX_SUFFIX_MARKER}{}", &line[prefix.len()..]));
+                handled = true;
+                break;
+            }
+        }
+        if !handled {
             out.push((*line).to_owned());
         }
     }
+
     out.join("\n")
 }
+
+const MIN_CLUSTER_LINES: usize = 5;
+const MIN_PREFIX_LEN: usize = 12;
+const MAX_PREFIX_CLUSTERS: usize = 8;
+const PREFIX_HEADER_OVERHEAD: usize = 22;
+const BLOCK_MIN_SIZE: usize = 2;
+const BLOCK_MAX_SIZE: usize = 50;
+const BLOCK_MIN_RUN: usize = 3;
 
 // ---------------------------------------------------------------------------
 // Step 8 — Keep only failures in test output
@@ -828,6 +1269,245 @@ fn collapse_blank_lines(input: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_common_suffix_factors_dotnet_warnings() {
+        // Many lines with unique file paths but identical trailing rule +
+        // message. Suffix factor should emit a single header + per-file
+        // ↰ rows.
+        let input = "\
+src/a.cs(42,13): warning CS8618: Non-nullable property 'X' must contain a non-null value.
+src/b.cs(42,13): warning CS8618: Non-nullable property 'X' must contain a non-null value.
+src/c.cs(42,13): warning CS8618: Non-nullable property 'X' must contain a non-null value.
+src/d.cs(42,13): warning CS8618: Non-nullable property 'X' must contain a non-null value.
+src/e.cs(42,13): warning CS8618: Non-nullable property 'X' must contain a non-null value.
+";
+        let result = filter(input);
+        // Group_by_template will collapse first since all 5 have same template.
+        // For pure suffix-factor verification, use a fixture where templates differ.
+        // Here templates DO match (paths get normalized). Either dedup or
+        // suffix-factor is fine — both compress.
+        assert!(
+            result.output.contains("[×5]") || result.output.contains(SUFFIX_HEADER_MARKER),
+            "expected dedup OR suffix factor: {}",
+            result.output
+        );
+    }
+
+    #[test]
+    fn test_common_suffix_factors_distinct_template_lines() {
+        // Different templates (different rule numbers, line numbers) but
+        // shared trailing message. Template dedup CANNOT collapse; suffix
+        // factor should.
+        let input = "\
+src/a.cs(11,1): warning CS1591: Missing XML comment for publicly visible type or member.
+src/b.cs(22,2): warning CS1592: Missing XML comment for publicly visible type or member.
+src/c.cs(33,3): warning CS1593: Missing XML comment for publicly visible type or member.
+src/d.cs(44,4): warning CS1594: Missing XML comment for publicly visible type or member.
+src/e.cs(55,5): warning CS1595: Missing XML comment for publicly visible type or member.
+src/f.cs(66,6): warning CS1596: Missing XML comment for publicly visible type or member.
+";
+        let result = filter(input);
+        assert!(
+            result.output.contains(SUFFIX_HEADER_MARKER),
+            "expected common-suffix factoring: {}",
+            result.output
+        );
+        assert!(
+            result.output.contains(SUFFIX_LEFT_MARKER),
+            "expected ↰ rows: {}",
+            result.output
+        );
+    }
+
+    #[test]
+    fn test_common_suffix_idempotent_on_factored_output() {
+        let input = "\
+file_a.txt :: tail-shared-content here
+file_b.txt :: tail-shared-content here
+file_c.txt :: tail-shared-content here
+file_d.txt :: tail-shared-content here
+file_e.txt :: tail-shared-content here
+file_f.txt :: tail-shared-content here
+";
+        let once = filter(input).output;
+        let twice = filter(&once).output;
+        assert_eq!(once, twice, "factor_common_suffix must be idempotent");
+    }
+
+    #[test]
+    fn test_common_suffix_does_not_fire_on_unique_endings() {
+        let input = "\
+alpha
+beta
+gamma
+delta
+epsilon
+";
+        let result = filter(input);
+        assert!(
+            !result.output.contains(SUFFIX_HEADER_MARKER),
+            "suffix factor should not fire on unique endings: {}",
+            result.output
+        );
+    }
+
+    #[test]
+    fn test_block_dedup_collapses_repeated_terraform_resources() {
+        // 4 identical 3-line blocks → 1 block + marker for the other 3.
+        let block = "  + resource \"x\" {\n    + foo = \"bar\"\n    }";
+        let input = format!("{block}\n{block}\n{block}\n{block}\n");
+        let result = filter(&input);
+        assert!(
+            result.output.contains(BLOCK_MARKER_PREFIX),
+            "expected block-dedup marker: {}",
+            result.output
+        );
+        assert!(result.output.contains("3-line block(s) omitted"));
+        // First block must survive intact.
+        assert!(result.output.contains("+ resource"));
+        assert!(result.output.contains("+ foo = \"bar\""));
+    }
+
+    #[test]
+    fn test_block_dedup_idempotent_on_marker_output() {
+        let block = "alpha\nbeta\ngamma";
+        let input = format!("{block}\n{block}\n{block}\n{block}\n");
+        let first = filter(&input).output;
+        let second = filter(&first).output;
+        assert_eq!(first, second, "block dedup must be idempotent");
+    }
+
+    #[test]
+    fn test_block_dedup_does_not_fire_on_non_repeating_content() {
+        let input = "\
+unique line A
+unique line B
+unique line C
+unique line D
+unique line E
+";
+        let result = filter(input);
+        assert!(
+            !result.output.contains(BLOCK_MARKER_PREFIX),
+            "block dedup must not fire on distinct lines: {}",
+            result.output
+        );
+    }
+
+    #[test]
+    fn test_block_dedup_idempotent_with_uneven_blanks() {
+        // Regression: pass 1 saw uneven blanks (2 then 1) and didn't match,
+        // pass 2 saw collapse_blank_lines-regularized blanks and matched —
+        // breaking idempotency. Putting collapse_blank_lines BEFORE block
+        // dedup fixed this.
+        let input = "\ntest module::test_fn ... ok\n\n\ntest module::test_fn ... ok\n\ntest module::test_fn ... ok\n";
+        let once = filter(input).output;
+        let twice = filter(&once).output;
+        assert_eq!(once, twice, "not idempotent on uneven-blanks input");
+    }
+
+    #[test]
+    fn test_normalize_gradle_task_dedups_runs() {
+        let input = "\
+> Task :core:compileKotlin
+> Task :core:compileJava
+> Task :data:compileKotlin
+> Task :data:processResources
+> Task :app:assemble UP-TO-DATE
+";
+        let result = filter(input);
+        assert!(
+            result.output.contains("[×5]"),
+            "expected 5-line dedup of `> Task :…`: {}",
+            result.output
+        );
+    }
+
+    #[test]
+    fn test_normalize_gradle_task_does_not_eat_unrelated_lines() {
+        // Lines starting with `> ` but not `> Task :` should be untouched.
+        let input = "\
+> some other prompt
+> not a gradle task
+> also not gradle
+";
+        let result = filter(input);
+        assert!(!result.output.contains("<TASK>"), "got: {}", result.output);
+    }
+
+    #[test]
+    fn test_normalize_pkg_ver_collapses_npm_install() {
+        // pnpm/npm install produces lines like "+ react 18.2.0". Different
+        // packages should now share the same template so template-dedup
+        // collapses the run. (No leading spaces — the `\<newline>` Rust
+        // continuation strips them and would split the first line into a
+        // distinct template.)
+        let input = "\
++ react 18.2.0
++ react-dom 18.2.0
++ @types/node 20.11.30
++ typescript 5.4.3
++ vite 5.2.6
+";
+        let result = filter(input);
+        assert!(
+            result.output.contains("[×5]"),
+            "expected 5-line dedup of `+ <pkg> <ver>`: {}",
+            result.output
+        );
+    }
+
+    #[test]
+    fn test_normalize_ver_collapses_bare_versions() {
+        // Lines like "Building module 1.4.2" should normalize the trailing
+        // version so a run of them dedups regardless of the digits.
+        let input = "\
+Building module 1.4.2
+Building module 1.4.3
+Building module 2.0.0
+";
+        let result = filter(input);
+        assert!(
+            result.output.contains("[×3]"),
+            "expected 3-line dedup of `Building module <ver>`: {}",
+            result.output
+        );
+    }
+
+    #[test]
+    fn test_normalize_replica_pod_dedups_kubernetes_pods() {
+        // After LONG_HEX collapses the 10-char replicaset hash, the trailing
+        // 5-char pod-specific hash must also normalize so different replicas
+        // of the same deployment share a template.
+        let input = "\
+pod/api-server-7d9c4b8f6c-2x8jk Started container api
+pod/api-server-7d9c4b8f6c-h7m4p Started container api
+pod/api-server-7d9c4b8f6c-9xqz4 Started container api
+";
+        let result = filter(input);
+        assert!(
+            result.output.contains("[×3]"),
+            "expected 3-line dedup across pod replicas: {}",
+            result.output
+        );
+    }
+
+    #[test]
+    fn test_normalize_pkg_ver_does_not_eat_unrelated_words() {
+        // Negative test: lines that look like prose with no version should be
+        // untouched and stay distinct.
+        let input = "\
+hello world
+foo bar baz
+quick brown fox
+";
+        let result = filter(input);
+        // No dedup, no placeholders leaking into output.
+        assert!(!result.output.contains("[×"));
+        assert!(!result.output.contains("<PKG>"));
+        assert!(!result.output.contains("<VER>"));
+    }
 
     #[test]
     fn test_remove_ansi_codes() {
@@ -1002,6 +1682,76 @@ very long shared leading prefix here FFF
             result.output.contains("common prefix") || result.output.contains("↳"),
             "expected common-prefix factoring: {}",
             result.output
+        );
+    }
+
+    #[test]
+    fn test_common_prefix_multi_cluster() {
+        // Two distinct clusters in the same input: route paths split between
+        // /api/ and /blog/. The single-cluster algorithm could only factor
+        // one of them; multi-cluster discovery should emit both headers.
+        let mut lines: Vec<String> = Vec::new();
+        for i in 1..=8 {
+            lines.push(format!("/api/v1/resource_{i:03}/handler"));
+        }
+        for i in 1..=8 {
+            lines.push(format!("/blog/posts/2026/article_{i:03}"));
+        }
+        let result = filter(&lines.join("\n"));
+        let header_count = result.output.matches("common prefix").count();
+        assert!(
+            header_count >= 2,
+            "expected ≥2 cluster headers, found {header_count}: {}",
+            &result.output[..result.output.len().min(400)]
+        );
+        assert!(
+            result.output.contains("/api/v1/") && result.output.contains("/blog/posts/"),
+            "both cluster prefixes should appear in headers: {}",
+            &result.output[..result.output.len().min(400)]
+        );
+    }
+
+    #[test]
+    fn test_common_prefix_idempotent_on_factored_output() {
+        // Re-running the filter on already-factored output must not nest
+        // headers or re-cluster the ↳ rows. Critical for invariant #5.
+        let mut lines: Vec<String> = (1..=20)
+            .map(|i| format!("warning: unused variable: `tmp_{i}` --> src/foo.rs:42:9"))
+            .collect();
+        lines.push("DONE".to_owned());
+        let first = filter(&lines.join("\n")).output;
+        let second = filter(&first).output;
+        assert_eq!(
+            first, second,
+            "factor_common_prefix must be idempotent on its own output"
+        );
+    }
+
+    #[test]
+    fn test_factor_handles_outlier_trailing_line() {
+        // Real-world case: 200 warnings sharing a long prefix plus a trailing
+        // "DONE" sentinel line. The naive LCP across all lines collapses to
+        // 0 chars, but ≥ 80% of lines still share the warning prefix, so the
+        // factoring must still fire. Regression test for the "echo DONE"
+        // case where L1 was registering zero savings via the hook.
+        let mut lines: Vec<String> = (1..=200)
+            .map(|i| format!("warning: unused variable: `tmp_{i}` --> src/foo.rs:42:9"))
+            .collect();
+        lines.push("DONE".to_owned());
+        let input = lines.join("\n");
+        let result = filter(&input);
+        // Either prefix OR suffix factor must fire — the bulk shares both
+        // a common prefix (`warning: unused variable: \`tmp_`) and a common
+        // suffix (`\` --> src/foo.rs:42:9`). Suffix factor runs first and
+        // typically wins on this fixture; either is acceptable.
+        assert!(
+            result.output.contains("common prefix") || result.output.contains("common suffix"),
+            "factor stage should fire despite the DONE outlier: {}",
+            &result.output[..result.output.len().min(300)]
+        );
+        assert!(
+            result.output.contains("DONE"),
+            "outlier line must survive unchanged"
         );
     }
 

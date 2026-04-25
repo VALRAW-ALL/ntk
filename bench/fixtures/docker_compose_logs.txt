@@ -1,0 +1,103 @@
+api-1      | 2026-04-25T10:23:00.123Z INFO  Starting application
+worker-1   | 2026-04-25T10:23:00.123Z INFO  Starting application
+worker-2   | 2026-04-25T10:23:00.123Z INFO  Starting application
+redis-1    | 2026-04-25T10:23:00.123Z INFO  Starting application
+postgres-1 | 2026-04-25T10:23:00.123Z INFO  Starting application
+api-1      | 2026-04-25T10:23:07.123Z INFO  Connected to database
+worker-1   | 2026-04-25T10:23:07.123Z INFO  Connected to database
+worker-2   | 2026-04-25T10:23:07.123Z INFO  Connected to database
+redis-1    | 2026-04-25T10:23:07.123Z INFO  Connected to database
+postgres-1 | 2026-04-25T10:23:07.123Z INFO  Connected to database
+api-1      | 2026-04-25T10:23:14.123Z INFO  Listening on :8080
+worker-1   | 2026-04-25T10:23:14.123Z INFO  Listening on :8080
+worker-2   | 2026-04-25T10:23:14.123Z INFO  Listening on :8080
+redis-1    | 2026-04-25T10:23:14.123Z INFO  Listening on :8080
+postgres-1 | 2026-04-25T10:23:14.123Z INFO  Listening on :8080
+api-1      | 2026-04-25T10:23:21.123Z INFO  Health check OK
+worker-1   | 2026-04-25T10:23:21.123Z INFO  Health check OK
+worker-2   | 2026-04-25T10:23:21.123Z INFO  Health check OK
+redis-1    | 2026-04-25T10:23:21.123Z INFO  Health check OK
+postgres-1 | 2026-04-25T10:23:21.123Z INFO  Health check OK
+api-1      | 2026-04-25T10:23:28.123Z WARN  Slow query detected: 1.2s
+worker-1   | 2026-04-25T10:23:28.123Z WARN  Slow query detected: 1.2s
+worker-2   | 2026-04-25T10:23:28.123Z WARN  Slow query detected: 1.2s
+redis-1    | 2026-04-25T10:23:28.123Z WARN  Slow query detected: 1.2s
+postgres-1 | 2026-04-25T10:23:28.123Z WARN  Slow query detected: 1.2s
+api-1      | 2026-04-25T10:23:35.123Z INFO  Request POST /api/users 201 12ms
+worker-1   | 2026-04-25T10:23:35.123Z INFO  Request POST /api/users 201 12ms
+worker-2   | 2026-04-25T10:23:35.123Z INFO  Request POST /api/users 201 12ms
+redis-1    | 2026-04-25T10:23:35.123Z INFO  Request POST /api/users 201 12ms
+postgres-1 | 2026-04-25T10:23:35.123Z INFO  Request POST /api/users 201 12ms
+api-1      | 2026-04-25T10:24:42.123Z INFO  Request GET  /api/users/42 200 4ms
+worker-1   | 2026-04-25T10:24:42.123Z INFO  Request GET  /api/users/42 200 4ms
+worker-2   | 2026-04-25T10:24:42.123Z INFO  Request GET  /api/users/42 200 4ms
+redis-1    | 2026-04-25T10:24:42.123Z INFO  Request GET  /api/users/42 200 4ms
+postgres-1 | 2026-04-25T10:24:42.123Z INFO  Request GET  /api/users/42 200 4ms
+api-1      | 2026-04-25T10:24:49.123Z INFO  Request GET  /health 200 1ms
+worker-1   | 2026-04-25T10:24:49.123Z INFO  Request GET  /health 200 1ms
+worker-2   | 2026-04-25T10:24:49.123Z INFO  Request GET  /health 200 1ms
+redis-1    | 2026-04-25T10:24:49.123Z INFO  Request GET  /health 200 1ms
+postgres-1 | 2026-04-25T10:24:49.123Z INFO  Request GET  /health 200 1ms
+api-1      | 2026-04-25T10:24:56.123Z INFO  Starting application
+worker-1   | 2026-04-25T10:24:56.123Z INFO  Starting application
+worker-2   | 2026-04-25T10:24:56.123Z INFO  Starting application
+redis-1    | 2026-04-25T10:24:56.123Z INFO  Starting application
+postgres-1 | 2026-04-25T10:24:56.123Z INFO  Starting application
+api-1      | 2026-04-25T10:24:03.123Z INFO  Connected to database
+worker-1   | 2026-04-25T10:24:03.123Z INFO  Connected to database
+worker-2   | 2026-04-25T10:24:03.123Z INFO  Connected to database
+redis-1    | 2026-04-25T10:24:03.123Z INFO  Connected to database
+postgres-1 | 2026-04-25T10:24:03.123Z INFO  Connected to database
+api-1      | 2026-04-25T10:24:10.123Z INFO  Listening on :8080
+worker-1   | 2026-04-25T10:24:10.123Z INFO  Listening on :8080
+worker-2   | 2026-04-25T10:24:10.123Z INFO  Listening on :8080
+redis-1    | 2026-04-25T10:24:10.123Z INFO  Listening on :8080
+postgres-1 | 2026-04-25T10:24:10.123Z INFO  Listening on :8080
+api-1      | 2026-04-25T10:24:17.123Z INFO  Health check OK
+worker-1   | 2026-04-25T10:24:17.123Z INFO  Health check OK
+worker-2   | 2026-04-25T10:24:17.123Z INFO  Health check OK
+redis-1    | 2026-04-25T10:24:17.123Z INFO  Health check OK
+postgres-1 | 2026-04-25T10:24:17.123Z INFO  Health check OK
+api-1      | 2026-04-25T10:25:24.123Z WARN  Slow query detected: 1.2s
+worker-1   | 2026-04-25T10:25:24.123Z WARN  Slow query detected: 1.2s
+worker-2   | 2026-04-25T10:25:24.123Z WARN  Slow query detected: 1.2s
+redis-1    | 2026-04-25T10:25:24.123Z WARN  Slow query detected: 1.2s
+postgres-1 | 2026-04-25T10:25:24.123Z WARN  Slow query detected: 1.2s
+api-1      | 2026-04-25T10:25:31.123Z INFO  Request POST /api/users 201 12ms
+worker-1   | 2026-04-25T10:25:31.123Z INFO  Request POST /api/users 201 12ms
+worker-2   | 2026-04-25T10:25:31.123Z INFO  Request POST /api/users 201 12ms
+redis-1    | 2026-04-25T10:25:31.123Z INFO  Request POST /api/users 201 12ms
+postgres-1 | 2026-04-25T10:25:31.123Z INFO  Request POST /api/users 201 12ms
+api-1      | 2026-04-25T10:25:38.123Z INFO  Request GET  /api/users/42 200 4ms
+worker-1   | 2026-04-25T10:25:38.123Z INFO  Request GET  /api/users/42 200 4ms
+worker-2   | 2026-04-25T10:25:38.123Z INFO  Request GET  /api/users/42 200 4ms
+redis-1    | 2026-04-25T10:25:38.123Z INFO  Request GET  /api/users/42 200 4ms
+postgres-1 | 2026-04-25T10:25:38.123Z INFO  Request GET  /api/users/42 200 4ms
+api-1      | 2026-04-25T10:25:45.123Z INFO  Request GET  /health 200 1ms
+worker-1   | 2026-04-25T10:25:45.123Z INFO  Request GET  /health 200 1ms
+worker-2   | 2026-04-25T10:25:45.123Z INFO  Request GET  /health 200 1ms
+redis-1    | 2026-04-25T10:25:45.123Z INFO  Request GET  /health 200 1ms
+postgres-1 | 2026-04-25T10:25:45.123Z INFO  Request GET  /health 200 1ms
+api-1      | 2026-04-25T10:25:52.123Z INFO  Starting application
+worker-1   | 2026-04-25T10:25:52.123Z INFO  Starting application
+worker-2   | 2026-04-25T10:25:52.123Z INFO  Starting application
+redis-1    | 2026-04-25T10:25:52.123Z INFO  Starting application
+postgres-1 | 2026-04-25T10:25:52.123Z INFO  Starting application
+api-1      | 2026-04-25T10:25:59.123Z INFO  Connected to database
+worker-1   | 2026-04-25T10:25:59.123Z INFO  Connected to database
+worker-2   | 2026-04-25T10:25:59.123Z INFO  Connected to database
+redis-1    | 2026-04-25T10:25:59.123Z INFO  Connected to database
+postgres-1 | 2026-04-25T10:25:59.123Z INFO  Connected to database
+api-1      | 2026-04-25T10:26:06.123Z INFO  Listening on :8080
+worker-1   | 2026-04-25T10:26:06.123Z INFO  Listening on :8080
+worker-2   | 2026-04-25T10:26:06.123Z INFO  Listening on :8080
+redis-1    | 2026-04-25T10:26:06.123Z INFO  Listening on :8080
+postgres-1 | 2026-04-25T10:26:06.123Z INFO  Listening on :8080
+api-1      | 2026-04-25T10:26:13.123Z INFO  Health check OK
+worker-1   | 2026-04-25T10:26:13.123Z INFO  Health check OK
+worker-2   | 2026-04-25T10:26:13.123Z INFO  Health check OK
+redis-1    | 2026-04-25T10:26:13.123Z INFO  Health check OK
+postgres-1 | 2026-04-25T10:26:13.123Z INFO  Health check OK
+api-1      | 2026-04-25T10:42:15.412Z ERROR Database connection lost: dial tcp 172.18.0.3:5432: connect: connection refused
+api-1      | 2026-04-25T10:42:16.001Z INFO  Reconnecting to database...
+api-1      | 2026-04-25T10:42:18.523Z INFO  Reconnected

@@ -1,0 +1,7 @@
+{
+    "category": "build",
+    "description": "ESLint stylish reporter output: file path then indented 'line:col level msg rule' rows. The level/rule columns repeat heavily; '  warning  ' / '  error  ' prefixes share long whitespace runs.",
+    "min_ratio": 0.0,
+    "expected_layer": 2,
+    "command": "eslint . --format stylish"
+}

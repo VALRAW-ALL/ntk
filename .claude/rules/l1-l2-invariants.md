@@ -60,9 +60,30 @@ first/last-frame guarantees (#3).
 5. `group_by_template` — template-dedup runs AFTER diagnostic noise
    so the template pool isn't polluted by wavy rows and index SHAs.
 6. `filter_stack_frames` — stack-trace run collapse.
-7. `factor_common_prefix` — `[prefix: …]` summarization.
-8. `filter_test_failures` — extract FAILED blocks when present.
-9. `collapse_blank_lines` — always last; never interleave with dedup.
+7. `filter_test_failures` — extract FAILED blocks when present. Runs
+   BEFORE `factor_common_prefix` so the bulk of `test foo ... ok` lines
+   is dropped before factoring would turn them into `↳` rows that
+   survive the extractor (which keys on the original line shape).
+8. `collapse_blank_lines` — runs HERE (not last) so block_dedup and
+   factor_common_prefix see a regularized blank-line structure on
+   every pass. Without this, pass 1 can see uneven blanks (no match),
+   pass 2 sees regularized blanks (match fires), and idempotency
+   breaks. No later stage produces stray blanks, so moving it earlier
+   is safe.
+9. `collapse_repeated_blocks` — n-gram block dedup. Detects ≥3
+   consecutive identical N-line blocks and emits one block plus a
+   `── ×K more N-line block(s) omitted ──` marker. Treats lines
+   produced by earlier stages (template-dedup `[×N]`, prefix-factor
+   `↳`/`──`, stack-frame `[N frames omitted]`, its own marker) as
+   barriers — never folded into a new block (idempotency #5).
+10. `factor_common_suffix` — mirror of `factor_common_prefix` for
+    trailing strings. Emits `── common suffix: <s> ──` headers and
+    `↰ <prefix-only>` rows. Runs BEFORE prefix factor so the residual
+    `↰` rows (which now share leading content) can also be prefix-
+    factored. Marker barriers same as block dedup.
+11. `factor_common_prefix` — `── common prefix: … ──` + `↳ <suffix>`
+    summarization. Multi-cluster: greedily picks the highest-savings
+    prefix, marks claimed lines, repeats up to MAX_PREFIX_CLUSTERS.
 
 ## When modifying stack-trace filter
 

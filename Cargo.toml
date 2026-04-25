@@ -6,7 +6,7 @@ exclude = ["fuzz"]
 
 [package]
 name = "ntk"
-version = "0.2.31"
+version = "0.3.0"
 edition = "2021"
 description = "Neural Token Killer — semantic compression proxy for Claude Code"
 license = "MIT"

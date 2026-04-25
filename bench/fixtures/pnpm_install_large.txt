@@ -1,0 +1,53 @@
+Lockfile is up to date, resolution step is skipped
+Progress: resolved 1, reused 0, downloaded 0, added 0
+Progress: resolved 312, reused 280, downloaded 32, added 0
+Packages: +316
++++++++++++++++++++++++++++++++++++++++++++++++++
+ + @types/node 20.11.30
+ + @types/react 18.2.66
+ + react 18.2.0
+ + react-dom 18.2.0
+ + typescript 5.4.3
+ + vite 5.2.6
+ + vitest 1.4.0
+ + eslint 8.57.0
+ + prettier 3.2.5
+ + axios 1.6.8
+ + zod 3.22.4
+ + zustand 4.5.2
+ + @tanstack/react-query 5.28.6
+ + clsx 2.1.0
+ + date-fns 3.6.0
+ + lucide-react 0.363.0
+ + react-hook-form 7.51.2
+ + tailwindcss 3.4.3
+ + autoprefixer 10.4.19
+ + postcss 8.4.38
+ + @vitejs/plugin-react 4.2.1
+ + happy-dom 14.3.10
+ + @testing-library/react 14.2.2
+ + @testing-library/jest-dom 6.4.2
+ + @playwright/test 1.42.1
+ + storybook 8.0.4
+ + @storybook/react-vite 8.0.4
+ + @storybook/addon-essentials 8.0.4
+ + @storybook/test 8.0.4
+ + husky 9.0.11
+ + lint-staged 15.2.2
+ + commitizen 4.3.0
+ + cz-conventional-changelog 3.3.0
+ + @commitlint/cli 19.2.1
+ + @commitlint/config-conventional 19.1.0
+ + semantic-release 23.0.6
+Progress: resolved 316, reused 284, downloaded 32, added 316, done
+
+dependencies:
++ react 18.2.0
++ react-dom 18.2.0
++ typescript 5.4.3
+
+devDependencies:
++ vite 5.2.6
++ vitest 1.4.0
+
+Done in 4.2s

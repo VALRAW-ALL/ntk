@@ -1,0 +1,7 @@
+{
+    "category": "test",
+    "description": "rspec --format documentation: 'Class' header then indented examples. Uniform two-space-indent prefix on most lines makes prefix factor effective; failure block must be preserved.",
+    "min_ratio": 0.0,
+    "expected_layer": 2,
+    "command": "rspec --format documentation"
+}

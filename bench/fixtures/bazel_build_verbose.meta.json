@@ -1,0 +1,7 @@
+{
+    "category": "build",
+    "description": "bazel build verbose with 'INFO: From Compiling //pkg:tgt:' / 'INFO: From Linking //pkg:tgt:' pairs across many targets. Block dedup across pairs + 'INFO: ' prefix factor unlock most of the savings.",
+    "min_ratio": 0.29,
+    "expected_layer": 2,
+    "command": "bazel build //..."
+}

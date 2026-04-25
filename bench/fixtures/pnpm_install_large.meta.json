@@ -1,0 +1,7 @@
+{
+    "category": "build",
+    "description": "pnpm install with many '+ <pkg> <version>' lines. L1 currently does not normalize package names or versions in the template, so each row stays unique.",
+    "min_ratio": 0.73,
+    "expected_layer": 2,
+    "command": "pnpm install"
+}

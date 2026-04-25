@@ -1,0 +1,286 @@
+[INFO] Scanning for projects...
+[INFO] ------------------------------------------------------------------------
+[INFO] Reactor Build Order:
+[INFO]
+[INFO]   common-utils [jar]
+[INFO]   common-config [jar]
+[INFO]   domain-model [jar]
+[INFO]   data-access [jar]
+[INFO]   service-user [jar]
+[INFO]   service-order [jar]
+[INFO]   service-payment [jar]
+[INFO]   service-notification [jar]
+[INFO]   api-rest [jar]
+[INFO]   api-graphql [jar]
+[INFO]   web-frontend [jar]
+[INFO]   scheduler [jar]
+[INFO]   main-app [jar]
+[INFO]
+[INFO] -----------------------< com.example:common-utils >------------------------
+[INFO] Building common-utils 1.4.2
+[INFO] --------------------------------[ jar ]---------------------------------
+[INFO]
+[INFO] --- maven-resources-plugin:3.3.1:resources (default-resources) @ common-utils ---
+[INFO] Using 'UTF-8' encoding to copy filtered resources.
+[INFO] --- maven-compiler-plugin:3.11.0:compile (default-compile) @ common-utils ---
+[INFO] Changes detected - recompiling the module! :source
+[INFO] Compiling 12 source files with javac [debug release 17] to target/classes
+[INFO] --- maven-surefire-plugin:3.2.5:test (default-test) @ common-utils ---
+[INFO]
+[INFO] -------------------------------------------------------
+[INFO]  T E S T S
+[INFO] -------------------------------------------------------
+[INFO] Running com.example.commonutils.SmokeTest
+[INFO] Tests run: 4, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.123 s
+[INFO] Results:
+[INFO] Tests run: 4, Failures: 0, Errors: 0, Skipped: 0
+[INFO]
+[INFO] -----------------------< com.example:common-config >------------------------
+[INFO] Building common-config 1.4.2
+[INFO] --------------------------------[ jar ]---------------------------------
+[INFO]
+[INFO] --- maven-resources-plugin:3.3.1:resources (default-resources) @ common-config ---
+[INFO] Using 'UTF-8' encoding to copy filtered resources.
+[INFO] --- maven-compiler-plugin:3.11.0:compile (default-compile) @ common-config ---
+[INFO] Changes detected - recompiling the module! :source
+[INFO] Compiling 12 source files with javac [debug release 17] to target/classes
+[INFO] --- maven-surefire-plugin:3.2.5:test (default-test) @ common-config ---
+[INFO]
+[INFO] -------------------------------------------------------
+[INFO]  T E S T S
+[INFO] -------------------------------------------------------
+[INFO] Running com.example.commonconfig.SmokeTest
+[INFO] Tests run: 4, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.123 s
+[INFO] Results:
+[INFO] Tests run: 4, Failures: 0, Errors: 0, Skipped: 0
+[INFO]
+[INFO] -----------------------< com.example:domain-model >------------------------
+[INFO] Building domain-model 1.4.2
+[INFO] --------------------------------[ jar ]---------------------------------
+[INFO]
+[INFO] --- maven-resources-plugin:3.3.1:resources (default-resources) @ domain-model ---
+[INFO] Using 'UTF-8' encoding to copy filtered resources.
+[INFO] --- maven-compiler-plugin:3.11.0:compile (default-compile) @ domain-model ---
+[INFO] Changes detected - recompiling the module! :source
+[INFO] Compiling 12 source files with javac [debug release 17] to target/classes
+[INFO] --- maven-surefire-plugin:3.2.5:test (default-test) @ domain-model ---
+[INFO]
+[INFO] -------------------------------------------------------
+[INFO]  T E S T S
+[INFO] -------------------------------------------------------
+[INFO] Running com.example.domainmodel.SmokeTest
+[INFO] Tests run: 4, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.123 s
+[INFO] Results:
+[INFO] Tests run: 4, Failures: 0, Errors: 0, Skipped: 0
+[INFO]
+[INFO] -----------------------< com.example:data-access >------------------------
+[INFO] Building data-access 1.4.2
+[INFO] --------------------------------[ jar ]---------------------------------
+[INFO]
+[INFO] --- maven-resources-plugin:3.3.1:resources (default-resources) @ data-access ---
+[INFO] Using 'UTF-8' encoding to copy filtered resources.
+[INFO] --- maven-compiler-plugin:3.11.0:compile (default-compile) @ data-access ---
+[INFO] Changes detected - recompiling the module! :source
+[INFO] Compiling 12 source files with javac [debug release 17] to target/classes
+[INFO] --- maven-surefire-plugin:3.2.5:test (default-test) @ data-access ---
+[INFO]
+[INFO] -------------------------------------------------------
+[INFO]  T E S T S
+[INFO] -------------------------------------------------------
+[INFO] Running com.example.dataaccess.SmokeTest
+[INFO] Tests run: 4, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.123 s
+[INFO] Results:
+[INFO] Tests run: 4, Failures: 0, Errors: 0, Skipped: 0
+[INFO]
+[INFO] -----------------------< com.example:service-user >------------------------
+[INFO] Building service-user 1.4.2
+[INFO] --------------------------------[ jar ]---------------------------------
+[INFO]
+[INFO] --- maven-resources-plugin:3.3.1:resources (default-resources) @ service-user ---
+[INFO] Using 'UTF-8' encoding to copy filtered resources.
+[INFO] --- maven-compiler-plugin:3.11.0:compile (default-compile) @ service-user ---
+[INFO] Changes detected - recompiling the module! :source
+[INFO] Compiling 12 source files with javac [debug release 17] to target/classes
+[INFO] --- maven-surefire-plugin:3.2.5:test (default-test) @ service-user ---
+[INFO]
+[INFO] -------------------------------------------------------
+[INFO]  T E S T S
+[INFO] -------------------------------------------------------
+[INFO] Running com.example.serviceuser.SmokeTest
+[INFO] Tests run: 4, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.123 s
+[INFO] Results:
+[INFO] Tests run: 4, Failures: 0, Errors: 0, Skipped: 0
+[INFO]
+[INFO] -----------------------< com.example:service-order >------------------------
+[INFO] Building service-order 1.4.2
+[INFO] --------------------------------[ jar ]---------------------------------
+[INFO]
+[INFO] --- maven-resources-plugin:3.3.1:resources (default-resources) @ service-order ---
+[INFO] Using 'UTF-8' encoding to copy filtered resources.
+[INFO] --- maven-compiler-plugin:3.11.0:compile (default-compile) @ service-order ---
+[INFO] Changes detected - recompiling the module! :source
+[INFO] Compiling 12 source files with javac [debug release 17] to target/classes
+[INFO] --- maven-surefire-plugin:3.2.5:test (default-test) @ service-order ---
+[INFO]
+[INFO] -------------------------------------------------------
+[INFO]  T E S T S
+[INFO] -------------------------------------------------------
+[INFO] Running com.example.serviceorder.SmokeTest
+[INFO] Tests run: 4, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.123 s
+[INFO] Results:
+[INFO] Tests run: 4, Failures: 0, Errors: 0, Skipped: 0
+[INFO]
+[INFO] -----------------------< com.example:service-payment >------------------------
+[INFO] Building service-payment 1.4.2
+[INFO] --------------------------------[ jar ]---------------------------------
+[INFO]
+[INFO] --- maven-resources-plugin:3.3.1:resources (default-resources) @ service-payment ---
+[INFO] Using 'UTF-8' encoding to copy filtered resources.
+[INFO] --- maven-compiler-plugin:3.11.0:compile (default-compile) @ service-payment ---
+[INFO] Changes detected - recompiling the module! :source
+[INFO] Compiling 12 source files with javac [debug release 17] to target/classes
+[INFO] --- maven-surefire-plugin:3.2.5:test (default-test) @ service-payment ---
+[INFO]
+[INFO] -------------------------------------------------------
+[INFO]  T E S T S
+[INFO] -------------------------------------------------------
+[INFO] Running com.example.servicepayment.SmokeTest
+[INFO] Tests run: 4, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.123 s
+[INFO] Results:
+[INFO] Tests run: 4, Failures: 0, Errors: 0, Skipped: 0
+[INFO]
+[INFO] -----------------------< com.example:service-notification >------------------------
+[INFO] Building service-notification 1.4.2
+[INFO] --------------------------------[ jar ]---------------------------------
+[INFO]
+[INFO] --- maven-resources-plugin:3.3.1:resources (default-resources) @ service-notification ---
+[INFO] Using 'UTF-8' encoding to copy filtered resources.
+[INFO] --- maven-compiler-plugin:3.11.0:compile (default-compile) @ service-notification ---
+[INFO] Changes detected - recompiling the module! :source
+[INFO] Compiling 12 source files with javac [debug release 17] to target/classes
+[INFO] --- maven-surefire-plugin:3.2.5:test (default-test) @ service-notification ---
+[INFO]
+[INFO] -------------------------------------------------------
+[INFO]  T E S T S
+[INFO] -------------------------------------------------------
+[INFO] Running com.example.servicenotification.SmokeTest
+[INFO] Tests run: 4, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.123 s
+[INFO] Results:
+[INFO] Tests run: 4, Failures: 0, Errors: 0, Skipped: 0
+[INFO]
+[INFO] -----------------------< com.example:api-rest >------------------------
+[INFO] Building api-rest 1.4.2
+[INFO] --------------------------------[ jar ]---------------------------------
+[INFO]
+[INFO] --- maven-resources-plugin:3.3.1:resources (default-resources) @ api-rest ---
+[INFO] Using 'UTF-8' encoding to copy filtered resources.
+[INFO] --- maven-compiler-plugin:3.11.0:compile (default-compile) @ api-rest ---
+[INFO] Changes detected - recompiling the module! :source
+[INFO] Compiling 12 source files with javac [debug release 17] to target/classes
+[INFO] --- maven-surefire-plugin:3.2.5:test (default-test) @ api-rest ---
+[INFO]
+[INFO] -------------------------------------------------------
+[INFO]  T E S T S
+[INFO] -------------------------------------------------------
+[INFO] Running com.example.apirest.SmokeTest
+[INFO] Tests run: 4, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.123 s
+[INFO] Results:
+[INFO] Tests run: 4, Failures: 0, Errors: 0, Skipped: 0
+[INFO]
+[INFO] -----------------------< com.example:api-graphql >------------------------
+[INFO] Building api-graphql 1.4.2
+[INFO] --------------------------------[ jar ]---------------------------------
+[INFO]
+[INFO] --- maven-resources-plugin:3.3.1:resources (default-resources) @ api-graphql ---
+[INFO] Using 'UTF-8' encoding to copy filtered resources.
+[INFO] --- maven-compiler-plugin:3.11.0:compile (default-compile) @ api-graphql ---
+[INFO] Changes detected - recompiling the module! :source
+[INFO] Compiling 12 source files with javac [debug release 17] to target/classes
+[INFO] --- maven-surefire-plugin:3.2.5:test (default-test) @ api-graphql ---
+[INFO]
+[INFO] -------------------------------------------------------
+[INFO]  T E S T S
+[INFO] -------------------------------------------------------
+[INFO] Running com.example.apigraphql.SmokeTest
+[INFO] Tests run: 4, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.123 s
+[INFO] Results:
+[INFO] Tests run: 4, Failures: 0, Errors: 0, Skipped: 0
+[INFO]
+[INFO] -----------------------< com.example:web-frontend >------------------------
+[INFO] Building web-frontend 1.4.2
+[INFO] --------------------------------[ jar ]---------------------------------
+[INFO]
+[INFO] --- maven-resources-plugin:3.3.1:resources (default-resources) @ web-frontend ---
+[INFO] Using 'UTF-8' encoding to copy filtered resources.
+[INFO] --- maven-compiler-plugin:3.11.0:compile (default-compile) @ web-frontend ---
+[INFO] Changes detected - recompiling the module! :source
+[INFO] Compiling 12 source files with javac [debug release 17] to target/classes
+[INFO] --- maven-surefire-plugin:3.2.5:test (default-test) @ web-frontend ---
+[INFO]
+[INFO] -------------------------------------------------------
+[INFO]  T E S T S
+[INFO] -------------------------------------------------------
+[INFO] Running com.example.webfrontend.SmokeTest
+[INFO] Tests run: 4, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.123 s
+[INFO] Results:
+[INFO] Tests run: 4, Failures: 0, Errors: 0, Skipped: 0
+[INFO]
+[INFO] -----------------------< com.example:scheduler >------------------------
+[INFO] Building scheduler 1.4.2
+[INFO] --------------------------------[ jar ]---------------------------------
+[INFO]
+[INFO] --- maven-resources-plugin:3.3.1:resources (default-resources) @ scheduler ---
+[INFO] Using 'UTF-8' encoding to copy filtered resources.
+[INFO] --- maven-compiler-plugin:3.11.0:compile (default-compile) @ scheduler ---
+[INFO] Changes detected - recompiling the module! :source
+[INFO] Compiling 12 source files with javac [debug release 17] to target/classes
+[INFO] --- maven-surefire-plugin:3.2.5:test (default-test) @ scheduler ---
+[INFO]
+[INFO] -------------------------------------------------------
+[INFO]  T E S T S
+[INFO] -------------------------------------------------------
+[INFO] Running com.example.scheduler.SmokeTest
+[INFO] Tests run: 4, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.123 s
+[INFO] Results:
+[INFO] Tests run: 4, Failures: 0, Errors: 0, Skipped: 0
+[INFO]
+[INFO] -----------------------< com.example:main-app >------------------------
+[INFO] Building main-app 1.4.2
+[INFO] --------------------------------[ jar ]---------------------------------
+[INFO]
+[INFO] --- maven-resources-plugin:3.3.1:resources (default-resources) @ main-app ---
+[INFO] Using 'UTF-8' encoding to copy filtered resources.
+[INFO] --- maven-compiler-plugin:3.11.0:compile (default-compile) @ main-app ---
+[INFO] Changes detected - recompiling the module! :source
+[INFO] Compiling 12 source files with javac [debug release 17] to target/classes
+[INFO] --- maven-surefire-plugin:3.2.5:test (default-test) @ main-app ---
+[INFO]
+[INFO] -------------------------------------------------------
+[INFO]  T E S T S
+[INFO] -------------------------------------------------------
+[INFO] Running com.example.mainapp.SmokeTest
+[INFO] Tests run: 4, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.123 s
+[INFO] Results:
+[INFO] Tests run: 4, Failures: 0, Errors: 0, Skipped: 0
+[INFO]
+[INFO] ------------------------------------------------------------------------
+[INFO] Reactor Summary for parent 1.4.2:
+[INFO]
+[INFO] common-utils................................................ SUCCESS [  3.421 s]
+[INFO] common-config............................................... SUCCESS [  3.421 s]
+[INFO] domain-model................................................ SUCCESS [  3.421 s]
+[INFO] data-access................................................. SUCCESS [  3.421 s]
+[INFO] service-user................................................ SUCCESS [  3.421 s]
+[INFO] service-order............................................... SUCCESS [  3.421 s]
+[INFO] service-payment............................................. SUCCESS [  3.421 s]
+[INFO] service-notification........................................ SUCCESS [  3.421 s]
+[INFO] api-rest.................................................... SUCCESS [  3.421 s]
+[INFO] api-graphql................................................. SUCCESS [  3.421 s]
+[INFO] web-frontend................................................ SUCCESS [  3.421 s]
+[INFO] scheduler................................................... SUCCESS [  3.421 s]
+[INFO] main-app.................................................... SUCCESS [  3.421 s]
+[INFO] ------------------------------------------------------------------------
+[INFO] BUILD SUCCESS
+[INFO] ------------------------------------------------------------------------
+[INFO] Total time:  44.523 s
+[INFO] Finished at: 2026-04-25T10:23:45+00:00

@@ -1,0 +1,7 @@
+{
+    "category": "test",
+    "description": "pytest -v with 247 tests across 10 files. Each line follows 'tests/<file>.py::test_case_NNN PASSED [pct%]' \u2014 perfect target for numeric-range collapse and per-file prefix factor.",
+    "min_ratio": 0.18,
+    "expected_layer": 2,
+    "command": "pytest -v"
+}

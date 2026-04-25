@@ -1,0 +1,42 @@
+Run options: include {:focus=>true}
+All examples were filtered out; ignoring {:focus=>true}
+
+User
+  is valid with valid attributes
+  is invalid without an email
+  is invalid without a password
+  is invalid with a duplicate email
+  validates email format
+  encrypts the password before save
+  generates an authentication token on create
+
+Order
+  is valid with valid attributes
+  calculates total from line items
+  applies discount when coupon present
+  is invalid without a customer
+  transitions through states correctly
+  sends confirmation email after create
+
+Payment
+  charges the gateway when created
+  marks order as paid on success
+  raises InvalidToken when gateway rejects token
+  supports refund
+  supports partial refund
+  tracks attempts on failure
+
+Failures:
+
+  1) Payment supports partial refund
+     Failure/Error: refund = payment.refund(amount: 500)
+       Stripe::InvalidRequestError:
+         Refund amount must be positive integer in cents
+     # ./spec/models/payment_spec.rb:88:in `block (3 levels) in <top (required)>'
+
+Finished in 4.21 seconds (files took 1.42 seconds to load)
+20 examples, 1 failure
+
+Failed examples:
+
+rspec ./spec/models/payment_spec.rb:84 # Payment supports partial refund

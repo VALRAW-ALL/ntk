@@ -1,0 +1,35 @@
+MSBuild version 17.9.6+a4ecab324 for .NET
+  Determining projects to restore...
+  All projects are up-to-date for restore.
+  MyApp.Core -> /home/user/proj/src/MyApp.Core/bin/Debug/net8.0/MyApp.Core.dll
+  MyApp.Domain -> /home/user/proj/src/MyApp.Domain/bin/Debug/net8.0/MyApp.Domain.dll
+  MyApp.Infrastructure -> /home/user/proj/src/MyApp.Infrastructure/bin/Debug/net8.0/MyApp.Infrastructure.dll
+  MyApp.Api -> /home/user/proj/src/MyApp.Api/bin/Debug/net8.0/MyApp.Api.dll
+  MyApp.Web -> /home/user/proj/src/MyApp.Web/bin/Debug/net8.0/MyApp.Web.dll
+  MyApp.Tests.Unit -> /home/user/proj/src/MyApp.Tests.Unit/bin/Debug/net8.0/MyApp.Tests.Unit.dll
+  MyApp.Tests.Integration -> /home/user/proj/src/MyApp.Tests.Integration/bin/Debug/net8.0/MyApp.Tests.Integration.dll
+src/MyApp.Core/Services/UserService.cs(42,13): warning CS8618: Non-nullable property 'Name' must contain a non-null value when exiting constructor. Consider declaring the property as nullable.
+src/MyApp.Core/Services/UserService.cs(67,9): warning CS8602: Dereference of a possibly null reference.
+src/MyApp.Core/Services/OrderService.cs(42,13): warning CS8618: Non-nullable property 'Name' must contain a non-null value when exiting constructor. Consider declaring the property as nullable.
+src/MyApp.Core/Services/OrderService.cs(67,9): warning CS8602: Dereference of a possibly null reference.
+src/MyApp.Core/Services/PaymentService.cs(42,13): warning CS8618: Non-nullable property 'Name' must contain a non-null value when exiting constructor. Consider declaring the property as nullable.
+src/MyApp.Core/Services/PaymentService.cs(67,9): warning CS8602: Dereference of a possibly null reference.
+src/MyApp.Core/Repositories/UserRepository.cs(42,13): warning CS8618: Non-nullable property 'Name' must contain a non-null value when exiting constructor. Consider declaring the property as nullable.
+src/MyApp.Core/Repositories/UserRepository.cs(67,9): warning CS8602: Dereference of a possibly null reference.
+src/MyApp.Core/Repositories/OrderRepository.cs(42,13): warning CS8618: Non-nullable property 'Name' must contain a non-null value when exiting constructor. Consider declaring the property as nullable.
+src/MyApp.Core/Repositories/OrderRepository.cs(67,9): warning CS8602: Dereference of a possibly null reference.
+src/MyApp.Domain/Entities/User.cs(42,13): warning CS8618: Non-nullable property 'Name' must contain a non-null value when exiting constructor. Consider declaring the property as nullable.
+src/MyApp.Domain/Entities/User.cs(67,9): warning CS8602: Dereference of a possibly null reference.
+src/MyApp.Domain/Entities/Order.cs(42,13): warning CS8618: Non-nullable property 'Name' must contain a non-null value when exiting constructor. Consider declaring the property as nullable.
+src/MyApp.Domain/Entities/Order.cs(67,9): warning CS8602: Dereference of a possibly null reference.
+src/MyApp.Api/Controllers/UsersController.cs(42,13): warning CS8618: Non-nullable property 'Name' must contain a non-null value when exiting constructor. Consider declaring the property as nullable.
+src/MyApp.Api/Controllers/UsersController.cs(67,9): warning CS8602: Dereference of a possibly null reference.
+src/MyApp.Api/Controllers/OrdersController.cs(42,13): warning CS8618: Non-nullable property 'Name' must contain a non-null value when exiting constructor. Consider declaring the property as nullable.
+src/MyApp.Api/Controllers/OrdersController.cs(67,9): warning CS8602: Dereference of a possibly null reference.
+
+Build succeeded.
+
+    18 Warning(s)
+    0 Error(s)
+
+Time Elapsed 00:00:18.42

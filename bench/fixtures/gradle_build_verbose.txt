@@ -1,0 +1,127 @@
+> Configure project :
+Detected Java version: 17.0.10
+
+> Configure project :app
+Using Android SDK 34
+
+> Task :core:compileKotlin
+> Task :core:compileJava
+> Task :core:processResources
+> Task :core:classes
+> Task :core:compileTestKotlin
+> Task :core:compileTestJava
+> Task :domain:compileKotlin
+> Task :domain:compileJava
+> Task :domain:processResources
+> Task :domain:classes
+> Task :domain:compileTestKotlin
+> Task :domain:compileTestJava
+> Task :data:compileKotlin
+> Task :data:compileJava
+> Task :data:processResources
+> Task :data:classes
+> Task :data:compileTestKotlin
+> Task :data:compileTestJava
+> Task :data-network:compileKotlin
+> Task :data-network:compileJava
+> Task :data-network:processResources
+> Task :data-network:classes
+> Task :data-network:compileTestKotlin
+> Task :data-network:compileTestJava
+> Task :data-database:compileKotlin
+> Task :data-database:compileJava
+> Task :data-database:processResources
+> Task :data-database:classes
+> Task :data-database:compileTestKotlin
+> Task :data-database:compileTestJava
+> Task :feature-home:compileKotlin
+> Task :feature-home:compileJava
+> Task :feature-home:processResources
+> Task :feature-home:classes
+> Task :feature-home:compileTestKotlin
+> Task :feature-home:compileTestJava
+> Task :feature-detail:compileKotlin
+> Task :feature-detail:compileJava
+> Task :feature-detail:processResources
+> Task :feature-detail:classes
+> Task :feature-detail:compileTestKotlin
+> Task :feature-detail:compileTestJava
+> Task :feature-settings:compileKotlin
+> Task :feature-settings:compileJava
+> Task :feature-settings:processResources
+> Task :feature-settings:classes
+> Task :feature-settings:compileTestKotlin
+> Task :feature-settings:compileTestJava
+> Task :feature-auth:compileKotlin
+> Task :feature-auth:compileJava
+> Task :feature-auth:processResources
+> Task :feature-auth:classes
+> Task :feature-auth:compileTestKotlin
+> Task :feature-auth:compileTestJava
+> Task :feature-profile:compileKotlin
+> Task :feature-profile:compileJava
+> Task :feature-profile:processResources
+> Task :feature-profile:classes
+> Task :feature-profile:compileTestKotlin
+> Task :feature-profile:compileTestJava
+> Task :feature-search:compileKotlin
+> Task :feature-search:compileJava
+> Task :feature-search:processResources
+> Task :feature-search:classes
+> Task :feature-search:compileTestKotlin
+> Task :feature-search:compileTestJava
+> Task :feature-cart:compileKotlin
+> Task :feature-cart:compileJava
+> Task :feature-cart:processResources
+> Task :feature-cart:classes
+> Task :feature-cart:compileTestKotlin
+> Task :feature-cart:compileTestJava
+> Task :feature-checkout:compileKotlin
+> Task :feature-checkout:compileJava
+> Task :feature-checkout:processResources
+> Task :feature-checkout:classes
+> Task :feature-checkout:compileTestKotlin
+> Task :feature-checkout:compileTestJava
+> Task :ui-components:compileKotlin
+> Task :ui-components:compileJava
+> Task :ui-components:processResources
+> Task :ui-components:classes
+> Task :ui-components:compileTestKotlin
+> Task :ui-components:compileTestJava
+> Task :ui-theme:compileKotlin
+> Task :ui-theme:compileJava
+> Task :ui-theme:processResources
+> Task :ui-theme:classes
+> Task :ui-theme:compileTestKotlin
+> Task :ui-theme:compileTestJava
+> Task :ui-resources:compileKotlin
+> Task :ui-resources:compileJava
+> Task :ui-resources:processResources
+> Task :ui-resources:classes
+> Task :ui-resources:compileTestKotlin
+> Task :ui-resources:compileTestJava
+> Task :test-utils:compileKotlin
+> Task :test-utils:compileJava
+> Task :test-utils:processResources
+> Task :test-utils:classes
+> Task :test-utils:compileTestKotlin
+> Task :test-utils:compileTestJava
+> Task :build-logic:compileKotlin
+> Task :build-logic:compileJava
+> Task :build-logic:processResources
+> Task :build-logic:classes
+> Task :build-logic:compileTestKotlin
+> Task :build-logic:compileTestJava
+> Task :app:compileKotlin
+> Task :app:compileJava
+> Task :app:processResources
+> Task :app:classes
+> Task :app:compileTestKotlin
+> Task :app:compileTestJava
+
+> Task :app:compileReleaseKotlin
+w: file:///home/user/proj/app/src/main/kotlin/com/example/MainActivity.kt:42:13 'onBackPressed(): Unit' is deprecated. Deprecated in Java
+w: file:///home/user/proj/app/src/main/kotlin/com/example/SettingsActivity.kt:18:9 Parameter 'savedInstanceState' is never used
+
+BUILD SUCCESSFUL in 1m 42s
+127 actionable tasks: 127 executed

@@ -1,0 +1,40 @@
+asset main.bundle.js 234 KiB [emitted] (name: main)
+asset vendor.bundle.js 1.42 MiB [emitted] (name: vendor)
+asset 0fa3b2c1.chunk.js 89.4 KiB [emitted] (id hint: react-router)
+asset 1c4d5e6f.chunk.js 47.2 KiB [emitted] (id hint: lodash)
+asset 2b3c4d5e.chunk.js 12.8 KiB [emitted]
+asset main.css 28.1 KiB [emitted] (name: main)
+runtime modules 4.91 KiB 11 modules
+modules by path ./node_modules/ 1.38 MiB 327 modules
+  modules by path ./node_modules/react-dom/ 1.05 MiB 13 modules
+  modules by path ./node_modules/react/ 88.7 KiB 4 modules
+  modules by path ./node_modules/scheduler/ 17.2 KiB 4 modules
+  modules by path ./node_modules/@tanstack/react-query/build/ 89.4 KiB 6 modules
+  modules by path ./node_modules/lodash/ 47.2 KiB 28 modules
+  modules by path ./node_modules/date-fns/ 32.1 KiB 14 modules
+  modules by path ./node_modules/zod/ 21.4 KiB 8 modules
+  modules by path ./node_modules/clsx/ 1.21 KiB 1 module
+modules by path ./src/ 142 KiB
+  ./src/App.tsx 4.21 KiB [built] [code generated]
+  ./src/main.tsx 4.21 KiB [built] [code generated]
+  ./src/router.tsx 4.21 KiB [built] [code generated]
+  ./src/store.tsx 4.21 KiB [built] [code generated]
+  ./src/api.tsx 4.21 KiB [built] [code generated]
+  ./src/auth.tsx 4.21 KiB [built] [code generated]
+  ./src/components/Layout.tsx 4.21 KiB [built] [code generated]
+  ./src/components/Header.tsx 4.21 KiB [built] [code generated]
+  ./src/components/Sidebar.tsx 4.21 KiB [built] [code generated]
+  ./src/components/Footer.tsx 4.21 KiB [built] [code generated]
+  ./src/pages/Home.tsx 4.21 KiB [built] [code generated]
+  ./src/pages/Settings.tsx 4.21 KiB [built] [code generated]
+  ./src/pages/Profile.tsx 4.21 KiB [built] [code generated]
+  ./src/hooks/useAuth.tsx 4.21 KiB [built] [code generated]
+  ./src/hooks/useApi.tsx 4.21 KiB [built] [code generated]
+  ./src/utils/format.tsx 4.21 KiB [built] [code generated]
+  ./src/utils/validate.tsx 4.21 KiB [built] [code generated]
+webpack 5.91.0 compiled successfully in 12421 ms
+
+WARNING in asset size limit: The following asset(s) exceed the recommended size limit (244 KiB).
+This can impact web performance.
+Assets:
+  vendor.bundle.js (1.42 MiB)

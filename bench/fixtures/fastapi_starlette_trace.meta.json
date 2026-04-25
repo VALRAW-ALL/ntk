@@ -1,0 +1,7 @@
+{
+    "category": "stack_trace",
+    "description": "FastAPI / Starlette / Uvicorn / Pydantic stack trace. Current Python classifier covers django/site-packages/gunicorn/asgiref/werkzeug \u2014 fastapi & starlette frames are the new ground.",
+    "min_ratio": 0.68,
+    "expected_layer": 2,
+    "command": "uvicorn app.main:app"
+}

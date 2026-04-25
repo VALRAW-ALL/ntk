@@ -1,0 +1,7 @@
+{
+    "category": "container_log",
+    "description": "kubectl get events table with repeated columns. Most rows share TYPE='Normal', REASON cycle, and replica-suffixed pod names. Strong template-fuzzy + numeric-suffix candidate.",
+    "min_ratio": 0.01,
+    "expected_layer": 2,
+    "command": "kubectl get events"
+}
