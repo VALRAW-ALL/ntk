@@ -1,12 +1,11 @@
 ---
 source: tests/integration/snapshots_per_layer.rs
-assertion_line: 75
 expression: "layer1_snapshot(\"cargo_test_output.txt\")"
 ---
 # fixture: cargo_test_output.txt
 # layer: 1
 # lines_removed: 47
-# applied_rules: ["ansi_strip(65 chars)", "progress_removed(1 lines)", "test_failure_extracted(46 lines)"]
+# applied_rules: ["progress_removed(1 lines)", "test_failure_extracted(46 lines)"]
 # rtk_pre_filtered: false
 ---
     Finished test [unoptimized + debuginfo] target(s) in 4.23s

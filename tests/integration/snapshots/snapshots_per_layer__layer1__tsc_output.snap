@@ -5,7 +5,7 @@ expression: "layer1_snapshot(\"tsc_output.txt\")"
 # fixture: tsc_output.txt
 # layer: 1
 # lines_removed: 0
-# applied_rules: ["ansi_strip(28 chars)"]
+# applied_rules: []
 # rtk_pre_filtered: false
 ---
 src/components/auth/LoginForm.tsx(42,5): error TS2345: Argument of type 'string | undefined' is not assignable to parameter of type 'string'.

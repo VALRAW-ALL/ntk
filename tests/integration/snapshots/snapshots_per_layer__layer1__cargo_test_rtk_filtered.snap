@@ -5,7 +5,7 @@ expression: "layer1_snapshot(\"cargo_test_rtk_filtered.txt\")"
 # fixture: cargo_test_rtk_filtered.txt
 # layer: 1
 # lines_removed: 0
-# applied_rules: ["ansi_strip(23 chars)", "rtk_pre_filtered"]
+# applied_rules: ["rtk_pre_filtered"]
 # rtk_pre_filtered: true
 ---
 [×8] test compressor::layer1::test_remove_ansi_codes ... ok

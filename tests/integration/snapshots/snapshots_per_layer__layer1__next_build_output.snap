@@ -5,7 +5,7 @@ expression: "layer1_snapshot(\"next_build_output.txt\")"
 # fixture: next_build_output.txt
 # layer: 1
 # lines_removed: 0
-# applied_rules: ["ansi_strip(29 chars)"]
+# applied_rules: []
 # rtk_pre_filtered: false
 ---
    Creating an optimized production build ...

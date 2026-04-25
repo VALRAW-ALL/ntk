@@ -4,28 +4,30 @@ expression: "layer2_snapshot(\"docker_logs.txt\")"
 ---
 # fixture: docker_logs.txt
 # layer: 2
-# tokens_in: 671
-# tokens_out: 668
+# tokens_in: 552
+# tokens_out: 549
 # applied_rules: ["paths_shortened"]
 ---
-2024-03-15T10:00:00.000Z INFO  [server] Starting NTK daemon on 127.0.0.1:8765
-2024-03-15T10:00:00.123Z INFO  [server] Loading config from .ntk/config.json
-2024-03-15T10:00:00.145Z INFO  [model] Checking Ollama availability at http:/localhost:11434
-2024-03-15T10:00:00.198Z WARN  [model] Ollama not available, Layer 3 disabled
-2024-03-15T10:00:00.210Z INFO  [server] Daemon ready — Layer 1+2 active
-2024-03-15T10:00:01.302Z INFO  [compress] POST /compress 1842 chars → 312 tokens
-2024-03-15T10:00:01.305Z INFO  [compress] Layer 1: removed 47 lines (progress bars)
-2024-03-15T10:00:01.307Z INFO  [compress] Layer 2: 312 tokens < threshold(300), skipping L3
-2024-03-15T10:00:01.308Z INFO  [compress] ratio=0.83 layer=2 latency=6ms
-2024-03-15T10:00:02.511Z INFO  [compress] POST /compress 9431 chars → 1204 tokens
-2024-03-15T10:00:02.514Z INFO  [compress] Layer 1: grouped 23 repeated lines
-2024-03-15T10:00:02.516Z INFO  [compress] Layer 2: 1204 tokens > threshold(300), L3 required
-2024-03-15T10:00:02.518Z WARN  [compress] Layer 3 unavailable, falling back to L2 output
-2024-03-15T10:00:02.519Z INFO  [compress] ratio=0.72 layer=2 latency=8ms
+── common prefix: 2024-03-15T10:00:0 ──
+↳ 0.000Z INFO  [server] Starting NTK daemon on 127.0.0.1:8765
+↳ 0.123Z INFO  [server] Loading config from .ntk/config.json
+↳ 0.145Z INFO  [model] Checking Ollama availability at http:/localhost:11434
+↳ 0.198Z WARN  [model] Ollama not available, Layer 3 disabled
+↳ 0.210Z INFO  [server] Daemon ready — Layer 1+2 active
+↳ 1.302Z INFO  [compress] POST /compress 1842 chars → 312 tokens
+↳ 1.305Z INFO  [compress] Layer 1: removed 47 lines (progress bars)
+↳ 1.307Z INFO  [compress] Layer 2: 312 tokens < threshold(300), skipping L3
+↳ 1.308Z INFO  [compress] ratio=0.83 layer=2 latency=6ms
+↳ 2.511Z INFO  [compress] POST /compress 9431 chars → 1204 tokens
+↳ 2.514Z INFO  [compress] Layer 1: grouped 23 repeated lines
+↳ 2.516Z INFO  [compress] Layer 2: 1204 tokens > threshold(300), L3 required
+↳ 2.518Z WARN  [compress] Layer 3 unavailable, falling back to L2 output
+↳ 2.519Z INFO  [compress] ratio=0.72 layer=2 latency=8ms
 [×5] 2024-03-15T10:00:05.001Z ERROR [db] Failed to write metrics record: database is locked
-2024-03-15T10:00:10.000Z INFO  [db] Database lock released, retrying pending writes
-2024-03-15T10:00:10.012Z INFO  [db] 5 records written successfully
-2024-03-15T10:00:15.200Z INFO  [compress] POST /compress 412 chars → 89 tokens
-2024-03-15T10:00:15.202Z INFO  [compress] ratio=0.91 layer=1 latency=2ms
-2024-03-15T10:00:20.000Z INFO  [telemetry] Daily ping sent (anonymous, 247 bytes)
-2024-03-15T10:00:20.045Z INFO  [telemetry] Response: 200 OK
+── common prefix: 2024-03-15T10:00: ──
+↳ 10.000Z INFO  [db] Database lock released, retrying pending writes
+↳ 10.012Z INFO  [db] 5 records written successfully
+↳ 15.200Z INFO  [compress] POST /compress 412 chars → 89 tokens
+↳ 15.202Z INFO  [compress] ratio=0.91 layer=1 latency=2ms
+↳ 20.000Z INFO  [telemetry] Daily ping sent (anonymous, 247 bytes)
+↳ 20.045Z INFO  [telemetry] Response: 200 OK

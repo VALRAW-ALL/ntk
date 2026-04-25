@@ -5,7 +5,7 @@ expression: "layer1_snapshot(\"vitest_output.txt\")"
 # fixture: vitest_output.txt
 # layer: 1
 # lines_removed: 0
-# applied_rules: ["ansi_strip(27 chars)"]
+# applied_rules: []
 # rtk_pre_filtered: false
 ---
  RUN  v1.6.0 /home/user/project
