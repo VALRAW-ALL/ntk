@@ -16,7 +16,7 @@
 
 </div>
 
-> **v0.2.29** — Four-layer compression pipeline. Local neural inference via Ollama / Candle / llama.cpp (optional, GPU-accelerated). Claude-compatible `cl100k_base` tokenizer. No cloud dependency.
+> **v0.3.0** — Four-layer compression pipeline. 6 new L1 stages (multi-cluster prefix factor, suffix factor, n-gram block dedup, package/version normalize, gradle classifier, single-digit normalize) lift the 34-fixture corpus average from 9.7% → 49.3%. Local neural inference via Ollama / Candle / llama.cpp (optional, GPU-accelerated). Claude-compatible `cl100k_base` tokenizer. No cloud dependency.
 
 > ⚠ **This project is an open initiative — it needs your help to evolve.**
 > NTK started as a one-person effort and the surface area (languages,
@@ -55,18 +55,23 @@ Every time Claude Code runs a Bash command, the output is fed back into the mode
 
 NTK intercepts those outputs via the `PostToolUse` hook, compresses them semantically, and returns a compact version that preserves all errors, warnings, and actionable information. Claude sees less noise, responds faster, and stays focused longer.
 
-**Typical savings** (measured on the shipped `bench/fixtures/` corpus at
-L1+L2 only; L3 adds another 30–80 pp on top when its token threshold
-triggers):
+**Typical savings** (measured on 34 deterministic fixtures in
+`bench/fixtures/`; L1+L2 only — L3 adds another 30–80 pp on top when
+its token threshold triggers):
 
 | Output type | Example | Savings |
 |---|---|---|
-| `cargo build --verbose` | 30+ `Compiling X v1.2.3` lines | ~67% |
-| `cargo test` (many passing) | 47 ok + 1 failure | ~68% |
-| Docker logs | Repeated warnings | ~84% |
-| `git diff` (many hunks) | Multi-file diff with index/+++/--- noise | ~29% |
-| `tsc` errors | 10 errors in 10 files with wavy underlines | ~25% |
-| Python Django stack trace | site-packages / gunicorn / asgiref frames | ~55% |
+| Repetitive logs | Docker / journal-style with timestamp + level | ~97% |
+| Stack traces (TS / Node / Ruby) | site-packages / framework frames collapsed | 83–92% |
+| Build tools (Gradle / Bazel / Cargo / Maven) | per-task prefix + version normalize | 55–90% |
+| `terraform plan` | N nearly-identical `+ resource` blocks | ~88% |
+| `pnpm install` | 30+ `+ pkg X.Y.Z` lines | ~78% |
+| Stack traces (Java / Python / Go / .NET) | hardcoded framework matrix | 57–63% |
+| `git diff` (many hunks) | Multi-file diff with index/+++/--- noise | ~57% |
+| `tsc` errors | wavy-underline stripped, dedup | ~33% |
+
+Aggregate across the 34-fixture corpus: **57.4%** token reduction
+(40 631 → 17 313 tokens), **49.3%** average per-fixture ratio.
 
 ---
 

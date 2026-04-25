@@ -456,19 +456,46 @@ NTK auto-detects the best inference backend at startup:
 | Error information preservation | 100% of fixtures |
 | Graceful fallback (no Ollama/GPU) | L1+L2 only, no crash |
 
-### Current measured ratios (L1+L2 only, 2026-04-19 baseline)
+### Current measured ratios (L1+L2 only, 2026-04-25 baseline, v0.3.0)
 
-These are the numbers the `bench_ratios_regression` test locks in.
-Update alongside any change to L1/L2 that affects them.
+34 deterministic fixtures in `bench/fixtures/`. Aggregate token reduction
+across the corpus: **57.4%** (40 631 → 17 313 tokens). Average per-fixture
+ratio: **49.3%**. The numbers below are what `bench_ratios_regression` locks
+in via each fixture's `.meta.json` floor.
 
-| Fixture | L1+L2 ratio |
-|---|---:|
-| `cargo_build_verbose` | 67% |
-| `cargo_test_failures` | 68% |
-| `docker_logs_repetitive` | 84% |
-| `git_diff_large` | 29% |
-| `tsc_errors_node_modules` | 25% |
-| `python_django_trace` | 55% |
+| Fixture | L1+L2 ratio | Stage that wins |
+|---|---:|---|
+| `docker_logs_repetitive` | 97% | template dedup + block dedup |
+| `typescript_react_trace` | 92% | stack-frame collapse |
+| `generic_long_log` | 91% | block dedup |
+| `gradle_build_verbose` | 90% | gradle classifier (`> Task :…`) |
+| `terraform_plan_apply` | 88% | block dedup + single-digit normalize |
+| `node_express_trace` | 83% | stack-frame collapse |
+| `ruby_rails_trace` | 83% | spec_loader |
+| `pnpm_install_large` | 78% | `<PKG> <VER>` normalize |
+| `cargo_build_verbose` | 76% | template dedup + multi-cluster prefix |
+| `fastapi_starlette_trace` | 73% | site-packages classifier |
+| `php_symfony_trace` | 69% | stack-frame collapse |
+| `cargo_test_failures` | 68% | test-failure extraction |
+| `kotlin_android_trace` | 63% | stack-frame collapse |
+| `stack_trace_java` | 62% | stack-frame collapse |
+| `python_django_trace` | 62% | site-packages classifier |
+| `csharp_aspnet_trace` | 61% | stack-frame collapse |
+| `dotnet_build_warnings` | 61% | suffix factor |
+| `go_panic_trace` | 57% | runtime.* classifier |
+| `git_diff_large` | 57% | multi-cluster prefix |
+| `maven_build_tests` | 55% | `[INFO]` prefix factor + block dedup |
+| `bazel_build_verbose` | 34% | multi-cluster prefix |
+| `webpack_stats` | 33% | suffix factor |
+| `tsc_errors_node_modules` | 33% | template dedup |
+| `docker_compose_logs` | 30% | per-service prefix |
+| `pytest_verbose_large` | 23% | template dedup |
+| `go_test_verbose` | 16% | template dedup |
+
+Eight fixtures sit at < 10% — they are baselines for the next round of
+classifier work (`elixir_phoenix_trace`, `kubectl_get_events`,
+`rspec_documentation`, `eslint_stylish`, `nextjs_build_routes`,
+`kubectl_describe_pod`, `swift_uikit_crash`, `already_short`).
 
 Fixtures covered only by the opt-in `spec_loader` (Elixir, Swift,
 kubectl, Ruby error-page format) have `min_ratio ≤ 0.05` at the

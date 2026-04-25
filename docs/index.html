@@ -746,12 +746,13 @@ rm -rf ~/.ntk           <span style="color:var(--color-texto-mutado)"># remove c
       <button class="metrics-tab" onclick="switchMetricsTab('combined')" data-i18n="met.tab_combined">NTK + RTK combined</button>
     </div>
 
-    <!-- NTK only panel — every row below is from bench/microbench.csv (v0.2.28) -->
+    <!-- NTK only panel — refreshed for v0.3.0 (2026-04-25) on 34 fixtures. -->
     <div class="metrics-panel active" id="panel-ntk">
       <p style="font-size:0.8125rem;color:var(--color-texto-mutado);margin-bottom:0.75rem">
-        Measured on 12 deterministic fixtures in <code style="font-family:var(--font-mono)">bench/fixtures/</code>.
-        All numbers are L1+L2 only (L3 not triggered in this run). Reproduce with
-        <code style="font-family:var(--font-mono)">pwsh bench/run_all.ps1</code> or <code style="font-family:var(--font-mono)">bash bench/run_all.sh</code>.
+        Measured on <strong>34 deterministic fixtures</strong> in <code style="font-family:var(--font-mono)">bench/fixtures/</code> with NTK <strong>v0.3.0</strong>.
+        All numbers are L1+L2 only (L3 not triggered in this run). Aggregate token reduction across the corpus:
+        <strong>57.4%</strong> (40 631 → 17 313 tokens). Average per-fixture ratio: <strong>49.3%</strong>.
+        Reproduce with <code style="font-family:var(--font-mono)">pwsh bench/run_all.ps1</code> or <code style="font-family:var(--font-mono)">bash bench/run_all.sh</code>.
       </p>
       <div class="savings-table-wrap fade-in">
         <div class="savings-tabs-wrap">
@@ -768,8 +769,32 @@ rm -rf ~/.ntk           <span style="color:var(--color-texto-mutado)"># remove c
               <tr>
                 <td><strong data-i18n="met.fx_repetitive">Repetitive logs</strong></td>
                 <td><span style="font-family:var(--font-mono);font-size:0.8125rem">docker_logs_repetitive</span></td>
+                <td><span class="range-badge">97%</span></td>
+                <td class="progress-cell"><div class="progress-bar-bg"><div class="progress-bar-fill" data-width="97"></div></div></td>
+              </tr>
+              <tr>
+                <td><strong data-i18n="met.fx_tsreact">TypeScript React trace</strong></td>
+                <td><span style="font-family:var(--font-mono);font-size:0.8125rem">typescript_react_trace</span></td>
                 <td><span class="range-badge">92%</span></td>
                 <td class="progress-cell"><div class="progress-bar-bg"><div class="progress-bar-fill" data-width="92"></div></div></td>
+              </tr>
+              <tr>
+                <td><strong data-i18n="met.fx_generic">Unstructured log</strong></td>
+                <td><span style="font-family:var(--font-mono);font-size:0.8125rem">generic_long_log</span></td>
+                <td><span class="range-badge">91%</span></td>
+                <td class="progress-cell"><div class="progress-bar-bg"><div class="progress-bar-fill" data-width="91"></div></div></td>
+              </tr>
+              <tr>
+                <td><strong>Gradle build</strong></td>
+                <td><span style="font-family:var(--font-mono);font-size:0.8125rem">gradle_build_verbose</span></td>
+                <td><span class="range-badge">90%</span></td>
+                <td class="progress-cell"><div class="progress-bar-bg"><div class="progress-bar-fill" data-width="90"></div></div></td>
+              </tr>
+              <tr>
+                <td><strong>Terraform plan</strong></td>
+                <td><span style="font-family:var(--font-mono);font-size:0.8125rem">terraform_plan_apply</span></td>
+                <td><span class="range-badge">88%</span></td>
+                <td class="progress-cell"><div class="progress-bar-bg"><div class="progress-bar-fill" data-width="88"></div></div></td>
               </tr>
               <tr>
                 <td><strong data-i18n="met.fx_node">Node.js trace</strong></td>
@@ -778,10 +803,52 @@ rm -rf ~/.ntk           <span style="color:var(--color-texto-mutado)"># remove c
                 <td class="progress-cell"><div class="progress-bar-bg"><div class="progress-bar-fill" data-width="83"></div></div></td>
               </tr>
               <tr>
+                <td><strong>Ruby on Rails trace</strong></td>
+                <td><span style="font-family:var(--font-mono);font-size:0.8125rem">ruby_rails_trace</span></td>
+                <td><span class="range-badge">83%</span></td>
+                <td class="progress-cell"><div class="progress-bar-bg"><div class="progress-bar-fill" data-width="83"></div></div></td>
+              </tr>
+              <tr>
+                <td><strong>pnpm install</strong></td>
+                <td><span style="font-family:var(--font-mono);font-size:0.8125rem">pnpm_install_large</span></td>
+                <td><span class="range-badge">78%</span></td>
+                <td class="progress-cell"><div class="progress-bar-bg"><div class="progress-bar-fill" data-width="78"></div></div></td>
+              </tr>
+              <tr>
+                <td><strong>cargo build</strong></td>
+                <td><span style="font-family:var(--font-mono);font-size:0.8125rem">cargo_build_verbose</span></td>
+                <td><span class="range-badge">76%</span></td>
+                <td class="progress-cell"><div class="progress-bar-bg"><div class="progress-bar-fill" data-width="76"></div></div></td>
+              </tr>
+              <tr>
+                <td><strong>FastAPI / Starlette trace</strong></td>
+                <td><span style="font-family:var(--font-mono);font-size:0.8125rem">fastapi_starlette_trace</span></td>
+                <td><span class="range-badge">73%</span></td>
+                <td class="progress-cell"><div class="progress-bar-bg"><div class="progress-bar-fill" data-width="73"></div></div></td>
+              </tr>
+              <tr>
+                <td><strong data-i18n="met.fx_php">PHP Symfony trace</strong></td>
+                <td><span style="font-family:var(--font-mono);font-size:0.8125rem">php_symfony_trace</span></td>
+                <td><span class="range-badge">69%</span></td>
+                <td class="progress-cell"><div class="progress-bar-bg"><div class="progress-bar-fill" data-width="69"></div></div></td>
+              </tr>
+              <tr>
                 <td><strong>cargo test</strong></td>
                 <td><span style="font-family:var(--font-mono);font-size:0.8125rem">cargo_test_failures</span></td>
                 <td><span class="range-badge">68%</span></td>
                 <td class="progress-cell"><div class="progress-bar-bg"><div class="progress-bar-fill" data-width="68"></div></div></td>
+              </tr>
+              <tr>
+                <td><strong data-i18n="met.fx_kotlin">Kotlin Android trace</strong></td>
+                <td><span style="font-family:var(--font-mono);font-size:0.8125rem">kotlin_android_trace</span></td>
+                <td><span class="range-badge">63%</span></td>
+                <td class="progress-cell"><div class="progress-bar-bg"><div class="progress-bar-fill" data-width="63"></div></div></td>
+              </tr>
+              <tr>
+                <td><strong data-i18n="met.fx_java">Java stack trace</strong></td>
+                <td><span style="font-family:var(--font-mono);font-size:0.8125rem">stack_trace_java</span></td>
+                <td><span class="range-badge">62%</span></td>
+                <td class="progress-cell"><div class="progress-bar-bg"><div class="progress-bar-fill" data-width="62"></div></div></td>
               </tr>
               <tr>
                 <td><strong data-i18n="met.fx_python">Python Django trace</strong></td>
@@ -790,64 +857,112 @@ rm -rf ~/.ntk           <span style="color:var(--color-texto-mutado)"># remove c
                 <td class="progress-cell"><div class="progress-bar-bg"><div class="progress-bar-fill" data-width="62"></div></div></td>
               </tr>
               <tr>
-                <td><strong data-i18n="met.fx_java">Java stack trace</strong></td>
-                <td><span style="font-family:var(--font-mono);font-size:0.8125rem">stack_trace_java</span></td>
-                <td><span class="range-badge">60%</span></td>
-                <td class="progress-cell"><div class="progress-bar-bg"><div class="progress-bar-fill" data-width="60"></div></div></td>
+                <td><strong data-i18n="met.fx_csharp">C# ASP.NET Core trace</strong></td>
+                <td><span style="font-family:var(--font-mono);font-size:0.8125rem">csharp_aspnet_trace</span></td>
+                <td><span class="range-badge">61%</span></td>
+                <td class="progress-cell"><div class="progress-bar-bg"><div class="progress-bar-fill" data-width="61"></div></div></td>
+              </tr>
+              <tr>
+                <td><strong>.NET build warnings</strong></td>
+                <td><span style="font-family:var(--font-mono);font-size:0.8125rem">dotnet_build_warnings</span></td>
+                <td><span class="range-badge">61%</span></td>
+                <td class="progress-cell"><div class="progress-bar-bg"><div class="progress-bar-fill" data-width="61"></div></div></td>
               </tr>
               <tr>
                 <td><strong data-i18n="met.fx_go">Go panic</strong></td>
                 <td><span style="font-family:var(--font-mono);font-size:0.8125rem">go_panic_trace</span></td>
-                <td><span class="range-badge">56%</span></td>
-                <td class="progress-cell"><div class="progress-bar-bg"><div class="progress-bar-fill" data-width="56"></div></div></td>
-              </tr>
-              <tr>
-                <td><strong data-i18n="met.fx_php">PHP Symfony trace</strong></td>
-                <td><span style="font-family:var(--font-mono);font-size:0.8125rem">php_symfony_trace</span></td>
-                <td><span class="range-badge">33%</span></td>
-                <td class="progress-cell"><div class="progress-bar-bg"><div class="progress-bar-fill" data-width="33"></div></div></td>
-              </tr>
-              <tr>
-                <td><strong data-i18n="met.fx_csharp">C# ASP.NET Core trace</strong></td>
-                <td><span style="font-family:var(--font-mono);font-size:0.8125rem">csharp_aspnet_trace</span></td>
-                <td><span class="range-badge" style="color:var(--color-texto-mutado)">N/A</span></td>
-                <td class="progress-cell"><div class="progress-bar-bg"></div></td>
-              </tr>
-              <tr>
-                <td><strong data-i18n="met.fx_tsreact">TypeScript React trace</strong></td>
-                <td><span style="font-family:var(--font-mono);font-size:0.8125rem">typescript_react_trace</span></td>
-                <td><span class="range-badge" style="color:var(--color-texto-mutado)">N/A</span></td>
-                <td class="progress-cell"><div class="progress-bar-bg"></div></td>
-              </tr>
-              <tr>
-                <td><strong data-i18n="met.fx_kotlin">Kotlin Android trace</strong></td>
-                <td><span style="font-family:var(--font-mono);font-size:0.8125rem">kotlin_android_trace</span></td>
-                <td><span class="range-badge" style="color:var(--color-texto-mutado)">N/A</span></td>
-                <td class="progress-cell"><div class="progress-bar-bg"></div></td>
-              </tr>
-              <tr>
-                <td><strong data-i18n="met.fx_generic">Unstructured log</strong></td>
-                <td><span style="font-family:var(--font-mono);font-size:0.8125rem">generic_long_log</span></td>
-                <td><span class="range-badge">14%</span></td>
-                <td class="progress-cell"><div class="progress-bar-bg"><div class="progress-bar-fill" data-width="14"></div></div></td>
-              </tr>
-              <tr>
-                <td><strong data-i18n="met.fx_ts">TypeScript errors</strong></td>
-                <td><span style="font-family:var(--font-mono);font-size:0.8125rem">tsc_errors_node_modules</span></td>
-                <td><span class="range-badge">10%</span></td>
-                <td class="progress-cell"><div class="progress-bar-bg"><div class="progress-bar-fill" data-width="10"></div></div></td>
+                <td><span class="range-badge">57%</span></td>
+                <td class="progress-cell"><div class="progress-bar-bg"><div class="progress-bar-fill" data-width="57"></div></div></td>
               </tr>
               <tr>
                 <td><strong data-i18n="met.fx_gitdiff">Git diff</strong></td>
                 <td><span style="font-family:var(--font-mono);font-size:0.8125rem">git_diff_large</span></td>
+                <td><span class="range-badge">57%</span></td>
+                <td class="progress-cell"><div class="progress-bar-bg"><div class="progress-bar-fill" data-width="57"></div></div></td>
+              </tr>
+              <tr>
+                <td><strong>Maven build</strong></td>
+                <td><span style="font-family:var(--font-mono);font-size:0.8125rem">maven_build_tests</span></td>
+                <td><span class="range-badge">55%</span></td>
+                <td class="progress-cell"><div class="progress-bar-bg"><div class="progress-bar-fill" data-width="55"></div></div></td>
+              </tr>
+              <tr>
+                <td><strong>Bazel build</strong></td>
+                <td><span style="font-family:var(--font-mono);font-size:0.8125rem">bazel_build_verbose</span></td>
+                <td><span class="range-badge">34%</span></td>
+                <td class="progress-cell"><div class="progress-bar-bg"><div class="progress-bar-fill" data-width="34"></div></div></td>
+              </tr>
+              <tr>
+                <td><strong>Webpack stats</strong></td>
+                <td><span style="font-family:var(--font-mono);font-size:0.8125rem">webpack_stats</span></td>
+                <td><span class="range-badge">33%</span></td>
+                <td class="progress-cell"><div class="progress-bar-bg"><div class="progress-bar-fill" data-width="33"></div></div></td>
+              </tr>
+              <tr>
+                <td><strong data-i18n="met.fx_ts">TypeScript errors</strong></td>
+                <td><span style="font-family:var(--font-mono);font-size:0.8125rem">tsc_errors_node_modules</span></td>
+                <td><span class="range-badge">33%</span></td>
+                <td class="progress-cell"><div class="progress-bar-bg"><div class="progress-bar-fill" data-width="33"></div></div></td>
+              </tr>
+              <tr>
+                <td><strong>docker compose logs</strong></td>
+                <td><span style="font-family:var(--font-mono);font-size:0.8125rem">docker_compose_logs</span></td>
+                <td><span class="range-badge">30%</span></td>
+                <td class="progress-cell"><div class="progress-bar-bg"><div class="progress-bar-fill" data-width="30"></div></div></td>
+              </tr>
+              <tr>
+                <td><strong>pytest verbose</strong></td>
+                <td><span style="font-family:var(--font-mono);font-size:0.8125rem">pytest_verbose_large</span></td>
+                <td><span class="range-badge">23%</span></td>
+                <td class="progress-cell"><div class="progress-bar-bg"><div class="progress-bar-fill" data-width="23"></div></div></td>
+              </tr>
+              <tr>
+                <td><strong>go test verbose</strong></td>
+                <td><span style="font-family:var(--font-mono);font-size:0.8125rem">go_test_verbose</span></td>
+                <td><span class="range-badge">16%</span></td>
+                <td class="progress-cell"><div class="progress-bar-bg"><div class="progress-bar-fill" data-width="16"></div></div></td>
+              </tr>
+              <tr>
+                <td><strong>Next.js build routes</strong></td>
+                <td><span style="font-family:var(--font-mono);font-size:0.8125rem">nextjs_build_routes</span></td>
                 <td><span class="range-badge">9%</span></td>
                 <td class="progress-cell"><div class="progress-bar-bg"><div class="progress-bar-fill" data-width="9"></div></div></td>
               </tr>
               <tr>
-                <td><strong>cargo build</strong></td>
-                <td><span style="font-family:var(--font-mono);font-size:0.8125rem">cargo_build_verbose</span></td>
-                <td><span class="range-badge">3%</span></td>
-                <td class="progress-cell"><div class="progress-bar-bg"><div class="progress-bar-fill" data-width="3"></div></div></td>
+                <td><strong>Elixir Phoenix trace</strong></td>
+                <td><span style="font-family:var(--font-mono);font-size:0.8125rem">elixir_phoenix_trace</span></td>
+                <td><span class="range-badge">7%</span></td>
+                <td class="progress-cell"><div class="progress-bar-bg"><div class="progress-bar-fill" data-width="7"></div></div></td>
+              </tr>
+              <tr>
+                <td><strong>kubectl get events</strong></td>
+                <td><span style="font-family:var(--font-mono);font-size:0.8125rem">kubectl_get_events</span></td>
+                <td><span class="range-badge">6%</span></td>
+                <td class="progress-cell"><div class="progress-bar-bg"><div class="progress-bar-fill" data-width="6"></div></div></td>
+              </tr>
+              <tr>
+                <td><strong>RSpec documentation</strong></td>
+                <td><span style="font-family:var(--font-mono);font-size:0.8125rem">rspec_documentation</span></td>
+                <td><span class="range-badge">2%</span></td>
+                <td class="progress-cell"><div class="progress-bar-bg"><div class="progress-bar-fill" data-width="2"></div></div></td>
+              </tr>
+              <tr>
+                <td><strong>ESLint stylish</strong></td>
+                <td><span style="font-family:var(--font-mono);font-size:0.8125rem">eslint_stylish</span></td>
+                <td><span class="range-badge">2%</span></td>
+                <td class="progress-cell"><div class="progress-bar-bg"><div class="progress-bar-fill" data-width="2"></div></div></td>
+              </tr>
+              <tr>
+                <td><strong>kubectl describe pod</strong></td>
+                <td><span style="font-family:var(--font-mono);font-size:0.8125rem">kubectl_describe_pod</span></td>
+                <td><span class="range-badge" style="color:var(--color-texto-mutado)">spec_loader only</span></td>
+                <td class="progress-cell"><div class="progress-bar-bg"></div></td>
+              </tr>
+              <tr>
+                <td><strong>Swift / UIKit crash</strong></td>
+                <td><span style="font-family:var(--font-mono);font-size:0.8125rem">swift_uikit_crash</span></td>
+                <td><span class="range-badge" style="color:var(--color-texto-mutado)">spec_loader only</span></td>
+                <td class="progress-cell"><div class="progress-bar-bg"></div></td>
               </tr>
             </tbody>
           </table>
