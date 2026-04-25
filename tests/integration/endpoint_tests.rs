@@ -62,7 +62,10 @@ async fn test_compress_endpoint_returns_compressed() {
     // filter_test_failures, which is an L1 stage. Accept either L1 or L2
     // — what we care about is that L3 was not invoked.
     let layer = body["layer"].as_u64().expect("layer field");
-    assert!(layer == 1 || layer == 2, "unexpected winning layer: {layer}");
+    assert!(
+        layer == 1 || layer == 2,
+        "unexpected winning layer: {layer}"
+    );
     // Compressed output must be shorter than original.
     let compressed = body["compressed"].as_str().unwrap();
     assert!(compressed.len() < output.len(), "expected compression");

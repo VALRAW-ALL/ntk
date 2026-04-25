@@ -379,9 +379,8 @@ static RE_PLAIN_INT: Lazy<Regex> =
 // trailing 5-char alphanumeric pod hash into `<POD>`. Anchored to `<HEX>-`
 // so it cannot fire on arbitrary 5-char words like "hello".
 #[allow(clippy::expect_used)]
-static RE_REPLICA_POD: Lazy<Regex> = Lazy::new(|| {
-    Regex::new(r"<HEX>-[a-z0-9]{5}\b").expect("replica pod regex must compile")
-});
+static RE_REPLICA_POD: Lazy<Regex> =
+    Lazy::new(|| Regex::new(r"<HEX>-[a-z0-9]{5}\b").expect("replica pod regex must compile"));
 
 // Package + semver inline: `react 18.2.0`, `@types/node 20.11.30`,
 // `Compiling foo v0.1.0`. Replaces both the identifier AND the version with
@@ -941,8 +940,7 @@ fn factor_common_suffix(input: &str) -> String {
     clusters.sort_by_key(|s| std::cmp::Reverse(s.len()));
 
     let mut header_emitted: Vec<bool> = vec![false; clusters.len()];
-    let mut out: Vec<String> =
-        Vec::with_capacity(lines.len().saturating_add(clusters.len()));
+    let mut out: Vec<String> = Vec::with_capacity(lines.len().saturating_add(clusters.len()));
 
     for line in &lines {
         if is_already_processed_marker(line) {
@@ -1005,7 +1003,10 @@ fn collapse_repeated_blocks(input: &str) -> String {
 
     // Pre-compute normalized templates; same shape ↔ block-equivalent.
     let templates: Vec<String> = lines.iter().map(|l| normalize_to_template(l)).collect();
-    let processed: Vec<bool> = lines.iter().map(|l| is_already_processed_marker(l)).collect();
+    let processed: Vec<bool> = lines
+        .iter()
+        .map(|l| is_already_processed_marker(l))
+        .collect();
 
     let mut out: Vec<String> = Vec::with_capacity(lines.len());
     let mut i = 0usize;
@@ -1048,10 +1049,7 @@ fn collapse_repeated_blocks(input: &str) -> String {
             if count >= BLOCK_MIN_RUN {
                 // (count-1) blocks of n lines each are dropped; subtract 1
                 // for the marker line we add.
-                let savings = count
-                    .saturating_sub(1)
-                    .saturating_mul(n)
-                    .saturating_sub(1);
+                let savings = count.saturating_sub(1).saturating_mul(n).saturating_sub(1);
                 if savings > best_savings {
                     best_savings = savings;
                     best_n = n;
@@ -1173,8 +1171,7 @@ fn factor_common_prefix(input: &str) -> String {
     clusters.sort_by_key(|p| std::cmp::Reverse(p.len()));
 
     let mut header_emitted: Vec<bool> = vec![false; clusters.len()];
-    let mut out: Vec<String> =
-        Vec::with_capacity(lines.len().saturating_add(clusters.len()));
+    let mut out: Vec<String> = Vec::with_capacity(lines.len().saturating_add(clusters.len()));
 
     for line in &lines {
         if is_already_processed_marker(line) {

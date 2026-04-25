@@ -131,12 +131,12 @@ impl MetricsStore {
             // fall back to attributing everything to the layer that won.
             match (r.tokens_after_l1, r.tokens_after_l2) {
                 (Some(after_l1), Some(after_l2)) => {
-                    total_saved_l1 = total_saved_l1
-                        .saturating_add(r.original_tokens.saturating_sub(after_l1));
+                    total_saved_l1 =
+                        total_saved_l1.saturating_add(r.original_tokens.saturating_sub(after_l1));
                     total_saved_l2 =
                         total_saved_l2.saturating_add(after_l1.saturating_sub(after_l2));
-                    total_saved_l3 = total_saved_l3
-                        .saturating_add(after_l2.saturating_sub(r.compressed_tokens));
+                    total_saved_l3 =
+                        total_saved_l3.saturating_add(after_l2.saturating_sub(r.compressed_tokens));
                 }
                 _ => {
                     let saved = r.original_tokens.saturating_sub(r.compressed_tokens);
