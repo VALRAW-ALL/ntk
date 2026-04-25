@@ -998,6 +998,16 @@ async fn handle_compress(
         2u8
     };
 
+    // RTK pre-filtering: trust the command name (`rtk <cmd>`) as the
+    // ground truth instead of L1's heuristic, which only catches the one
+    // RTK output format that emits `[×N]` markers. Most RTK rules
+    // (compact git, grep grouped by file, gh field selection, etc.)
+    // produce no `[×` so the heuristic alone misses ~90% of real RTK
+    // invocations. The OR keeps the heuristic as a safety net for cases
+    // where the user shells out to RTK without prefixing the bash
+    // command — e.g. `bash -c 'rtk foo'` arriving as command="bash".
+    let rtk_pre_filtered = cmd_base == "rtk" || l1.rtk_pre_filtered;
+
     // Record metrics.
     let record = CompressionRecord {
         command,
@@ -1008,7 +1018,7 @@ async fn handle_compress(
         tokens_after_l2: Some(tokens_after_l2),
         layer_used: winning_layer,
         latency_ms,
-        rtk_pre_filtered: l1.rtk_pre_filtered,
+        rtk_pre_filtered,
         timestamp: Utc::now(),
     };
     if let Ok(mut m) = state.metrics.lock() {
