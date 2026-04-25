@@ -983,6 +983,21 @@ async fn handle_compress(
         saved as f32 / original_tokens as f32
     };
 
+    // Re-attribute `layer_used` from "highest stage reached" (always 2 or 3
+    // because L1 can never be the terminal stage) to "stage that contributed
+    // the most savings". This is what users actually want from the
+    // dashboard's Layer Distribution chart — without it L1 always shows 0.
+    let l1_saved = original_tokens.saturating_sub(tokens_after_l1);
+    let l2_saved = tokens_after_l1.saturating_sub(tokens_after_l2);
+    let l3_saved = tokens_after_l2.saturating_sub(compressed_tokens);
+    let winning_layer = if layer_used == 3 && l3_saved >= l1_saved && l3_saved >= l2_saved {
+        3u8
+    } else if l1_saved > l2_saved {
+        1u8
+    } else {
+        2u8
+    };
+
     // Record metrics.
     let record = CompressionRecord {
         command,
@@ -991,7 +1006,7 @@ async fn handle_compress(
         compressed_tokens,
         tokens_after_l1: Some(tokens_after_l1),
         tokens_after_l2: Some(tokens_after_l2),
-        layer_used,
+        layer_used: winning_layer,
         latency_ms,
         rtk_pre_filtered: l1.rtk_pre_filtered,
         timestamp: Utc::now(),
@@ -1013,7 +1028,7 @@ async fn handle_compress(
     let response = CompressResponse {
         compressed: output.clone(),
         ratio,
-        layer: layer_used,
+        layer: winning_layer,
         tokens_before: original_tokens,
         tokens_after: compressed_tokens,
         tokens_after_l1: Some(tokens_after_l1),
@@ -1038,7 +1053,7 @@ async fn handle_compress(
             &cwd,
             original_tokens,
             compressed_tokens,
-            layer_used,
+            winning_layer,
             &output,
         );
         security::append_audit_record(&path, &record);
@@ -1054,7 +1069,7 @@ async fn handle_compress(
             input: req.output.clone(),
             after_l1: l1.output.clone(),
             after_l2: l2.output.clone(),
-            after_l3: if layer_used == 3 {
+            after_l3: if tokens_after_l3.is_some() {
                 Some(output.clone())
             } else {
                 None
@@ -1070,7 +1085,7 @@ async fn handle_compress(
             latency_ms_l1: l1_latency,
             latency_ms_l2: l2_latency,
             latency_ms_l3: l3_latency,
-            layer_used,
+            layer_used: winning_layer,
         };
         tokio::spawn(async move {
             if let Err(e) = write_compression_log(&log_payload) {
