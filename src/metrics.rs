@@ -14,6 +14,15 @@ pub struct CompressionRecord {
     pub output_type: OutputType,
     pub original_tokens: usize,
     pub compressed_tokens: usize,
+    /// Token counts at each intermediate stage. Enables the dashboard to
+    /// attribute savings to the specific layer that produced them, rather
+    /// than only showing the final compressed_tokens. `tokens_after_l1`
+    /// and `tokens_after_l2` are always populated for new records;
+    /// `None` only appears on legacy rows loaded from pre-migration DBs.
+    #[serde(default)]
+    pub tokens_after_l1: Option<usize>,
+    #[serde(default)]
+    pub tokens_after_l2: Option<usize>,
     /// Which layer produced the final output: 1, 2, or 3.
     pub layer_used: u8,
     pub latency_ms: u64,
@@ -42,6 +51,12 @@ pub struct SessionSummary {
     pub total_original_tokens: usize,
     pub total_compressed_tokens: usize,
     pub total_tokens_saved: usize,
+    /// Incremental tokens saved by each layer. `saved_l1 + saved_l2 +
+    /// saved_l3 == total_tokens_saved` (modulo legacy rows missing the
+    /// per-stage counts, which contribute only to the L2/L3 bucket).
+    pub total_saved_l1: usize,
+    pub total_saved_l2: usize,
+    pub total_saved_l3: usize,
     pub average_ratio: f32,
     /// Distribution: how many compressions used each layer.
     pub layer_counts: [usize; 3],
@@ -86,6 +101,9 @@ impl MetricsStore {
                 total_original_tokens: 0,
                 total_compressed_tokens: 0,
                 total_tokens_saved: 0,
+                total_saved_l1: 0,
+                total_saved_l2: 0,
+                total_saved_l3: 0,
                 average_ratio: 0.0,
                 layer_counts: [0; 3],
                 rtk_pre_filtered_count: 0,
@@ -95,6 +113,9 @@ impl MetricsStore {
         let mut total_original_tokens = 0usize;
         let mut total_compressed_tokens = 0usize;
         let mut total_tokens_saved = 0usize;
+        let mut total_saved_l1 = 0usize;
+        let mut total_saved_l2 = 0usize;
+        let mut total_saved_l3 = 0usize;
         let mut ratio_sum = 0.0f32;
         let mut layer_counts = [0usize; 3];
         let mut rtk_pre_filtered_count = 0usize;
@@ -105,6 +126,27 @@ impl MetricsStore {
             total_tokens_saved = total_tokens_saved
                 .saturating_add(r.original_tokens.saturating_sub(r.compressed_tokens));
             ratio_sum += r.ratio();
+
+            // Per-layer incremental savings. Legacy rows (no tokens_after_l1)
+            // fall back to attributing everything to the layer that won.
+            match (r.tokens_after_l1, r.tokens_after_l2) {
+                (Some(after_l1), Some(after_l2)) => {
+                    total_saved_l1 = total_saved_l1
+                        .saturating_add(r.original_tokens.saturating_sub(after_l1));
+                    total_saved_l2 =
+                        total_saved_l2.saturating_add(after_l1.saturating_sub(after_l2));
+                    total_saved_l3 = total_saved_l3
+                        .saturating_add(after_l2.saturating_sub(r.compressed_tokens));
+                }
+                _ => {
+                    let saved = r.original_tokens.saturating_sub(r.compressed_tokens);
+                    match r.layer_used {
+                        1 => total_saved_l1 = total_saved_l1.saturating_add(saved),
+                        3 => total_saved_l3 = total_saved_l3.saturating_add(saved),
+                        _ => total_saved_l2 = total_saved_l2.saturating_add(saved),
+                    }
+                }
+            }
 
             // layer_used is 1-indexed; clamp to valid range.
             let idx = (r.layer_used as usize).saturating_sub(1).min(2);
@@ -123,6 +165,9 @@ impl MetricsStore {
             total_original_tokens,
             total_compressed_tokens,
             total_tokens_saved,
+            total_saved_l1,
+            total_saved_l2,
+            total_saved_l3,
             average_ratio,
             layer_counts,
             rtk_pre_filtered_count,
@@ -174,6 +219,30 @@ impl MetricsDb {
         .execute(&pool)
         .await
         .context("creating compression_records table")?;
+
+        // Idempotent schema migration: add per-stage token counts so the
+        // dashboard can show incremental savings for L1 (pre-filter) and
+        // L2 (tokenizer) separately. Checking PRAGMA keeps this portable
+        // to older SQLite versions that lack `ADD COLUMN IF NOT EXISTS`.
+        let existing: Vec<String> = sqlx::query("PRAGMA table_info(compression_records)")
+            .fetch_all(&pool)
+            .await
+            .context("reading compression_records columns")?
+            .iter()
+            .map(|r| r.get::<String, _>("name"))
+            .collect();
+        if !existing.iter().any(|c| c == "tokens_after_l1") {
+            sqlx::query("ALTER TABLE compression_records ADD COLUMN tokens_after_l1 INTEGER")
+                .execute(&pool)
+                .await
+                .context("adding tokens_after_l1 column")?;
+        }
+        if !existing.iter().any(|c| c == "tokens_after_l2") {
+            sqlx::query("ALTER TABLE compression_records ADD COLUMN tokens_after_l2 INTEGER")
+                .execute(&pool)
+                .await
+                .context("adding tokens_after_l2 column")?;
+        }
 
         // Layer 3 inference cache. Key is a SHA-256 hex digest over
         // (l2_output + context_prefix + model + prompt_format). Value is
@@ -327,8 +396,9 @@ impl MetricsDb {
         sqlx::query(
             "INSERT INTO compression_records
                 (command, output_type, original_tokens, compressed_tokens,
-                 layer_used, latency_ms, rtk_pre_filtered)
-             VALUES (?, ?, ?, ?, ?, ?, ?)",
+                 layer_used, latency_ms, rtk_pre_filtered,
+                 tokens_after_l1, tokens_after_l2)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
         )
         .bind(&record.command)
         .bind(&output_type)
@@ -337,6 +407,8 @@ impl MetricsDb {
         .bind(record.layer_used as i64)
         .bind(record.latency_ms as i64)
         .bind(record.rtk_pre_filtered)
+        .bind(record.tokens_after_l1.map(|v| v as i64))
+        .bind(record.tokens_after_l2.map(|v| v as i64))
         .execute(&self.pool)
         .await
         .context("inserting compression record")?;
@@ -548,6 +620,8 @@ mod tests {
             output_type: OutputType::Test,
             original_tokens: original,
             compressed_tokens: compressed,
+            tokens_after_l1: None,
+            tokens_after_l2: None,
             layer_used: layer,
             latency_ms: 5,
             rtk_pre_filtered: rtk,

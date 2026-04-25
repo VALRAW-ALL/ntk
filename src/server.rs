@@ -618,6 +618,12 @@ const DASHBOARD_HTML: &str = r##"<!doctype html>
       const layerTotal = layers[0] + layers[1] + layers[2] || 1;
       const pct = i => Math.round((layers[i] / layerTotal) * 100);
 
+      const savedL1 = d.total_saved_l1 || 0;
+      const savedL2 = d.total_saved_l2 || 0;
+      const savedL3 = d.total_saved_l3 || 0;
+      const savedTotal = savedL1 + savedL2 + savedL3 || 1;
+      const savedPct = v => Math.round((v / savedTotal) * 100);
+
       content.innerHTML = `
         <div class="kpi-grid">
           <div class="kpi">
@@ -642,7 +648,7 @@ const DASHBOARD_HTML: &str = r##"<!doctype html>
           </div>
         </div>
         <section>
-          <h2>Layer Distribution</h2>
+          <h2>Layer Distribution <small style="font-weight:400;opacity:.6">(by winning layer)</small></h2>
           <div class="layer-bar">
             ${pct(0) > 0 ? `<span class="l1" style="width:${pct(0)}%" title="L1: fast filter">L1 ${pct(0)}%</span>` : ''}
             ${pct(1) > 0 ? `<span class="l2" style="width:${pct(1)}%" title="L2: tokenizer-aware">L2 ${pct(1)}%</span>` : ''}
@@ -652,6 +658,19 @@ const DASHBOARD_HTML: &str = r##"<!doctype html>
             <span><span class="swatch" style="background: var(--l1)"></span>L1 fast filter · ${layers[0].toLocaleString()}</span>
             <span><span class="swatch" style="background: var(--l2)"></span>L2 tokenizer · ${layers[1].toLocaleString()}</span>
             <span><span class="swatch" style="background: var(--l3)"></span>L3 inference · ${layers[2].toLocaleString()}</span>
+          </div>
+        </section>
+        <section>
+          <h2>Tokens Saved by Layer <small style="font-weight:400;opacity:.6">(incremental contribution)</small></h2>
+          <div class="layer-bar">
+            ${savedPct(savedL1) > 0 ? `<span class="l1" style="width:${savedPct(savedL1)}%" title="L1 incremental savings">L1 ${savedPct(savedL1)}%</span>` : ''}
+            ${savedPct(savedL2) > 0 ? `<span class="l2" style="width:${savedPct(savedL2)}%" title="L2 incremental savings">L2 ${savedPct(savedL2)}%</span>` : ''}
+            ${savedPct(savedL3) > 0 ? `<span class="l3" style="width:${savedPct(savedL3)}%" title="L3 incremental savings">L3 ${savedPct(savedL3)}%</span>` : ''}
+          </div>
+          <div class="layer-legend">
+            <span><span class="swatch" style="background: var(--l1)"></span>L1 · ${savedL1.toLocaleString()} tokens</span>
+            <span><span class="swatch" style="background: var(--l2)"></span>L2 · ${savedL2.toLocaleString()} tokens</span>
+            <span><span class="swatch" style="background: var(--l3)"></span>L3 · ${savedL3.toLocaleString()} tokens</span>
           </div>
         </section>`;
     }
@@ -970,6 +989,8 @@ async fn handle_compress(
         output_type,
         original_tokens,
         compressed_tokens,
+        tokens_after_l1: Some(tokens_after_l1),
+        tokens_after_l2: Some(tokens_after_l2),
         layer_used,
         latency_ms,
         rtk_pre_filtered: l1.rtk_pre_filtered,

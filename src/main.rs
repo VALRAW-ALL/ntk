@@ -1049,6 +1049,8 @@ fn run_graph() -> Result<()> {
                 output_type: ntk::detector::OutputType::Generic,
                 original_tokens: r.original_tokens,
                 compressed_tokens: r.compressed_tokens,
+                tokens_after_l1: None,
+                tokens_after_l2: None,
                 layer_used: r.layer_used,
                 latency_ms: r.latency_ms,
                 rtk_pre_filtered: false,
