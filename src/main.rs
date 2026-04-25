@@ -1075,65 +1075,69 @@ fn run_graph() -> Result<()> {
 }
 
 fn run_gain() -> Result<()> {
-    let url = match daemon_url() {
-        Ok(u) => u,
-        Err(_) => {
-            println!("NTK: 0 tokens saved across 0 compressions (0% avg)");
-            println!("[ntk gain] daemon unreachable — start with: ntk start");
-            return Ok(());
-        }
-    };
+    // `ntk gain` reports the FULL SQLite history (every compression ever
+    // recorded), independent of whether the daemon is currently running.
+    // Reading the DB directly keeps the metric stable across daemon
+    // restarts and across machines that share `~/.ntk/metrics.db`.
+    let cwd = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
+    let config = ntk::config::load(&cwd).unwrap_or_default();
+    let db_path = config.storage_path_expanded();
 
-    // Fetch all session records for the bar chart.
-    let records: Vec<ntk::metrics::CompressionRecord> = match ureq_get(&format!("{url}/records")) {
-        Ok(body) => serde_json::from_str(&body).unwrap_or_default(),
-        Err(_) => vec![],
-    };
-
-    if records.is_empty() {
-        // No data yet — try to fetch a summary from the daemon.
-        match ureq_get(&format!("{url}/metrics")) {
-            Ok(response) => {
-                if let Ok(val) = serde_json::from_str::<serde_json::Value>(&response) {
-                    let saved = val["total_tokens_saved"].as_u64().unwrap_or(0);
-                    let calls = val["total_compressions"].as_u64().unwrap_or(0);
-                    let pct = val["average_ratio"].as_f64().unwrap_or(0.0) * 100.0;
-                    println!(
-                        "NTK: {saved} tokens saved across {calls} compressions ({pct:.0}% avg)"
-                    );
-                } else {
-                    println!("NTK: 0 tokens saved across 0 compressions (0% avg)");
-                    println!("[ntk gain] daemon unreachable — start with: ntk start");
-                }
-            }
-            Err(_) => {
-                // Daemon not running — print the zero-state message.
-                println!("NTK: 0 tokens saved across 0 compressions (0% avg)");
-                println!("[ntk gain] daemon unreachable — start with: ntk start");
-            }
-        }
+    if !db_path.exists() {
+        println!("NTK: 0 tokens saved across 0 compressions (0% avg)");
+        println!("[ntk gain] no metrics database yet — run a few commands through the hook first");
         return Ok(());
     }
 
-    // Show the bar chart (includes footer with totals).
-    ntk::output::graph::print_bar_chart(&records);
+    // Bar chart caps at ~50 rows for legibility; the summary still
+    // aggregates the entire history.
+    const CHART_ROWS: usize = 50;
+    // `summary(N days)` is the only DB API for aggregates; pass a
+    // century to cover effectively all rows.
+    const ALL_HISTORY_DAYS: u32 = 36500;
 
-    // RTK-compatible one-liner below the chart (for piping/scripting).
-    let saved: u64 = records
-        .iter()
-        .map(|r| r.original_tokens.saturating_sub(r.compressed_tokens) as u64)
-        .sum();
-    let calls = records.len() as u64;
-    let avg_pct = if records.iter().map(|r| r.original_tokens).sum::<usize>() > 0 {
-        let orig: u64 = records.iter().map(|r| r.original_tokens as u64).sum();
-        saved as f64 / orig as f64 * 100.0
-    } else {
-        0.0
-    };
-    println!();
-    println!("NTK: {saved} tokens saved across {calls} compressions ({avg_pct:.0}% avg)");
+    let rt = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()?;
+    rt.block_on(async {
+        let db = ntk::metrics::MetricsDb::init(&db_path).await?;
+        let rows = db.history(CHART_ROWS).await?;
+        let total = db.records_size().await?;
+        let summary = db.summary(ALL_HISTORY_DAYS).await?;
 
-    Ok(())
+        let records: Vec<ntk::metrics::CompressionRecord> = rows
+            .iter()
+            .map(|r| ntk::metrics::CompressionRecord {
+                command: r.command.clone(),
+                output_type: ntk::detector::OutputType::Generic,
+                original_tokens: r.original_tokens,
+                compressed_tokens: r.compressed_tokens,
+                tokens_after_l1: None,
+                tokens_after_l2: None,
+                layer_used: r.layer_used,
+                latency_ms: r.latency_ms,
+                rtk_pre_filtered: false,
+                timestamp: chrono::Utc::now(),
+            })
+            .collect();
+
+        if !records.is_empty() {
+            ntk::output::graph::print_bar_chart(&records);
+            if total > records.len() {
+                let extra = total.saturating_sub(records.len());
+                println!("(+{extra} earlier compressions not shown in chart)");
+            }
+            println!();
+        }
+
+        // RTK-compatible one-liner — full-history aggregate.
+        let pct = (summary.average_ratio * 100.0).round();
+        println!(
+            "NTK: {} tokens saved across {} compressions ({pct:.0}% avg)",
+            summary.total_tokens_saved, summary.total_compressions
+        );
+        Ok::<(), anyhow::Error>(())
+    })
 }
 
 fn run_dashboard() -> Result<()> {
